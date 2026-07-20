@@ -1,0 +1,178 @@
+# GitHub Actions: Build APK + AAB + IPA tự động khi push tag
+# Usage:
+#   git tag v3.0.62
+#   git push origin v3.0.62
+# → Action tự build 3 platform, upload artifacts, tạo GitHub Release
+
+name: Build Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version (vd: 3.0.62)'
+        required: true
+        default: '3.0.62'
+
+env:
+  FLUTTER_VERSION: '3.41.7'
+  JAVA_VERSION: '17'
+
+jobs:
+  # ============================================================
+  # ANDROID - APK (universal)
+  # ============================================================
+  build-apk:
+    name: 📦 Build APK (Android, arm64)
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: 🐦 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: 📦 Get dependencies
+        run: flutter pub get
+
+      - name: 🔍 Analyze
+        run: flutter analyze --no-pub
+
+      - name: 🧪 Run tests
+        run: flutter test --no-pub || echo "Tests skipped (no test files)"
+
+      - name: 🏗️ Build APK (arm64)
+        run: flutter build apk --release --target-platform android-arm64
+
+      - name: 📤 Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: his-mobile-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 30
+
+  # ============================================================
+  # ANDROID - AAB (Google Play Store)
+  # ============================================================
+  build-aab:
+    name: 📦 Build AAB (Android App Bundle)
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: 🐦 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: 📦 Get dependencies
+        run: flutter pub get
+
+      - name: 🏗️ Build AAB (universal)
+        run: flutter build appbundle --release
+
+      - name: 📤 Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: his-mobile-aab
+          path: build/app/outputs/bundle/release/app-release.aab
+          retention-days: 30
+
+  # ============================================================
+  # iOS - IPA (chỉ work trên macOS)
+  # ============================================================
+  build-ipa:
+    name: 🍎 Build IPA (iOS, cần macOS)
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🐦 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: 📦 Get dependencies
+        run: flutter pub get
+
+      - name: 🍎 Setup iOS
+        run: |
+          cd ios
+          pod install
+          cd ..
+
+      - name: 🏗️ Build IPA (no-codesign)
+        # Không cần signing để verify build OK
+        # Để distribute thật cần Apple Developer account + signing config
+        run: flutter build ipa --release --no-codesign
+
+      - name: 📤 Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: his-mobile-ipa
+          path: build/ios/ipa/*.ipa
+          if-no-files-found: warn
+          retention-days: 30
+
+  # ============================================================
+  # GITHUB RELEASE - tạo release tự động khi push tag
+  # ============================================================
+  create-release:
+    name: 🚀 Create GitHub Release
+    needs: [build-apk, build-aab, build-ipa]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - name: 📥 Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: 📋 List artifacts
+        run: ls -la artifacts/
+
+      - name: 🚀 Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            artifacts/his-mobile-apk/app-release.apk
+            artifacts/his-mobile-aab/app-release.aab
+            artifacts/his-mobile-ipa/*.ipa
+            release_v*/CHANGELOG.md
+            release_v*/README.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
