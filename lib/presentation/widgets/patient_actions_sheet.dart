@@ -5,9 +5,24 @@
 // BỎ hết: Lập phiếu, Tạo phiếu khám, Phiếu đã lưu, Thao tác nhanh 16 chức năng,
 //         Chuyển khoa, Xuất viện, Tiện ích (4 grid)
 // Mục đích: 15 chức năng Y tế số đã cover TẤT CẢ nhu cầu tạo phiếu
+//
+// v3.0.75: Thêm tile "Mở trên EMR web" - VPN detect:
+//   - VPN ON  → http://172.16.9.6/emr/treatment-detail?code={code}
+//   - VPN OFF → http://thongke.benhvienninhthuan.vn:8080/emr/index/search?treatment_code={code}
+// v3.0.78: Thêm tile "Lịch sử điều trị" - mở TreatmentHistoryScreen
+//   - Gọi 5 API HIS Pro: HisTreatment/GetLView, HisDepartmentTran/GetView, HisServiceReq/Get,
+//     HisSereServ/GetDHisSereServ2, HisServiceReq/GetDynamic
+//   - Cần HIS Pro token (Settings → EMR Sync nếu thiếu/hết hạn)
+// v3.0.79: Thêm tile "Đính kèm tài liệu" - mở AttachDocumentScreen
+//   - Gọi api/EmrDocument/CreateWithFile (port 1417) để upload ảnh/file lên EMR BN
+//   - Workflow giống HIS desktop "Chi tiết BA → Đính kèm" (theo note2.docx)
 import 'package:flutter/material.dart';
 import 'package:his_mobile/data/models/y_te_so_feature.dart';
 import 'package:his_mobile/data/models/y_te_so_router.dart';
+import 'package:his_mobile/presentation/screens/attach_document_screen.dart';
+import 'package:his_mobile/presentation/screens/treatment_history_screen.dart';
+// v3.0.90: BỎ import y_te_screen.dart - menu Chức năng Y tế đã xóa
+import 'package:his_mobile/presentation/screens/y_te_so_screen.dart';
 import 'package:his_mobile/presentation/screens/xem_benh_an_screen.dart';
 import 'package:his_mobile/presentation/widgets/user_header.dart';
 
@@ -36,6 +51,56 @@ class PatientActionsSheet extends StatelessWidget {
       builder: (_) => XemBenhAnScreen(patient: patient),
     ));
   }
+
+  /// v3.0.78: Mở màn hình Lịch sử điều trị (3-pane: list lần khám → khoa → DV/thuốc)
+  void _openLichSuDieuTri(BuildContext context) {
+    if (_patientCode.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('BN chưa có mã (TDL_PATIENT_CODE)')),
+      );
+      return;
+    }
+    Navigator.push(context, MaterialPageRoute(
+      builder: (_) => TreatmentHistoryScreen(patient: patient),
+    ));
+  }
+
+  /// v3.0.79: Mở màn hình Đính kèm tài liệu (ảnh/file → EMR BN)
+  /// Yêu cầu: treatment_code (mã điều trị), HIS Pro token (EMR port 1417)
+  void _openDinhKemTaiLieu(BuildContext context) {
+    if (_treatmentCode.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('BN chưa có mã điều trị - không thể đính kèm')),
+      );
+      return;
+    }
+    Navigator.push(context, MaterialPageRoute(
+      builder: (_) => AttachDocumentScreen(patient: patient),
+    ));
+  }
+
+  /// v3.0.75: Mở EMR trên web/browser
+  /// - VPN ON  → LAN EMR (172.16.9.6)
+  /// v3.0.83: Mở Y Tế Số (Bộ Y tế) - tích hợp native, không cần VPN
+  /// API: http://113.163.187.3:3000 (public) - 50+ endpoints đã khám phá
+  Future<void> _openYTeSo(BuildContext context) async {
+    if (_treatmentCode.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('BN chưa có mã điều trị')),
+      );
+      return;
+    }
+    if (!context.mounted) return;
+    Navigator.push(context, MaterialPageRoute(
+      builder: (_) => YTeSoScreen(
+        treatmentCode: _treatmentCode,
+        patientName: _patientName,
+        patientCode: _patientCode,
+      ),
+    ));
+  }
+
+  // v3.0.90: BỎ _openYTe - đã xóa menu "Chức năng Y tế" (theo yêu cầu user)
 
   @override
   Widget build(BuildContext context) {
@@ -156,6 +221,19 @@ class PatientActionsSheet extends StatelessWidget {
                 chips: const ['📄 Đã ký', '🔍 Zoom', '⬇ Tải về', '🖨 In'],
               ),
 
+              // v3.0.83: TILE 1b: Y tế số (Bộ Y tế) - 50+ API native
+              // Thay thế "Mở trên EMR web" cũ. Dùng Y Tế Số public API (113.163.187.3:3000)
+              _yTeSoTile(context),
+
+              // v3.0.90: BỎ TILE 1b2 "Chức năng Y tế (Bộ Y tế) - menu 6 mục" theo yêu cầu user
+              // (sau này tính sau)
+
+              // v3.0.78: TILE 1c: Lịch sử điều trị (HIS Pro, 3-pane)
+              _lichSuDieuTriTile(context),
+
+              // v3.0.79: TILE 1d: Đính kèm tài liệu (EMR upload)
+              _dinhKemTaiLieuTile(context),
+
               // === GRID TILE: Y TẾ SỐ (Bộ Y tế) - 15 chức năng ===
               _sectionHeader('Y TẾ SỐ (BỘ Y TẾ)', Icons.health_and_safety, const Color(0xFF00838F), '15 chức năng'),
               _buildYTeSoGrid(context),
@@ -261,6 +339,174 @@ class PatientActionsSheet extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
       decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(3)),
       child: Text(label, style: TextStyle(color: color, fontSize: 9, fontWeight: FontWeight.w600)),
+    );
+  }
+
+  /// v3.0.83: Tile Y tế số (Bộ Y tế) - native, thay thế "Mở trên EMR web"
+  /// Tích hợp trực tiếp Y Tế Số public API (113.163.187.3:3000)
+  /// 50+ endpoints: xem bệnh án, y lệnh, điều dưỡng, phiếu bàn giao, ...
+  /// Không cần VPN, không cần HIS Pro token, dùng chung tài khoản thongke
+  Widget _yTeSoTile(BuildContext context) {
+    final color1 = const Color(0xFF00838F);
+    final color2 = const Color(0xFF006064);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+      child: InkWell(
+        onTap: () => _openYTeSo(context),
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: color1, width: 1.5),
+          ),
+          padding: const EdgeInsets.all(10),
+          child: Row(children: [
+            Container(
+              width: 40, height: 40,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [color1, color2]),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.health_and_safety, color: Colors.white, size: 22),
+            ),
+            const SizedBox(width: 10),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Expanded(
+                  child: Text('Y tế số - Xem bệnh án',
+                    style: TextStyle(color: color1, fontSize: 14, fontWeight: FontWeight.bold)),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(color: color1.withOpacity(0.12), borderRadius: BorderRadius.circular(4)),
+                  child: const Text('Bộ Y tế • 50+ API',
+                    style: TextStyle(color: Color(0xFF00838F), fontSize: 9, fontWeight: FontWeight.bold)),
+                ),
+              ]),
+              const SizedBox(height: 2),
+              const Text(
+                'List tài liệu theo nhóm, xem PDF/ảnh native, không cần VPN • dùng chung tk thongke',
+                style: TextStyle(color: Colors.black54, fontSize: 11, height: 1.3),
+              ),
+            ])),
+            Icon(Icons.chevron_right, color: color1.withOpacity(0.5), size: 20),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  // v3.0.90: BỎ _yTeTile - "Chức năng Y tế" menu (theo yêu cầu user, sẽ tính sau)
+
+  /// v3.0.78: Tile Lịch sử điều trị — mở TreatmentHistoryScreen
+  /// - Lấy tất cả các lần khám + khoa ĐT + dịch vụ/thuốc từ HIS Pro
+  /// - Yêu cầu: HIS Pro token còn hạn (Cài đặt → EMR Sync)
+  /// - Yêu cầu: VPN BV nội bộ để tới 172.16.9.6:1429
+  Widget _lichSuDieuTriTile(BuildContext context) {
+    final color1 = const Color(0xFF6A1B9A);
+    final color2 = const Color(0xFF4A148C);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+      child: InkWell(
+        onTap: () => _openLichSuDieuTri(context),
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: color1, width: 1.5),
+          ),
+          padding: const EdgeInsets.all(10),
+          child: Row(children: [
+            Container(
+              width: 40, height: 40,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [color1, color2]),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.history_edu, color: Colors.white, size: 22),
+            ),
+            const SizedBox(width: 10),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Expanded(
+                  child: Text('Lịch sử điều trị',
+                    style: TextStyle(color: color1, fontSize: 14, fontWeight: FontWeight.bold)),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(color: color1.withOpacity(0.12), borderRadius: BorderRadius.circular(4)),
+                  child: const Text('HIS Pro', style: TextStyle(color: Color(0xFF6A1B9A), fontSize: 9, fontWeight: FontWeight.bold)),
+                ),
+              ]),
+              const SizedBox(height: 2),
+              const Text(
+                'Tất cả lần khám + khoa ĐT + dịch vụ/thuốc (giống HIS desktop)',
+                style: TextStyle(color: Colors.black54, fontSize: 11, height: 1.3),
+              ),
+            ])),
+            const Icon(Icons.chevron_right, color: Color(0xFF6A1B9A), size: 22),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  /// v3.0.79: Tile Đính kèm tài liệu - mở AttachDocumentScreen
+  /// - Upload ảnh/file lên EMR BN (port 1417 EmrDocument/CreateWithFile)
+  /// - Workflow giống HIS desktop "Chi tiết BA → Đính kèm" (theo note2.docx)
+  /// - Yêu cầu: HIS Pro token + mã điều trị (treatment_code)
+  Widget _dinhKemTaiLieuTile(BuildContext context) {
+    final hasTreatmentCode = _treatmentCode.isNotEmpty;
+    final color1 = hasTreatmentCode ? const Color(0xFF00897B) : const Color(0xFFBDBDBD);
+    final color2 = hasTreatmentCode ? const Color(0xFF00695C) : const Color(0xFF9E9E9E);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+      child: InkWell(
+        onTap: hasTreatmentCode ? () => _openDinhKemTaiLieu(context) : null,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: color1, width: 1.5),
+          ),
+          padding: const EdgeInsets.all(10),
+          child: Row(children: [
+            Container(
+              width: 40, height: 40,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [color1, color2]),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.attach_file, color: Colors.white, size: 22),
+            ),
+            const SizedBox(width: 10),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Expanded(
+                  child: Text('Đính kèm tài liệu',
+                    style: TextStyle(color: color1, fontSize: 14, fontWeight: FontWeight.bold)),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(color: color1.withOpacity(0.12), borderRadius: BorderRadius.circular(4)),
+                  child: Text('EMR • 1417', style: TextStyle(color: color1, fontSize: 9, fontWeight: FontWeight.bold)),
+                ),
+              ]),
+              const SizedBox(height: 2),
+              Text(
+                hasTreatmentCode
+                    ? 'Chụp ảnh / chọn file → upload EMR BN (giống HIS desktop)'
+                    : 'BN chưa có mã điều trị - không thể đính kèm',
+                style: const TextStyle(color: Colors.black54, fontSize: 11, height: 1.3),
+              ),
+            ])),
+            Icon(Icons.chevron_right, color: color1.withOpacity(0.5), size: 20),
+          ]),
+        ),
+      ),
     );
   }
 

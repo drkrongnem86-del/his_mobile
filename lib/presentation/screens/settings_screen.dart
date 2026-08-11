@@ -16,6 +16,7 @@ import 'package:his_mobile/data/services/mock_emr_server.dart';
 import 'package:his_mobile/presentation/screens/log_viewer_screen.dart';
 import 'package:his_mobile/presentation/widgets/user_header.dart';
 import 'package:his_mobile/presentation/screens/his_config_screen.dart';
+import 'package:his_mobile/presentation/screens/vpn_benh_vien_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Màn hình Cài đặt v2.66.0
@@ -308,6 +309,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                       );
                     }
+                  },
+                ),
+                // v3.0.74: VPN Bệnh viện - kết nối VPN BV tự động
+                _menuItem(
+                  icon: Icons.vpn_lock,
+                  color: const Color(0xFF0D47A1),
+                  title: 'VPN Bệnh viện',
+                  subtitle: 'Kết nối VPN BV tự động (nemk)',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const VpnBenhVienScreen(),
+                      ),
+                    );
                   },
                 ),
 

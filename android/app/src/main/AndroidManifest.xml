@@ -1,25 +1,28 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- VPN Permissions -->
     <uses-permission android:name="android.permission.INTERNET"/>
-    <!-- v3.0.24: VNPT SmartCA Deeplink SDK cần INTERNET để ký server-side -->
-    <!-- (Đã có ở trên nhưng comment lại cho rõ) -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE"/>
+    <!-- v3.0.76: openvpn_flutter cần BIND_VPN_SERVICE + foreground service variants -->
+    <uses-permission android:name="android.permission.BIND_VPN_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
     <!-- v2.36.2: Camera cho QR Scanner (mobile_scanner) -->
     <uses-permission android:name="android.permission.CAMERA"/>
     <uses-feature android:name="android.hardware.camera" android:required="false"/>
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false"/>
-    
+
     <application
         android:label="HIS MOBILE"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:usesCleartextTraffic="true">
+        android:usesCleartextTraffic="true"
+        android:extractNativeLibs="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -38,18 +41,23 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
-        
-        <!-- VPN Service -->
+
+        <!-- v3.0.76: openvpn_flutter -> ics-openvpn (de.blinkt.openvpn) -->
         <service
             android:name="de.blinkt.openvpn.core.OpenVPNService"
-            android:foregroundServiceType="dataSync"
-            android:exported="false"/>
-            
+            android:foregroundServiceType="specialUse"
+            android:exported="false"
+            android:permission="android.permission.BIND_VPN_SERVICE">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="VPN connection to hospital network" />
+        </service>
+
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
     </application>
-    
+
     <queries>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>

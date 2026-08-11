@@ -174,24 +174,64 @@ class SmartCaService {
   /// [signerName] - tên BS đang đăng nhập (lấy từ HisProApiService.session.userName)
   /// v3.0.21: Convert ảnh (chụp từ camera/gallery) sang PDF
   /// Dùng cho Scan phiếu - giữ chất lượng ảnh trong PDF
+  /// v3.0.81: Thêm signaturePath - nếu có sẽ embed chữ ký tay vào góc dưới phải
+  ///   → dùng cho "Lưu ký" của Đính kèm tài liệu (workflow giống Scan phiếu)
   Future<Uint8List?> convertImageToPdf({
     required String imagePath,
     required String documentName,
     String? signerName,
+    String? signaturePath,  // v3.0.81: optional - path file PNG chữ ký
   }) async {
     try {
       final imageBytes = await File(imagePath).readAsBytes();
       final image = pw.MemoryImage(imageBytes);
+
+      // v3.0.81: Load signature nếu có
+      pw.MemoryImage? sigImage;
+      if (signaturePath != null && signaturePath.isNotEmpty && await File(signaturePath).exists()) {
+        final sigBytes = await File(signaturePath).readAsBytes();
+        sigImage = pw.MemoryImage(sigBytes);
+        debugPrint('  Signature loaded: ${(sigBytes.length / 1024).toStringAsFixed(1)}KB');
+      }
+
       final pdf = pw.Document();
       pdf.addPage(pw.Page(
         pageFormat: PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(0),  // v3.0.58: margin = 0 để ảnh full A4
         build: (ctx) => pw.Stack(
           children: [
-            // v3.0.58: Chỉ hiện ảnh quét (BS yêu cầu - không ghi thêm header/title/timestamp/signature)
+            // Ảnh chính full A4
             pw.Positioned.fill(
               child: pw.Image(image, fit: pw.BoxFit.contain),
             ),
+            // v3.0.81: Overlay chữ ký ở góc dưới phải (nếu có)
+            if (sigImage != null)
+              pw.Positioned(
+                right: 20,
+                bottom: 30,
+                child: pw.SizedBox(
+                  width: 120,
+                  height: 60,
+                  child: pw.Image(sigImage, fit: pw.BoxFit.contain),
+                ),
+              ),
+            // v3.0.81: Text "Đã ký" + tên signer dưới chữ ký
+            if (sigImage != null && signerName != null && signerName.isNotEmpty)
+              pw.Positioned(
+                right: 20,
+                bottom: 10,
+                child: pw.Container(
+                  padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: pw.BoxDecoration(
+                    color: PdfColors.white,
+                    border: pw.Border.all(width: 0.5, color: PdfColors.grey400),
+                  ),
+                  child: pw.Text(
+                    'Đã ký: $signerName',
+                    style: const pw.TextStyle(fontSize: 8, color: PdfColors.grey800),
+                  ),
+                ),
+              ),
           ],
         ),
       ));

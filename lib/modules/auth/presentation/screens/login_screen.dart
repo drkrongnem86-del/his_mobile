@@ -9,11 +9,15 @@ import 'package:his_mobile/core/constants/app_constants.dart';
 import 'package:his_mobile/core/services/connection_service.dart';
 import 'package:his_mobile/core/theme/app_theme.dart';
 import 'package:his_mobile/data/api/his_pro_api_service.dart';
+import 'package:his_mobile/data/api/y_te_so_service.dart';
 import 'package:his_mobile/data/services/data_service.dart';
 import 'package:his_mobile/presentation/screens/connection_check_screen.dart';
 import 'package:his_mobile/presentation/screens/his_config_screen.dart';
+import 'package:his_mobile/presentation/screens/vpn_benh_vien_screen.dart';
+import 'package:his_mobile/core/services/vpn_benh_vien_service.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:async';
 import 'dart:convert';
 
 class LoginScreen extends StatefulWidget {
@@ -62,15 +66,15 @@ class _LoginScreenState extends State<LoginScreen> {
         await prefs.setString(AppConstants.keyUserName, result.user?.userName ?? email);
       } catch (_) {}
 
-      // Auto-fetch HIS Pro token (silent)
-      try {
-        final r = await HisProApiService.instance.login(email);
-        if (r.success && r.session != null) {
-          debugPrint('✅ Auto-fetched HIS Pro token: ${r.session!.token.length} chars');
-        }
-      } catch (_) {}
+      // v3.0.89: NAVIGATE NGAY để user thấy home → giảm perceived login time
+      // Auto-fetch HIS Pro + Y Tế Số JWT chạy BACKGROUND (fire-and-forget)
       if (!mounted) return;
       context.go('/home');
+
+      // Background auto-fetch (không block navigation)
+      // Trước đây: Future.wait → tổng thời gian = max(t2, t3) ≈ 3-5s BLOCKING
+      // Giờ: fire-and-forget → user vào home ngay, tokens sẵn sàng khi cần
+      unawaited(_bgFetchTokens(email, pass));
     } else {
       final msg = _friendlyAuthMessage(result.message);
       if (!mounted) return;
@@ -98,6 +102,41 @@ class _LoginScreenState extends State<LoginScreen> {
       return 'Lỗi mạng — kiểm tra kết nối và thử lại';
     }
     return 'Tên đăng nhập hoặc mật khẩu không chính xác';
+  }
+
+  /// v3.0.89: Background auto-fetch tokens (HIS Pro + Y Tế Số)
+  /// Fire-and-forget - không block navigation
+  /// Tokens sẽ có sẵn khi user mở Xem bệnh án / Y tế số screen
+  Future<void> _bgFetchTokens(String email, String pass) async {
+    try {
+      // Chạy song song 2 luồng
+      await Future.wait([
+        () async {
+          try {
+            final r = await HisProApiService.instance.login(email);
+            if (r.success && r.session != null) {
+              debugPrint('✅ BG: Auto-fetched HIS Pro token: ${r.session!.token.length} chars');
+            }
+          } catch (e) {
+            debugPrint('⚠️ BG: HIS Pro login error: $e');
+          }
+        }(),
+        () async {
+          try {
+            final r = await YTeSoService.instance.login(email: email, password: pass);
+            if (r.success) {
+              debugPrint('✅ BG: Auto-fetched Y Tế Số JWT: ${YTeSoService.instance.accessToken?.length ?? 0} chars');
+            } else {
+              debugPrint('⚠️ BG: Y Tế Số login failed: ${r.message}');
+            }
+          } catch (e) {
+            debugPrint('⚠️ BG: Y Tế Số login error: $e');
+          }
+        }(),
+      ]);
+    } catch (e) {
+      debugPrint('⚠️ BG fetch tokens error: $e');
+    }
   }
 
   /// v2.75.0: Test 4 endpoints
@@ -230,6 +269,8 @@ class _LoginScreenState extends State<LoginScreen> {
         automaticallyImplyLeading: false,
         // v2.75.0: Nứt Back ở góc phải trên cùng
         actions: [
+          // v3.0.74: VPN status indicator
+          _VpnStatusButton(),
           IconButton(
             icon: const Icon(Icons.close, color: Colors.black54),
             tooltip: 'Đóng',
@@ -376,3 +417,57 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 }
 
+
+/// v3.0.74: Nút hiển thị trạng thái VPN Bệnh viện ở AppBar
+class _VpnStatusButton extends StatefulWidget {
+  @override
+  State<_VpnStatusButton> createState() => _VpnStatusButtonState();
+}
+
+class _VpnStatusButtonState extends State<_VpnStatusButton> {
+  @override
+  void initState() {
+    super.initState();
+    VpnBenhVienService.instance.init();
+    VpnBenhVienService.instance.addListener(_onChange);
+  }
+
+  @override
+  void dispose() {
+    VpnBenhVienService.instance.removeListener(_onChange);
+    super.dispose();
+  }
+
+  void _onChange() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final vpn = VpnBenhVienService.instance;
+    final isConnected = vpn.isConnected;
+    final isConnecting = vpn.isConnecting;
+    Color color = Colors.grey;
+    IconData icon = Icons.vpn_lock;
+    String tooltip = 'VPN BV: Chưa kết nối';
+    if (isConnected) {
+      color = Colors.green;
+      icon = Icons.verified;
+      tooltip = 'VPN BV: Đã kết nối';
+    } else if (isConnecting) {
+      color = Colors.orange;
+      icon = Icons.sync;
+      tooltip = 'VPN BV: Đang kết nối...';
+    }
+    return IconButton(
+      icon: Icon(icon, color: color),
+      tooltip: tooltip,
+      onPressed: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const VpnBenhVienScreen()),
+        );
+      },
+    );
+  }
+}

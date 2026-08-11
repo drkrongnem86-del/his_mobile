@@ -77,13 +77,13 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
 
   // Filter state
   String _dateFilterType = '30days';
+
+  /// v3.0.85: chỉ giữ date filter + search. Bỏ treatment type, type name, room.
+  /// Filter giống "Hồ sơ điều trị" (Treatment History) - đơn giản, chỉ theo ngày.
   DateTime _dateFrom = DateTime.now().subtract(const Duration(days: 30));
   DateTime _dateTo = DateTime.now();
-  // v3.0.42: Filter TREATMENT_TYPE_NAME (trạng thái khám)
-  String _treatmentTypeFilter = 'all';
-  // v3.0.46: Filter Hình thức ĐT (dynamic từ data HIS Pro desktop - "Khám bệnh" / "Điều trị ngoại trú" / "Điều trị nội trú" / ...)
-  // BS yêu cầu: filter theo chuẩn hiển thị TREATMENT_TYPE_NAME trong HIS Pro desktop
-  String _treatmentTypeNameFilter = 'all';
+  /// v3.0.86: Bỏ date filter, thay bằng status filter (Tất cả / Đang điều trị / Đã xuất viện)
+  String _statusFilter = 'all';
   bool _showSuggestions = false;
 
   // v2.96.0: API source
@@ -380,26 +380,35 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
           children: [
             // v2.96.0: API selector (←/→) - đặt trên cùng
             _buildApiSelector(),
-            // Date filter chips
+            // v3.0.89: Time filter chips - bỏ Trạng thái filter
             Container(
               color: Colors.white,
               padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // v3.0.87: Time filter chips (giống Hồ sơ điều trị)
                   Row(
                     children: [
+                      const Icon(Icons.access_time, size: 13, color: Color(0xFF2E7D32)),
+                      const SizedBox(width: 4),
+                      const Text('Thời gian:',
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: Color(0xFF2E7D32),
+                              fontWeight: FontWeight.w600)),
+                      const SizedBox(width: 6),
                       Expanded(
                         child: SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
                           child: Row(
                             children: [
                               _dateChip('today', 'Hôm nay'),
-                              const SizedBox(width: 6),
+                              const SizedBox(width: 4),
                               _dateChip('7days', '7 ngày'),
-                              const SizedBox(width: 6),
+                              const SizedBox(width: 4),
                               _dateChip('30days', '30 ngày'),
-                              const SizedBox(width: 6),
+                              const SizedBox(width: 4),
                               _dateChip('90days', '90 ngày'),
                             ],
                           ),
@@ -407,7 +416,8 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
                       ),
                       if (_loading)
                         const SizedBox(
-                          width: 16, height: 16,
+                          width: 16,
+                          height: 16,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         ),
                     ],
@@ -461,10 +471,8 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
                 textInputAction: TextInputAction.search,
               ),
             ),
-            // v3.0.42: Filter TREATMENT_TYPE_NAME chips (Tất cả / Nội trú / Khám / Ngoại trú)
-            _buildTreatmentTypeChips(),
-            // v2.75.6: Chips phòng ngang (giống HomeScreen)
-            _buildRoomChips(),
+            // v3.0.85: Bỏ filter TREATMENT_TYPE_NAME + room - giống Hồ sơ điều trị
+            // (chỉ giữ date filter + search)
             // Suggestions (type-ahead)
             if (_showSuggestions && _suggestions.isNotEmpty)
               Container(
@@ -540,6 +548,28 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
       labelStyle: TextStyle(
         color: selected ? Colors.white : Colors.black87,
         fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+        fontSize: 11,
+      ),
+    );
+  }
+
+  /// v3.0.86: Status chip (Tất cả / Đang ĐT / Đã xuất viện)
+  Widget _statusChip(String value, String label, IconData icon) {
+    final selected = _statusFilter == value;
+    return ChoiceChip(
+      avatar: Icon(icon,
+          size: 14,
+          color: selected ? Colors.white : const Color(0xFF1976D2)),
+      label: Text(label),
+      selected: selected,
+      onSelected: (_) {
+        setState(() => _statusFilter = value);
+      },
+      selectedColor: const Color(0xFF1976D2),
+      backgroundColor: Colors.grey[100],
+      labelStyle: TextStyle(
+        color: selected ? Colors.white : Colors.black87,
+        fontWeight: selected ? FontWeight.bold : FontWeight.w500,
         fontSize: 11,
       ),
     );
@@ -759,33 +789,18 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
     );
   }
 
-  /// v2.98.0: Filter LOCAL trên _patients (như workspace cũ) + search + room
-  /// Trả về list đã filter theo search query + room chip
-  /// v3.0.46: Thêm filter TREATMENT_TYPE_NAME (Hình thức ĐT) - dynamic từ data HIS Pro
+  /// v3.0.86: Filter LOCAL đơn giản - search + status
+  /// v3.0.89: Sort ca mới nhất lên đầu (IN_TIME desc)
   List<Map<String, dynamic>> _filteredPatients() {
     var list = _patients;
-    // v3.0.44: Filter trạng thái khám (Khoa Cấp Cứu)
-    if (_treatmentTypeFilter != 'all') {
+    // v3.0.86: Status filter (Tất cả / Đang ĐT / Đã xuất viện) - giữ logic nhưng ẩn UI
+    if (_statusFilter != 'all') {
       list = list.where((p) {
         final outTime = (p['out_time'] ?? p['OUT_TIME'] ?? '').toString().trim();
-        final sttId = p['service_req_stt_id'] ?? p['SERVICE_REQ_STT_ID'];
-        final hasStt = sttId != null && sttId.toString().isNotEmpty;
-        final hasOut = outTime.isNotEmpty && outTime != '-' && outTime != 'null';
-        switch (_treatmentTypeFilter) {
-          case 'chuakham':
-            return !hasStt && !hasOut;
-          case 'dangkham':
-            return hasStt || hasOut;
-          default:
-            return true;
-        }
-      }).toList();
-    }
-    // v3.0.46: Filter Hình thức ĐT (TREATMENT_TYPE_NAME) - dynamic từ data HIS Pro desktop
-    if (_treatmentTypeNameFilter != 'all') {
-      list = list.where((p) {
-        final ttn = (p['TREATMENT_TYPE_NAME'] ?? p['treatment_type_name'] ?? '').toString();
-        return ttn == _treatmentTypeNameFilter;
+        final isOut = outTime.isNotEmpty && outTime != '-' && outTime != 'null';
+        if (_statusFilter == 'in') return !isOut;
+        if (_statusFilter == 'out') return isOut;
+        return true;
       }).toList();
     }
     // v2.98.0: Filter LOCAL theo search query (giống workspace cũ)
@@ -798,196 +813,18 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
         return name.contains(q) || code.contains(q) || reqCode.contains(q);
       }).toList();
     }
-    // Filter theo phòng
-    if (_selectedRoom != null && _selectedRoom!.isNotEmpty) {
-      list = list.where((p) {
-        final room = (p['EXECUTE_ROOM_NAME'] ?? p['BED_ROOM_NAME'] ?? p['room_name'] ?? '').toString();
-        return room == _selectedRoom;
-      }).toList();
-    }
+    // v3.0.89: Sort ca mới nhất lên đầu (IN_TIME desc)
+    list = List<Map<String, dynamic>>.from(list);
+    list.sort((a, b) {
+      final aIn = (a['IN_TIME'] ?? a['in_time'] ?? '').toString();
+      final bIn = (b['IN_TIME'] ?? b['in_time'] ?? '').toString();
+      return bIn.compareTo(aIn); // desc: larger (newer) first
+    });
     return list;
   }
 
-  /// v2.75.6: Chips phĂ²ng ngang
-  /// v3.0.42: Filter TREATMENT_TYPE_NAME chips (Tat ca / Noi tru / Kham / Ngoai tru)
-  /// v3.0.46: Thêm dòng filter phụ TREATMENT_TYPE_NAME (Hình thức ĐT) - dynamic từ data HIS Pro
-  Widget _buildTreatmentTypeChips() {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Dòng 1: Filter trạng thái khám (giống HomeScreen)
-          Row(
-            children: [
-              const Icon(Icons.filter_alt, size: 12, color: Colors.black45),
-              const SizedBox(width: 4),
-              const Text('Trạng thái:', style: TextStyle(fontSize: 10, color: Colors.black54, fontWeight: FontWeight.w600)),
-              const SizedBox(width: 4),
-              Expanded(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _treatmentTypeChip('all', 'Tất cả'),
-                      // v3.0.44: phân loại theo trạng thái khám
-                      _treatmentTypeChip('chuakham', '⏳ Chưa khám'),
-                      _treatmentTypeChip('dangkham', '🩺 Đang khám'),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-          // v3.0.46: Dòng 2 - Filter Hình thức ĐT (dynamic từ data HIS Pro)
-          // Chỉ hiện khi data có > 1 loại TREATMENT_TYPE_NAME
-          _buildTreatmentTypeNameChips(),
-        ],
-      ),
-    );
-  }
-
-  /// v3.0.46: Filter phụ - Hình thức ĐT (TREATMENT_TYPE_NAME)
-  /// Lấy các giá trị TREATMENT_TYPE_NAME duy nhất từ _patients
-  /// và build chips filter (giống HIS Pro desktop "Tất cả / Khám bệnh / Ngoại trú / Nội trú / ...")
-  Widget _buildTreatmentTypeNameChips() {
-    final types = <String>{};
-    for (final p in _patients) {
-      final t = (p['TREATMENT_TYPE_NAME'] ?? p['treatment_type_name'] ?? '').toString().trim();
-      if (t.isNotEmpty) types.add(t);
-    }
-    if (types.isEmpty) return const SizedBox.shrink();
-    if (types.length == 1) {
-      // Chỉ 1 loại → hiện label cho BS biết
-      final only = types.first;
-      return Padding(
-        padding: const EdgeInsets.only(top: 2),
-        child: Row(
-          children: [
-            const Icon(Icons.medical_information, size: 11, color: Colors.black38),
-            const SizedBox(width: 4),
-            Text(
-              'Hình thức ĐT: $only',
-              style: const TextStyle(fontSize: 10, color: Colors.black54, fontStyle: FontStyle.italic),
-            ),
-          ],
-        ),
-      );
-    }
-    final typeList = types.toList()..sort();
-    return Padding(
-      padding: const EdgeInsets.only(top: 2),
-      child: Row(
-        children: [
-          const Icon(Icons.medical_information, size: 11, color: Colors.black45),
-          const SizedBox(width: 4),
-          const Text('Hình thức:', style: TextStyle(fontSize: 10, color: Colors.black54, fontWeight: FontWeight.w600)),
-          const SizedBox(width: 4),
-          Expanded(
-            child: SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  _treatmentTypeNameChip('all', 'Tất cả'),
-                  for (final t in typeList) _treatmentTypeNameChip(t, t),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _treatmentTypeNameChip(String value, String label) {
-    final selected = _treatmentTypeNameFilter == value;
-    return Padding(
-      padding: const EdgeInsets.only(right: 4),
-      child: ChoiceChip(
-        label: Text(label, style: TextStyle(fontSize: 10, color: selected ? Colors.white : Colors.black87)),
-        selected: selected,
-        onSelected: (_) => setState(() => _treatmentTypeNameFilter = value),
-        selectedColor: Colors.teal.shade700,
-        backgroundColor: Colors.grey.shade100,
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        visualDensity: VisualDensity.compact,
-      ),
-    );
-  }
-
-  Widget _treatmentTypeChip(String value, String label) {
-    final selected = _treatmentTypeFilter == value;
-    return Padding(
-      padding: const EdgeInsets.only(right: 4),
-      child: ChoiceChip(
-        label: Text(label, style: TextStyle(fontSize: 10, color: selected ? Colors.white : Colors.black87)),
-        selected: selected,
-        onSelected: (_) => setState(() => _treatmentTypeFilter = value),
-        selectedColor: Colors.indigo.shade700,
-        backgroundColor: Colors.grey.shade100,
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-        visualDensity: VisualDensity.compact,
-      ),
-    );
-  }
-
-  Widget _buildRoomChips() {
-    final rooms = <String>{};
-    for (final p in _patients) {
-      final room = (p['EXECUTE_ROOM_NAME'] ?? p['BED_ROOM_NAME'] ?? p['room_name'] ?? '').toString();
-      if (room.isNotEmpty) rooms.add(room);
-    }
-    final roomList = rooms.toList()..sort();
-    if (roomList.isEmpty) return const SizedBox.shrink();
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      color: const Color(0xFFF5F5F5),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            _roomChip(label: 'Tất cả', value: null, isSelected: _selectedRoom == null),
-            for (final r in roomList) _roomChip(label: r, value: r, isSelected: _selectedRoom == r),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _roomChip({required String label, required String? value, required bool isSelected}) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 6),
-      child: InkWell(
-        onTap: () => setState(() => _selectedRoom = value),
-        borderRadius: BorderRadius.circular(20),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFF1976D2) : Colors.white,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: isSelected ? const Color(0xFF1976D2) : Colors.black26,
-              width: 1,
-            ),
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: isSelected ? Colors.white : Colors.black87,
-              fontSize: 12,
-              fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
+  /// v3.0.85: Bỏ các filter cũ (_buildTreatmentTypeChips, _buildRoomChips, ...)
+  /// Chỉ giữ date filter + search (giống Hồ sơ điều trị)
   Widget _buildPatientCard(Map<String, dynamic> p) {
     final name = fixVietnameseMojibake(
       (p['TDL_PATIENT_UNSIGNED_NAME'] ?? p['TDL_PATIENT_NAME'] ?? p['tdl_patient_name'] ?? 'BN').toString());

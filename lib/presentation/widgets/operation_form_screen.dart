@@ -104,6 +104,15 @@ class _OperationFormScreenState extends State<OperationFormScreen> {
     });
   }
 
+  /// v3.0.76: Build _formData từ _ctrls (controllers) cho mỗi lần save
+  Map<String, dynamic> get _formData {
+    final m = <String, dynamic>{};
+    for (final entry in _ctrls.entries) {
+      m[entry.key] = entry.value.text;
+    }
+    return m;
+  }
+
   /// v3.0.58: Lưu local + đẩy EMR (Lưu ký hoặc Ký CA) - giống clinical_note
   Future<void> _saveAndPushEmr({required bool useVnptSignature}) async {
     if (!_validate()) return;

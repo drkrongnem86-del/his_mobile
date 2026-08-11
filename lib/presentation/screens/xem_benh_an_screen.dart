@@ -94,7 +94,10 @@ class _XemBenhAnScreenState extends State<XemBenhAnScreen> {
 
   final _ytso = DataService.instance;
 
-  final PdfViewerController _pdfController = PdfViewerController();
+  PdfViewerController _pdfController = PdfViewerController();
+
+  /// v3.0.84: PageController cho fullscreen PageView - đồng bộ với nút < >
+  PageController _pageController = PageController();
 
 
 
@@ -2233,114 +2236,145 @@ class _XemBenhAnScreenState extends State<XemBenhAnScreen> {
 
 
 
-  // ===== Fullscreen PDF View =====
+  // ===== Fullscreen PDF View v3.0.74 - swipe trái/phải giữa các phiếu =====
 
   Widget _buildFullscreen() {
 
     final bytes = _selected == null ? null : _docBytes[_selected!.id];
+    final currentIndex = _selected == null ? 0 : _docs.indexWhere((d) => d.id == _selected!.id);
+    final canPrev = currentIndex > 0;
+    final canNext = currentIndex >= 0 && currentIndex < _docs.length - 1;
 
     return Scaffold(
-
       backgroundColor: Colors.black,
-
       body: Stack(
-
         children: [
-
-          if (_selected != null && bytes != null)
-
-            // v2.41.0: Image vs PDF viewer
-
-            Builder(builder: (_) {
-
-              final isImage = _selected?.documentTypeName?.contains('scan') ?? false;
-
-              if (isImage) {
-
-                return InteractiveViewer(
-
-                  minScale: 0.5,
-
-                  maxScale: 4.0,
-
-                  child: Center(child: Image.memory(bytes, fit: BoxFit.contain)),
-
-                );
-
-              }
-
-              return SfPdfViewer.memory(bytes, controller: _pdfController);
-
-            })
-
+          // PageView cho phép vuốt trái/phải giữa các phiếu
+          if (_docs.isNotEmpty)
+            PageView.builder(
+              // v3.0.84: dùng _pageController instance để nút < > animate tới page
+              controller: _pageController.hasClients
+                  ? _pageController
+                  : (_pageController = PageController(
+                      initialPage: currentIndex >= 0 ? currentIndex : 0,
+                    )),
+              itemCount: _docs.length,
+              onPageChanged: (idx) {
+                if (idx >= 0 && idx < _docs.length) {
+                  final newDoc = _docs[idx];
+                  setState(() {
+                    _selected = newDoc;
+                    _pdfController = PdfViewerController();
+                  });
+                  // v3.0.77: Load docBytes cho phiếu mới khi swipe (trước đây chỉ setState,
+                  // khiến itemBuilder show "loading" mãi vì bytes chưa được fetch)
+                  _loadDocBytes(newDoc);
+                }
+              },
+              itemBuilder: (ctx, idx) {
+                final doc = _docs[idx];
+                final docBytes = _docBytes[doc.id];
+                if (docBytes == null) {
+                  // v3.0.77: Hiển thị loading rõ ràng + tên phiếu đang tải
+                  return Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const CircularProgressIndicator(color: Colors.white),
+                        const SizedBox(height: 12),
+                        Text(
+                          'Đang tải ${doc.name}...',
+                          style: const TextStyle(color: Colors.white70, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  );
+                }
+                final isImage = doc.documentTypeName?.contains('scan') ?? false;
+                if (isImage) {
+                  return InteractiveViewer(
+                    minScale: 0.5,
+                    maxScale: 4.0,
+                    child: Center(child: Image.memory(docBytes, fit: BoxFit.contain)),
+                  );
+                }
+                return SfPdfViewer.memory(docBytes, controller: _pdfController);
+              },
+            )
           else
-
             const Center(child: CircularProgressIndicator()),
 
-          // Top bar
-
+          // Top bar với nút back + title + download + đếm
           Positioned(
-
             top: 0, left: 0, right: 0,
-
             child: SafeArea(
-
               child: Container(
-
                 color: Colors.black.withOpacity(0.6),
-
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-
                 child: Row(
-
                   children: [
-
                     IconButton(
-
                       icon: const Icon(Icons.arrow_back, color: Colors.white),
-
                       onPressed: _toggleFullscreen,
-
                     ),
-
                     Expanded(
-
-                      child: Text(
-
-                        _selected?.name ?? '',
-
-                        style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
-
-                        maxLines: 1, overflow: TextOverflow.ellipsis,
-
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            _selected?.name ?? '',
+                            style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                            maxLines: 1, overflow: TextOverflow.ellipsis,
+                          ),
+                          if (_docs.isNotEmpty)
+                            Text(
+                              '${currentIndex + 1} / ${_docs.length}  •  Vuốt trái/phải để chuyển',
+                              style: const TextStyle(color: Colors.white70, fontSize: 11),
+                            ),
+                        ],
                       ),
-
                     ),
-
                     IconButton(
-
-                      icon: const Icon(Icons.download, color: Colors.white),
-
-                      onPressed: _savingPdf ? null : () => _selected != null ? _downloadPdf(_selected!) : null,
-
+                      icon: const Icon(Icons.chevron_left, color: Colors.white),
+                      onPressed: canPrev ? () => _goToDoc(currentIndex - 1) : null,
                     ),
-
+                    IconButton(
+                      icon: const Icon(Icons.chevron_right, color: Colors.white),
+                      onPressed: canNext ? () => _goToDoc(currentIndex + 1) : null,
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.download, color: Colors.white),
+                      onPressed: _savingPdf ? null : () => _selected != null ? _downloadPdf(_selected!) : null,
+                    ),
                   ],
-
                 ),
-
               ),
-
             ),
-
           ),
-
         ],
-
       ),
-
     );
-
   }
 
+  /// v3.0.84: Fix đồng bộ nút < > với PageView swipe
+  /// - Animate PageController tới idx
+  /// - setState _selected để header update
+  /// - Reset PdfViewerController (vì SfPdfViewer memory cần controller mới)
+  /// - Load docBytes cho phiếu mới
+  void _goToDoc(int idx) {
+    if (idx < 0 || idx >= _docs.length) return;
+    if (_pageController.hasClients) {
+      _pageController.animateToPage(
+        idx,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+    setState(() {
+      _selected = _docs[idx];
+      _pdfController = PdfViewerController();
+    });
+    _loadDocBytes(_docs[idx]);
+  }
 }

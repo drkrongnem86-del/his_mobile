@@ -138,8 +138,8 @@ class _CatalogBrowserScreenState extends State<CatalogBrowserScreen> {
       final auth = ThongkeAuthService.instance;
       // v2.39.0: Public Data API chi co account admin/admin
       // KHONG can dang nhap Data service truoc - hardcode credentials
-      const email = 'admin';
-      const password = 'admin';
+      const email = 'nemk';
+      const password = '1027';
 
       CatalogFetchResult result;
       switch (widget.type) {
@@ -225,9 +225,9 @@ class _CatalogBrowserScreenState extends State<CatalogBrowserScreen> {
     setState(() => _loadingMore = true);
     try {
       final auth = ThongkeAuthService.instance;
-      // v2.39.0: hardcode admin/admin
-      const email = 'admin';
-      const password = 'admin';
+      // v2.39.0: hardcode nemk/1027
+      const email = 'nemk';
+      const password = '1027';
 
       CatalogFetchResult result;
       switch (widget.type) {
@@ -425,9 +425,25 @@ class _CatalogBrowserScreenState extends State<CatalogBrowserScreen> {
             children: [
               Icon(Icons.error_outline, size: 48, color: Colors.red.shade300),
               const SizedBox(height: 12),
-              Text(_error!, textAlign: TextAlign.center, style: const TextStyle(color: Colors.red)),
+              // v3.0.77: Hiển thị thông báo thân thiện hơn
+              if (_error == 'No response')
+                const Text(
+                  'Server không phản hồi.\nVui lòng kiểm tra mạng hoặc VPN.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.red, fontSize: 13),
+                )
+              else
+                Text(
+                  _error!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.red, fontSize: 13),
+                ),
               const SizedBox(height: 16),
-              FilledButton(onPressed: _load, child: const Text('Thử lại')),
+              FilledButton.icon(
+                onPressed: _load,
+                icon: const Icon(Icons.refresh, size: 18),
+                label: const Text('Thử lại'),
+              ),
             ],
           ),
         ),

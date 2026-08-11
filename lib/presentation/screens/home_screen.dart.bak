@@ -11,9 +11,8 @@ import 'package:his_mobile/core/utils/mojibake_fixer.dart';
 import 'package:his_mobile/core/utils/patient_name_helper.dart';
 import 'package:his_mobile/core/utils/vietnamese.dart';
 import 'package:his_mobile/data/api/his_api_service.dart';
-// v3.0.77: Bỏ import his_pro_api_service + his_pro_service (đã bỏ dialog login HIS Pro)
-// import 'package:his_mobile/data/api/his_pro_api_service.dart';
-// import 'package:his_mobile/data/api/his_pro_service.dart';
+import 'package:his_mobile/data/api/his_pro_api_service.dart';
+import 'package:his_mobile/data/api/his_pro_service.dart';
 import 'package:his_mobile/data/api/thongke_auth_service.dart';
 import 'package:his_mobile/data/services/emr_push_api_source.dart';
 import 'package:his_mobile/presentation/navigation/safe_navigator.dart';
@@ -291,9 +290,10 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() => _showSuggestions = false);
       }
     });
-    // v3.0.77: Bỏ HIS Pro auto-bootstrap (đã bỏ dialog login thủ công)
-    // - HIS Pro dùng bearer token auto-load từ splash screen
-    // - Không cần bootstrap thêm ở home
+    // v2.48.0: Tự động bootstrap HIS Pro silent
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      HisProApiService.instance.silentBootstrap();
+    });
   }
 
   /// v3.0.36: Load API push EMR + check role admin
@@ -1043,6 +1043,329 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // ====== HIS PRO SYNC (v2.16) ======
+
+  Widget _buildHisProSyncButton() {
+    final hasToken = HisProService.instance.isLoggedIn;
+    return SizedBox(
+      width: 110,
+      height: 60,
+      child: ElevatedButton.icon(
+        onPressed: _syncFromHisPro,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: hasToken ? const Color(0xFFE65100) : Colors.white,
+          foregroundColor: hasToken ? Colors.white : const Color(0xFFE65100),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+            side: const BorderSide(color: Color(0xFFE65100), width: 1.5),
+          ),
+          padding: const EdgeInsets.all(4),
+        ),
+        icon: const Icon(Icons.cloud_sync, size: 22),
+        label: Text(
+          hasToken ? 'ĐB HIS' : 'HIS Pro',
+          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _syncFromHisPro() async {
+    try {
+      // Step 1: Login HIS Pro (nếu chưa login)
+      if (!HisProService.instance.isLoggedIn) {
+        final logged = await _showHisProLoginDialog();
+        if (logged != true) return;
+      }
+
+      // Step 2: Fetch patients by department
+      final dept = _departments[_currentDeptIndex];
+      final deptId = dept['id'] as int?;
+
+      if (deptId == null) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Khoa này chưa cấu hình ID')),
+        );
+        return;
+      }
+
+      // Show progress dialog với step-by-step feedback
+      // v2.38.6: nhỏ gọn + không chiếm full screen + step text update
+      final progressLabel = ValueNotifier<String>('Đang kết nối HIS Pro...');
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => WillPopScope(
+          onWillPop: () async => false,
+          child: AlertDialog(
+            content: SizedBox(
+              height: 100,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(
+                    width: 30, height: 30,
+                    child: CircularProgressIndicator(strokeWidth: 2.5),
+                  ),
+                  const SizedBox(height: 12),
+                  ValueListenableBuilder<String>(
+                    valueListenable: progressLabel,
+                    builder: (_, label, __) => Text(label,
+                      style: const TextStyle(fontSize: 12),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      // Step 1: Fetch patients
+      progressLabel.value = 'Bước 1/2: Đang tải BN từ HIS Pro...';
+      final result = await HisProService.instance.fetchPatientsByDepartment(deptId)
+          .timeout(const Duration(seconds: 12), onTimeout: () => HisProSyncResult(
+            success: false,
+            message: 'Timeout 12s - HIS Pro không phản hồi. Kiểm tra VPN BV.',
+            patients: const [],
+          ));
+      if (!mounted) return;
+      Navigator.pop(context); // close progress
+
+      if (!result.success) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('❌ ${result.message}'),
+          backgroundColor: Colors.red.shade700,
+          duration: const Duration(seconds: 5),
+        ));
+        // Nếu lỗi token → reset session
+        if (result.httpStatus == 401) {
+          HisProService.instance.clearSession();
+        }
+        return;
+      }
+
+      // Forward data tới DepartmentPatientPageState để update _patients ở đó
+      if (mounted) {
+        _departmentKey.currentState?._updateFromHisPro(
+          result.patients,
+          dept['name']?.toString() ?? '',
+        );
+      }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('✅ Đã đồng bộ ${result.patients.length} BN từ HIS Pro'),
+        backgroundColor: Colors.green.shade700,
+        duration: const Duration(seconds: 4),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        margin: const EdgeInsets.fromLTRB(12, 0, 12, 80),
+      ));
+    } catch (e, st) {
+      debugPrint('_syncFromHisPro exception: $e\n$st');
+      if (!mounted) return;
+      try {
+        Navigator.of(context, rootNavigator: true).pop();
+      } catch (_) {}
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('❌ Lỗi đồng bộ: ${e.toString().split("\n").first}'),
+        backgroundColor: Colors.red.shade700,
+        duration: const Duration(seconds: 5),
+      ));
+    }
+  }
+
+  Future<bool?> _showHisProLoginDialog() async {
+    // v2.75.3: Auto-fill từ SharedPreferences nếu đã lưu
+    final prefs = await SharedPreferences.getInstance();
+    final savedLogin = prefs.getString('hispro_saved_login') ?? 'nemk';
+    final savedPass = prefs.getString('hispro_saved_pass') ?? '';
+    var rememberPass = savedPass.isNotEmpty;
+    final loginCtrl = TextEditingController(text: savedLogin);
+    final passCtrl = TextEditingController(text: savedPass);
+    final formKey = GlobalKey<FormState>();
+    return showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setSt) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        title: const Row(
+          children: [
+            Icon(Icons.cloud_sync, color: Color(0xFFE65100)),
+            SizedBox(width: 8),
+            Text('Đăng nhập HIS Pro'),
+          ],
+        ),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.amber.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.amber.shade300),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.vpn_lock, size: 16, color: Colors.amber),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        rememberPass
+                            ? 'Đã lưu mật khẩu (bấm Đăng nhập để sync)'
+                            : 'Cần bật OpenVPN BV trước khi đồng bộ',
+                        style: const TextStyle(fontSize: 11, color: Colors.black87),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: loginCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Tài khoản',
+                  hintText: 'VD: BV',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                  prefixIcon: Icon(Icons.person),
+                ),
+                validator: (v) => (v == null || v.trim().isEmpty) ? 'Nhập tài khoản' : null,
+              ),
+              const SizedBox(height: 10),
+              TextFormField(
+                controller: passCtrl,
+                obscureText: !rememberPass, // v2.75.3: show nếu đã lưu
+                decoration: InputDecoration(
+                  labelText: 'Mật khẩu',
+                  border: const OutlineInputBorder(),
+                  isDense: true,
+                  prefixIcon: const Icon(Icons.lock),
+                  suffixIcon: IconButton(
+                    icon: Icon(rememberPass ? Icons.visibility : Icons.visibility_off, size: 18),
+                    tooltip: rememberPass ? 'Ẩn mật khẩu' : 'Hiện mật khẩu',
+                    onPressed: () {
+                      // v2.75.3: Nếu đã lưu thì toggle show/hide
+                      if (savedPass.isNotEmpty) {
+                        setSt(() {
+                          passCtrl.text = savedPass;
+                          passCtrl.selection = TextSelection.collapsed(offset: passCtrl.text.length);
+                        });
+                      }
+                    },
+                  ),
+                ),
+                validator: (v) => (v == null || v.isEmpty) ? 'Nhập mật khẩu' : null,
+              ),
+              const SizedBox(height: 4),
+              // v2.75.3: Checkbox "Lưu mật khẩu"
+              Row(
+                children: [
+                  Checkbox(
+                    value: rememberPass,
+                    onChanged: (v) {
+                      setSt(() => rememberPass = v ?? false);
+                    },
+                  ),
+                  const Text('Lưu mật khẩu cho lần sau', style: TextStyle(fontSize: 12)),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Server: ${ConnectionService.instance.acsUrl}',
+                style: const TextStyle(color: Colors.black54, fontSize: 10, fontStyle: FontStyle.italic),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Hủy'),
+          ),
+          ElevatedButton.icon(
+            icon: const Icon(Icons.login, size: 18),
+            label: const Text('Đăng nhập'),
+            onPressed: () async {
+              if (!formKey.currentState!.validate()) return;
+              // v2.75.3: Lưu mật khẩu nếu user tick
+              final p = prefs;
+              if (rememberPass) {
+                await p.setString('hispro_saved_login', loginCtrl.text.trim());
+                await p.setString('hispro_saved_pass', passCtrl.text);
+              } else {
+                await p.remove('hispro_saved_pass');
+                await p.setString('hispro_saved_login', loginCtrl.text.trim());
+              }
+              // v2.38.6: KHÔNG Navigator.pop trước khi login xong - để dialog hiển thị "Đang đăng nhập"
+              // Thay bằng cách hiển thị overlay loading trên dialog login hiện tại
+              showDialog(
+                context: ctx,
+                barrierDismissible: false,
+                builder: (_) => const Center(
+                  child: Material(
+                    color: Colors.transparent,
+                    child: SizedBox(
+                      width: 200,
+                      height: 80,
+                      child: Card(
+                        child: Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              CircularProgressIndicator(strokeWidth: 2),
+                              SizedBox(height: 8),
+                              Text('Đang đăng nhập HIS Pro...', style: TextStyle(fontSize: 12)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+              final res = await HisProService.instance.login(
+                loginCtrl.text.trim(),
+                passCtrl.text,
+              );
+              if (!mounted) return;
+              // Đóng TẤT CẢ dialog: overlay loading + login dialog
+              Navigator.of(context, rootNavigator: true).pop(); // close overlay
+              Navigator.of(context, rootNavigator: true).pop(); // close login dialog
+              // Give Flutter a tick to settle before opening sync
+              await Future.delayed(const Duration(milliseconds: 100));
+
+              if (res.success) {
+                if (!mounted) return;
+                await _syncFromHisPro();
+              } else {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text('❌ ${res.message}'),
+                  backgroundColor: Colors.red.shade700,
+                  duration: const Duration(seconds: 5),
+                ));
+              }
+            },
+          ),
+        ],
+      ),
+      ),
+    );
+  }
+
   void _openActions(Map<String, dynamic> patient) {
     // v3.0.75: BỎ "always on top" - KHÔNG set _selectedPatient làm AppBar/banner "ghim" BN
     // Trước đó: setState(() => _selectedPatient = patient) → AppBar + banner vàng hiển thị BN
@@ -1302,6 +1625,7 @@ class _HomeScreenState extends State<HomeScreen> {
               selectedPatientId: _selectedPatient?['ID'] as int?,
               onPatientTap: _openActions,
               onPatientSelect: (p) => setState(() => _selectedPatient = p),
+              onSyncFromHisPro: () => _syncFromHisPro(),
             ),
           ),
         ],
@@ -1838,6 +2162,7 @@ class DepartmentPatientPage extends StatefulWidget {
   final Function(Map<String, dynamic>) onPatientTap;
   final ValueChanged<Map<String, dynamic>?> onPatientSelect;
   final int? selectedPatientId;
+  final VoidCallback? onSyncFromHisPro;
 
   const DepartmentPatientPage({
     super.key,
@@ -1850,6 +2175,7 @@ class DepartmentPatientPage extends StatefulWidget {
     this.dateFrom,
     this.dateTo,
     this.selectedPatientId,
+    this.onSyncFromHisPro,
   });
 
   @override
@@ -1947,6 +2273,7 @@ class _DepartmentPatientPageState extends State<DepartmentPatientPage>
           selectedPatientId: null,
           onPatientTap: widget.onPatientTap,
           onPatientSelect: widget.onPatientSelect,
+          onSyncFromHisPro: widget.onSyncFromHisPro,
         ),
       ),
     );
@@ -1975,13 +2302,11 @@ class _DepartmentPatientPageState extends State<DepartmentPatientPage>
   }
 
   // v2.91.0: Load + save _apiSource preference
-  // v3.0.77: Default = Public API (khi chưa set lần nào)
-  // - Public nhanh, không cần auth, dùng được khi chưa có VPN
-  // - User vẫn có thể chuyển sang HIS Pro qua menu API
+  // v2.98.2: Default = API 1 (HIS Pro) khi chưa set lần nào
   void _loadApiSourcePreference() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final idx = prefs.getInt('patient_api_source') ?? PatientApiSource.public.index;
+      final idx = prefs.getInt('patient_api_source') ?? PatientApiSource.hisPro.index;
       if (idx >= 0 && idx < PatientApiSource.values.length) {
         _apiSource = PatientApiSource.values[idx];
         _apiSourceLabel = _apiSourceLabelFor(_apiSource);
@@ -2981,6 +3306,13 @@ class _DepartmentPatientPageState extends State<DepartmentPatientPage>
                   ],
                 ),
               ),
+              IconButton(
+                icon: Icon(Icons.refresh, size: 18, color: Colors.deepOrange.shade700),
+                onPressed: widget.onSyncFromHisPro,
+                tooltip: 'Đồng bộ lại',
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+              ),
             ],
           ),
         );
@@ -3123,16 +3455,25 @@ class _DepartmentPatientPageState extends State<DepartmentPatientPage>
               const SizedBox(width: 6),
               Expanded(
                 child: Text(
-                  'Khoa không có BN trong khoảng thời gian đã chọn. Bấm "Thử lại" hoặc đổi khoa/ngày.',
+                  HisProService.instance.isLoggedIn
+                      ? 'Khoa không có BN (Data+HIS Pro đều trống). Bấm "ĐB HIS" để thử lại.'
+                      : 'Khoa không có BN. Bật VPN BV → bấm "ĐB HIS" để load PK cấp cứu.',
                   style: const TextStyle(color: Colors.black87, fontSize: 11),
                 ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.cloud_sync, size: 18, color: Colors.deepOrange),
+                onPressed: widget.onSyncFromHisPro,
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                tooltip: 'ĐB HIS Pro (lấy BN PK cấp cứu)',
               ),
               IconButton(
                 icon: const Icon(Icons.refresh, size: 18, color: Colors.black54),
                 onPressed: _load,
                 visualDensity: VisualDensity.compact,
                 padding: EdgeInsets.zero,
-                tooltip: 'Tải lại',
+                tooltip: 'Tải lại Data',
               ),
             ],
           ),

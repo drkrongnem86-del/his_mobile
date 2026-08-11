@@ -5,6 +5,7 @@ import 'package:his_mobile/core/constants/app_constants.dart';
 import 'package:his_mobile/data/api/his_api_service.dart';
 import 'package:his_mobile/data/api/thongke_auth_service.dart';
 import 'package:his_mobile/data/api/his_pro_api_service.dart';
+import 'package:his_mobile/core/services/vpn_benh_vien_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -21,7 +22,21 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    _bootstrap();
+    // v3.0.76: Wrap toàn bộ bootstrap trong 1 timeout 8s
+    // → tránh app treo ở splash khi không có VPN / API chậm
+    _bootstrap().timeout(const Duration(seconds: 8), onTimeout: () {
+      debugPrint('SplashScreen: bootstrap timeout 8s → force go /home');
+    }).catchError((e) {
+      debugPrint('SplashScreen: bootstrap error: $e');
+    });
+    // Vẫn fallback: nếu 8s vẫn chưa xong, ép về home
+    Future.delayed(const Duration(seconds: 8), () {
+      if (mounted) {
+        try {
+          context.go('/home');
+        } catch (_) {}
+      }
+    });
   }
 
   Future<void> _bootstrap() async {
@@ -29,8 +44,6 @@ class _SplashScreenState extends State<SplashScreen> {
       setState(() => _status = 'Đang khôi phục phiên...');
 
       // v2.75.0: Check keyIsLoggedIn trước (state persistence)
-      // Tắt ngang/đóng app → mở lại vẫn giữ đăng nhập
-      // Trừ khi user chủ động logout thì keyIsLoggedIn = false
       final prefs = await SharedPreferences.getInstance();
       final isLoggedIn = prefs.getBool(AppConstants.keyIsLoggedIn) ?? false;
       if (!isLoggedIn) {
@@ -40,16 +53,14 @@ class _SplashScreenState extends State<SplashScreen> {
         return;
       }
 
-      // 1. Khôi phục thongke session (Data path - 8080)
-      final thongke = ThongkeAuthService();
-      bool thongkeOk = false;
-      try {
-        thongkeOk = await thongke.restoreSession();
-      } catch (_) {
-        thongkeOk = false;
-      }
+      // 0. v3.0.76: Init VPN service (không block, fire-and-forget)
+      // → user có thể thấy VPN status indicator trên home/setting
+      VpnBenhVienService.instance.init().catchError((e) {
+        debugPrint('VpnBenhVienService init error: $e');
+        return;
+      });
 
-      // Lấy username từ prefs
+      // Lấy username từ prefs (nhanh, local)
       final loginName = prefs.getString(AppConstants.keyLoginName) ?? '';
       final savedName = prefs.getString(AppConstants.keyUserName) ?? '';
       if (savedName.isNotEmpty) {
@@ -58,38 +69,55 @@ class _SplashScreenState extends State<SplashScreen> {
         _username = loginName;
       }
 
-      if (thongkeOk && thongke.currentUsername != null) {
-        _username = 'BS. ${thongke.currentUsername}';
-      }
+      // 1. v3.0.76: Thongke restore trong 3s max - không block splash
+      setState(() => _status = 'Đang kết nối thongke...');
+      final thongke = ThongkeAuthService();
+      try {
+        await thongke.restoreSession().timeout(const Duration(seconds: 3),
+            onTimeout: () => false);
+        if (thongke.currentUsername != null) {
+          _username = 'BS. ${thongke.currentUsername}';
+        }
+      } catch (_) {}
 
-      // 2. v2.47.0: Auto-login HIS Pro (1417) bằng saved loginName
-      //    AcsToken/Authorize chỉ cần LOGIN_NAME - KHÔNG cần password
-      //    → mỗi lần mở app tự lấy TokenCode mới
+      // 2. v3.0.76: Auto-login HIS Pro trong 4s max - KHÔNG block splash
+      //    Nếu quá timeout → vẫn vào home, BN sẽ tự load lại khi cần
       setState(() => _status = 'Đang kết nối HIS Pro...');
+      // Fire-and-forget - chạy nền, không await
+      _tryHisProAutoLoginInBackground();
+
+      // v3.0.76: Vào home ngay (không đợi HIS Pro)
+      setState(() => _status = 'Chào mừng trở lại, $_username');
+      await Future.delayed(const Duration(milliseconds: 300));
+      if (mounted) context.go('/home');
+    } catch (e) {
+      if (mounted) {
+        setState(() => _status = 'Lỗi: $e');
+        await Future.delayed(const Duration(milliseconds: 500));
+        if (mounted) context.go('/home');  // v3.0.76: luôn về home (không về login)
+      }
+    }
+  }
+
+  /// v3.0.76: HIS Pro auto-login chạy nền (không block splash)
+  void _tryHisProAutoLoginInBackground() {
+    Future.microtask(() async {
       try {
         final hisPro = HisProApiService.instance;
-        final r = await hisPro.tryAutoLogin();
+        final r = await hisPro.tryAutoLogin()
+            .timeout(const Duration(seconds: 4), onTimeout: () {
+          debugPrint('HIS Pro auto-login timeout 4s (no VPN?)');
+          return (success: false, message: 'Timeout - kiểm tra VPN', session: null);
+        });
         if (r.success && r.session != null) {
           print('✅ HIS Pro auto-login OK: ${r.session!.loginName}');
         } else {
           print('ℹ HIS Pro auto-login skipped: ${r.message}');
         }
       } catch (e) {
-        print('⚠ HIS Pro auto-login error: $e');
+        debugPrint('HIS Pro auto-login error: $e');
       }
-
-      // v2.75.0: Đã có keyIsLoggedIn = true → vào home trực tiếp
-      // Kể cả khi thongke restore fail, vẫn vào home (BN sẽ tự load lại khi cần)
-      setState(() => _status = 'Chào mừng trở lại, $_username');
-      await Future.delayed(const Duration(milliseconds: 400));
-      if (mounted) context.go('/home');
-    } catch (e) {
-      if (mounted) {
-        setState(() => _status = 'Lỗi: $e');
-        await Future.delayed(const Duration(milliseconds: 800));
-        context.go('/login');
-      }
-    }
+    });
   }
 
   @override

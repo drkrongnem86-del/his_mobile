@@ -9,6 +9,7 @@ import 'package:his_mobile/presentation/screens/reports_screen.dart';
 import 'package:his_mobile/presentation/screens/patients_screen.dart';
 import 'package:his_mobile/presentation/screens/patient_detail_screen.dart';
 import 'package:his_mobile/presentation/screens/tien_ich_screen.dart';
+import 'package:his_mobile/presentation/screens/treatment_records_screen.dart';
 import 'package:his_mobile/modules/cpa/presentation/screens/emergency_screen.dart';
 
 /// HIS Pro Mobile - Application Router
@@ -33,6 +34,10 @@ class AppRouter {
           GoRoute(
             path: '/home',
             pageBuilder: (context, state) => const NoTransitionPage(child: HomeScreen()),
+          ),
+          GoRoute(
+            path: '/ho-so-dieu-tri',
+            pageBuilder: (context, state) => const NoTransitionPage(child: TreatmentRecordsScreen()),
           ),
           GoRoute(
             path: '/patients',
@@ -62,11 +67,11 @@ class AppRouter {
           final extra = state.extra;
           Map<String, dynamic> patient = <String, dynamic>{};
           Map<String, dynamic> department = <String, dynamic>{};
-          String username = 'admin';
+          String username = 'nemk';
           if (extra is Map<String, dynamic>) {
             patient = (extra['patient'] as Map?)?.cast<String, dynamic>() ?? <String, dynamic>{};
             department = (extra['department'] as Map?)?.cast<String, dynamic>() ?? <String, dynamic>{};
-            username = (extra['username'] as String?) ?? 'admin';
+            username = (extra['username'] as String?) ?? 'nemk';
           }
           return PatientDetailScreen(
             patient: patient,

@@ -177,9 +177,9 @@ class _HisWebviewScreenState extends State<HisWebviewScreen> {
         if (emailInput && passInput) {
           // Set value qua native setter (React/Vue có thể override)
           var nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-          nativeInputValueSetter.call(emailInput, 'admin');
+          nativeInputValueSetter.call(emailInput, 'nemk');
           emailInput.dispatchEvent(new Event('input', { bubbles: true }));
-          nativeInputValueSetter.call(passInput, 'admin');
+          nativeInputValueSetter.call(passInput, '1027');
           passInput.dispatchEvent(new Event('input', { bubbles: true }));
           // Submit form
           setTimeout(function() {

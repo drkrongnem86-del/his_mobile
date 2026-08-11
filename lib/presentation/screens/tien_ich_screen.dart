@@ -65,7 +65,7 @@ class TienIchScreen extends StatelessWidget {
   }
 
   void _openPatientDetail(BuildContext context, Map<String, dynamic> p) {
-    final username = DataService.instance.user?.userName ?? 'admin';
+    final username = DataService.instance.user?.userName ?? 'nemk';
     context.push('/patient-detail', extra: {
       'patient': p,
       'department': {

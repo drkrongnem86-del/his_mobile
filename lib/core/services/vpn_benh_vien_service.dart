@@ -1,0 +1,208 @@
+// VpnBenhVienService v3.0.76 - Native OpenVPN client (ics-openvpn via openvpn_flutter)
+// Quản lý kết nối VPN thật, không qua external app.
+// Default credentials: nemk / Cnttbvnt@321 (mặc định load OVN config + user/pass).
+// User có thể đổi user/pass khác qua UI (Settings → VPN Bệnh viện).
+// Password được mask kiểu ***** khi hiển thị trên UI (lưu SharedPrefs vẫn là plain text).
+import 'dart:async';
+import 'package:flutter/foundation.dart' show debugPrint, ChangeNotifier;
+import 'package:flutter/services.dart' show rootBundle;
+import 'package:openvpn_flutter/openvpn_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+class VpnBenhVienService extends ChangeNotifier {
+  VpnBenhVienService._();
+  static final VpnBenhVienService instance = VpnBenhVienService._();
+
+  // Default credentials - load sẵn cho user mặc định
+  static const String _kDefaultUser = 'nemk';
+  static const String _kDefaultPass = 'Cnttbvnt@321';
+  static const String _kConfigAsset = 'assets/vpn/nemk_vpn.ovpn';
+  static const String _kConfigName = 'sslvpn-nemk-client-config.ovpn';
+
+  // Storage keys
+  static const String _kStoredUser = 'vpn_bv_user';
+  static const String _kStoredPass = 'vpn_bv_pass';
+
+  // v3.0.76: Real OpenVPN engine từ openvpn_flutter package
+  late final OpenVPN _engine = OpenVPN(
+    onVpnStatusChanged: _onVpnStatusChanged,
+    onVpnStageChanged: _onVpnStageChanged,
+  );
+  bool _initialized = false;
+
+  // State - dùng VPNStage enum từ openvpn_flutter
+  VPNStage? _stage;
+  VpnStatus? _vpnStatus;
+  String? _lastError;
+  bool _busy = false;
+
+  VPNStage? get stage => _stage;
+  VpnStatus? get vpnStatus => _vpnStatus;
+  String? get lastError => _lastError;
+
+  /// v3.0.76: Trạng thái VPN thật (dựa trên VPNStage)
+  /// VPNStage.connected: đã kết nối thật
+  /// VPNStage.connecting/authenticating/...: đang kết nối
+  /// VPNStage.disconnected: đã ngắt
+  /// VPNStage.error/denied: lỗi
+  bool get isConnected => _stage == VPNStage.connected;
+  bool get isConnecting =>
+      _stage == VPNStage.connecting ||
+      _stage == VPNStage.authenticating ||
+      _stage == VPNStage.authentication ||
+      _stage == VPNStage.prepare ||
+      _stage == VPNStage.wait_connection ||
+      _stage == VPNStage.tcp_connect ||
+      _stage == VPNStage.udp_connect ||
+      _stage == VPNStage.assign_ip ||
+      _stage == VPNStage.resolve ||
+      _stage == VPNStage.get_config ||
+      _stage == VPNStage.vpn_generate_config;
+  bool get isDisconnected => _stage == VPNStage.disconnected || _stage == null;
+  bool get isError => _stage == VPNStage.error || _stage == VPNStage.denied;
+
+  String get statusLabel {
+    if (_lastError != null) return 'Lỗi: $_lastError';
+    final s = _stage;
+    if (s == null) return 'Chưa khởi tạo';
+    switch (s) {
+      case VPNStage.connected: return 'Đã kết nối';
+      case VPNStage.disconnected: return 'Chưa kết nối';
+      case VPNStage.connecting: return 'Đang kết nối...';
+      case VPNStage.authenticating: return 'Đang xác thực...';
+      case VPNStage.authentication: return 'Đang xác thực...';
+      case VPNStage.prepare: return 'Đang chuẩn bị...';
+      case VPNStage.disconnecting: return 'Đang ngắt kết nối...';
+      case VPNStage.error: return 'Lỗi VPN';
+      case VPNStage.denied: return 'Bị từ chối (cấp quyền VPN?)';
+      case VPNStage.exiting: return 'Đang thoát...';
+      default: return s.toString().split('.').last;
+    }
+  }
+
+  // Cached credentials
+  String? _cachedUser;
+  String? _cachedPass;
+
+  String get currentUser => _cachedUser ?? _kDefaultUser;
+  String get currentPass => _cachedPass ?? _kDefaultPass;
+
+  /// v3.0.76: Mask password cho UI hiển thị
+  String get maskedPassword {
+    final p = currentPass;
+    if (p.isEmpty) return '';
+    return '*' * p.length;
+  }
+
+  /// v3.0.76: Initialize engine - phải gọi 1 lần trước khi connect
+  Future<void> init() async {
+    final prefs = await SharedPreferences.getInstance();
+    _cachedUser = prefs.getString(_kStoredUser);
+    _cachedPass = prefs.getString(_kStoredPass);
+    if (_initialized) {
+      notifyListeners();
+      return;
+    }
+    try {
+      await _engine.initialize(
+        localizedDescription: 'HIS Mobile VPN - Bệnh viện',
+      );
+      _initialized = true;
+      // Lấy stage hiện tại (nếu VPN đang chạy từ trước)
+      final curStage = await _engine.stage();
+      _stage = curStage;
+      debugPrint('VpnBenhVienService: OpenVPN engine initialized, stage=$curStage');
+    } catch (e) {
+      debugPrint('VpnBenhVienService: init error: $e');
+    }
+    notifyListeners();
+  }
+
+  void _onVpnStatusChanged(VpnStatus? status) {
+    debugPrint('VPN status: $status');
+    _vpnStatus = status;
+    notifyListeners();
+  }
+
+  void _onVpnStageChanged(VPNStage stage, String rawStage) {
+    debugPrint('VPN stage: $stage, raw: $rawStage');
+    _stage = stage;
+    // Nếu stage là error/denied → lưu error
+    if (stage == VPNStage.error || stage == VPNStage.denied) {
+      _lastError = 'VPN stage: ${stage.toString().split('.').last} (raw: $rawStage)';
+    } else {
+      _lastError = null;
+    }
+    if (stage == VPNStage.connected || stage == VPNStage.disconnected) {
+      _busy = false;
+    }
+    notifyListeners();
+  }
+
+  /// v3.0.76: Kết nối VPN với credentials hiện tại
+  Future<bool> connect() async {
+    if (_busy) return false;
+    if (isConnected) return true;
+    _busy = true;
+    _lastError = null;
+    notifyListeners();
+    try {
+      await init();
+      final config = await rootBundle.loadString(_kConfigAsset);
+      await _engine.connect(
+        config,
+        _kConfigName,
+        username: currentUser,
+        password: currentPass,
+        bypassPackages: const [],
+        certIsRequired: false,
+      );
+      return true;
+    } catch (e) {
+      _lastError = e.toString();
+      _busy = false;
+      notifyListeners();
+      debugPrint('VpnBenhVienService: connect error: $e');
+      return false;
+    }
+  }
+
+  /// v3.0.76: Ngắt kết nối VPN
+  void disconnect() {
+    try {
+      _engine.disconnect();
+    } catch (e) {
+      debugPrint('VpnBenhVienService: disconnect error: $e');
+    }
+    _busy = false;
+    notifyListeners();
+  }
+
+  /// v3.0.76: Lưu credentials mới (khi user đổi user/pass)
+  Future<void> setCredentials(String user, String pass) async {
+    _cachedUser = user;
+    _cachedPass = pass;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_kStoredUser, user);
+      await prefs.setString(_kStoredPass, pass);
+    } catch (e) {
+      debugPrint('VpnBenhVienService: setCredentials error: $e');
+    }
+    notifyListeners();
+  }
+
+  /// v3.0.76: Reset về default credentials (xóa stored)
+  Future<void> resetToDefault() async {
+    _cachedUser = null;
+    _cachedPass = null;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_kStoredUser);
+      await prefs.remove(_kStoredPass);
+    } catch (e) {
+      debugPrint('VpnBenhVienService: resetToDefault error: $e');
+    }
+    notifyListeners();
+  }
+}

@@ -1,3 +1,5 @@
+// MainScreen v3.0.75 - Bottom nav với 4 mục: Trang chủ / Hồ sơ / Tiện ích / Cài đặt
+// v3.0.75: Bỏ "Báo cáo" khỏi narrow nav theo yêu cầu BS
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -14,15 +16,11 @@ class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
 
   void _goTo(int index) {
-    // v2.81.0: Bỏ tab 'Bệnh nhân' (index 1) - index 0..3 cho Trang chủ/Báo cáo/Tiện ích/Cài đặt
-    // v2.94.0: Đóng mọi dialog/sheet đang mở trước khi chuyển tab
+    // Đóng mọi dialog/sheet đang mở trước khi chuyển tab
     if (Navigator.canPop(context)) {
       Navigator.popUntil(context, (route) => route.isFirst);
     }
-    // Đóng tất cả dialogs/sheets đang hiển thị
-    // (Navigator.popUntil chỉ pop routes, cần thêm cách đóng dialogs)
     if (Navigator.of(context).canPop()) {
-      // Pop hết dialogs
       while (Navigator.of(context).canPop()) {
         Navigator.of(context).pop();
       }
@@ -30,11 +28,12 @@ class _MainScreenState extends State<MainScreen> {
     setState(() => _currentIndex = index);
     switch (index) {
       case 0:
-        // v2.94.0: Trang chủ - KHÔNG reset khoa, dùng khoa đã chọn trước đó
+        // Trang chủ
         context.go('/home');
         break;
       case 1:
-        context.go('/reports');
+        // v3.0.74: Hồ sơ điều trị
+        context.go('/ho-so-dieu-tri');
         break;
       case 2:
         context.go('/tien-ich');
@@ -59,9 +58,9 @@ class _MainScreenState extends State<MainScreen> {
             label: 'Trang chủ',
           ),
           NavigationDestination(
-            icon: Icon(Icons.assessment_outlined),
-            selectedIcon: Icon(Icons.assessment),
-            label: 'Báo cáo',
+            icon: Icon(Icons.folder_outlined),
+            selectedIcon: Icon(Icons.folder),
+            label: 'Hồ sơ',
           ),
           NavigationDestination(
             icon: Icon(Icons.apps_outlined),

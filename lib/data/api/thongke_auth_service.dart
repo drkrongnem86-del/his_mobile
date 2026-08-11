@@ -29,17 +29,26 @@ class ThongkeAuthService {
   /// v2.38.8: Public Data API endpoint - có BN PK cấp cứu HSCC/CCS
   /// (113.163.187.3:8080 = thongke.benhvienninthuan.vn:8080 public IP)
   static const String publicBaseUrl = 'http://113.163.187.3:8080';
-  /// v2.47.0: HIS Pro thật (port 1408 MOS) - có ICD_CODE/ICD_NAME/ICD_TEXT đầy đủ
-  /// Lấy từ log: 1408 = MosBaseUri, dùng Bearer token 64-char hex
-  /// v2.75.2: dynamic
-  static String get hisProBaseUrl => ConnectionService.instance.mosUrl
-      .replaceAll(RegExp(r'/$'), '')
-      .replaceFirst(':1408/', ':1408');
+  /// v3.0.79: HIS Pro thật (port 1408 MOS) - có ICD_CODE/ICD_NAME/ICD_TEXT đầy đủ.
+  /// Port này KHÁC với mosUrl (1429): mosUrl 1429 = Mới (v3.0.62) trả 404 cho
+  /// HisTreatment/GetLView và các API TreatmentHistory. Port 1408 (legacy) mới
+  /// có các API: GetLView, GetView, Get, GetDHisSereServ2, GetDynamic.
+  /// v3.0.79: hardcode port 1408 thay vì dynamic từ mosUrl (vì mosUrl 1429 bị 404).
+  /// Lấy host từ mosUrl (172.16.9.6 LAN hoặc 117.2.25.67 public VPN) nhưng ép port 1408.
+  static String get hisProBaseUrl {
+    final mos = ConnectionService.instance.mosUrl.replaceAll(RegExp(r'/$'), '');
+    // Extract host (e.g., "http://172.16.9.6" từ "http://172.16.9.6:1429")
+    final uri = Uri.parse(mos);
+    return '${uri.scheme}://${uri.host}:1408';
+  }
   static const String _kHisProToken = 'hispro_bearer_token';
+  static const String _kHisProTokenSavedAt = 'hispro_token_saved_at';
   static const String _kUsername = 'hispro_username';
   static const String _kEmail = 'hispro_email';
   static const String _kRecentUsers = 'hispro_recent_users';
   static const int _kMaxRecent = 5;
+  // v3.0.90: Token expiry window (HIS Pro tokens typically valid 1 hour)
+  static const Duration _hisProTokenMaxAge = Duration(hours: 1);
 
   /// v2.52.0: Embedded default token (XOR + Base64) — auto-load khi không có token
   /// Mục đích: Bác sĩ mở app → tự động có ICD cho 218 BN HSCC mà KHÔNG cần paste
@@ -147,11 +156,52 @@ class ThongkeAuthService {
   Future<void> setHisProToken(String token) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kHisProToken, token.trim());
+    // v3.0.90: Lưu timestamp để check expiry
+    await prefs.setString(_kHisProTokenSavedAt, DateTime.now().toIso8601String());
     _hisProToken = token.trim();
   }
 
   String? get hisProToken => _hisProToken;
   bool get hasHisProToken => (_hisProToken ?? '').isNotEmpty;
+
+  /// v3.0.90: Lấy thời điểm token được lưu (null nếu chưa có)
+  Future<DateTime?> getHisProTokenSavedAt() async {
+    final prefs = await SharedPreferences.getInstance();
+    final s = prefs.getString(_kHisProTokenSavedAt);
+    if (s == null || s.isEmpty) return null;
+    return DateTime.tryParse(s);
+  }
+
+  /// v3.0.90: Tuổi token (Duration since saved). Null nếu chưa lưu.
+  Future<Duration?> getHisProTokenAge() async {
+    final saved = await getHisProTokenSavedAt();
+    if (saved == null) return null;
+    return DateTime.now().difference(saved);
+  }
+
+  /// v3.0.90: True nếu token còn hạn (< 1h)
+  Future<bool> isHisProTokenFresh() async {
+    final age = await getHisProTokenAge();
+    if (age == null) return false;
+    return age < _hisProTokenMaxAge;
+  }
+
+  /// v3.0.90: Format tuổi token thành chuỗi tiếng Việt
+  Future<String> hisProTokenAgeText() async {
+    final age = await getHisProTokenAge();
+    if (age == null) return 'chưa rõ';
+    if (age.inMinutes < 1) return 'vừa lưu';
+    if (age.inMinutes < 60) return '${age.inMinutes} phút trước';
+    if (age.inHours < 24) return '${age.inHours} giờ trước';
+    return '${age.inDays} ngày trước';
+  }
+
+  /// v3.0.90: Cảnh báo nếu token sắp hết hạn
+  Future<bool> isHisProTokenExpired() async {
+    final age = await getHisProTokenAge();
+    if (age == null) return true; // chưa có = coi như hết hạn
+    return age >= _hisProTokenMaxAge;
+  }
 
   /// v2.47.0: Lấy ICD/mặt bệnh cho 1 treatment từ HIS Pro thật (port 1408)
   /// Trả về: {icd_code, icd_name, icd_sub_codes, icd_text, department_in, in_time, ...}
@@ -260,12 +310,20 @@ class ThongkeAuthService {
   /// - Hoặc từ SharedPreferences (nếu user paste tay 1 lần)
   /// v2.52.0: FALLBACK xuống embedded default token (XOR-encoded) để auto hiện ICD
   /// ưu tiên: SharedPreferences > file local > embedded default
+  /// v3.0.90: Khi load từ file/embedded, set savedAt = now (vì coi như "vừa lấy")
   Future<void> loadHisProToken() async {
     final prefs = await SharedPreferences.getInstance();
-    _hisProToken = prefs.getString(_kHisProToken);
+    final fromPrefs = prefs.getString(_kHisProToken);
+    final hasSavedAt = prefs.getString(_kHisProTokenSavedAt) != null;
+    _hisProToken = fromPrefs;
     // Nếu chưa có token, thử đọc file local
     if ((_hisProToken ?? '').isEmpty) {
       _hisProToken = await _readTokenFromFile();
+      if (_hisProToken != null) {
+        // v3.0.90: Lưu cả token + savedAt khi lấy từ file
+        await prefs.setString(_kHisProToken, _hisProToken!);
+        await prefs.setString(_kHisProTokenSavedAt, DateTime.now().toIso8601String());
+      }
     }
     // v2.52.0: Fallback cuối cùng — embedded default token (BS không cần paste)
     if ((_hisProToken ?? '').isEmpty) {
@@ -274,7 +332,11 @@ class ThongkeAuthService {
         debugPrint('✅ Loaded embedded default HIS Pro token (v2.52.0)');
         // Cache luôn vào SharedPreferences để các lần sau khỏi decode
         await prefs.setString(_kHisProToken, _hisProToken!);
+        await prefs.setString(_kHisProTokenSavedAt, DateTime.now().toIso8601String());
       }
+    } else if (!hasSavedAt) {
+      // v3.0.90: Có token từ prefs nhưng thiếu savedAt → set = now
+      await prefs.setString(_kHisProTokenSavedAt, DateTime.now().toIso8601String());
     }
     debugPrint('HIS Pro token loaded: ${_hisProToken != null ? "OK (len=${_hisProToken!.length})" : "null"}');
   }
@@ -922,10 +984,10 @@ class ThongkeAuthService {
   ///
   /// Date format: 'YYYY-MM-DD HH:mm:ss' (web format, not just YYYY-MM-DD)
   ///
-  /// Default credentials: admin/admin
+  /// Default credentials: nemk/1027
   Future<List<Map<String, dynamic>>?> fetchPatientsPublic({
-    String? email,                 // default: 'admin'
-    String? password,              // default: 'admin'
+    String? email,                 // default: 'nemk'
+    String? password,              // default: 'nemk'
     int? departmentCatalogId,      // PRIMARY: server filter (22=HSCC, 23=CCS, ...)
     String? department,            // fallback dept code for client-side filter
     String? treatmentCode,         // search by treatment code (server supports)
@@ -938,9 +1000,9 @@ class ThongkeAuthService {
     int start = 0,
   }) async {
     try {
-      // v2.39.0: hardcode admin/admin - public Data chỉ có account này
-      final _email = email ?? 'admin';
-      final _pwd = password ?? 'admin';
+      // v2.39.0: hardcode nemk/1027 - public Data chỉ có account này
+      final _email = email ?? 'nemk';
+      final _pwd = password ?? '1027';
 
       final dio = Dio(BaseOptions(
         connectTimeout: const Duration(seconds: 8),
@@ -987,9 +1049,20 @@ class ThongkeAuthService {
 
       // Step 2: Build query params (web-compatible)
       // v2.40.0: Use department_catalog (NOT department_id) - server respects this
-      final today = DateTime.now();
-      final fromDt = from ?? today.subtract(const Duration(days: 13));
-      final toDt = to ?? today;
+      // v3.0.89: Normalize "Hôm nay" - server expects from <= to, both ở start/end of day
+      final now = DateTime.now();
+      final todayStart = DateTime(now.year, now.month, now.day);
+      final todayEnd = DateTime(now.year, now.month, now.day, 23, 59, 59);
+      // Auto-detect: nếu from == to (cùng 1 ngày, cùng giờ) → mở rộng to đến cuối ngày
+      DateTime fromDt, toDt;
+      if (from != null && to != null &&
+          from!.year == to!.year && from!.month == to!.month && from!.day == to!.day) {
+        fromDt = DateTime(from!.year, from!.month, from!.day);
+        toDt = DateTime(to!.year, to!.month, to!.day, 23, 59, 59);
+      } else {
+        fromDt = from ?? todayStart.subtract(const Duration(days: 13));
+        toDt = to ?? todayEnd;
+      }
       String two(int n) => n.toString().padLeft(2, '0');
       // Web format: 'YYYY-MM-DD HH:mm:ss' - server expects this exact format
       String fmtDt(DateTime dt) {
@@ -1201,6 +1274,7 @@ class ThongkeAuthService {
 
   /// Helper: Login + gọi 1 GET endpoint trên publicBaseUrl, trả về Map JSON
   /// Dùng chung cho các catalog API (medicine, CLS, supply, staff, bed, equipment, DVKT)
+  /// v3.0.77: Robust hơn - thử nhiều pattern CSRF + fallback không CSRF
   Future<Map<String, dynamic>?> _publicCatalogCall({
     required String endpoint,
     required String email,
@@ -1212,45 +1286,62 @@ class ThongkeAuthService {
         connectTimeout: const Duration(seconds: 8),
         receiveTimeout: const Duration(seconds: 30),
         headers: {
-          'Accept': 'application/json',
+          'Accept': 'application/json, text/html, */*',
           'X-Requested-With': 'XMLHttpRequest',
         },
       ));
       final jar = CookieJar();
       dio.interceptors.add(CookieManager(jar));
 
-      // Step 1: Login
+      // Step 1: GET /login để lấy CSRF + session cookies
       final r1 = await dio.get('$publicBaseUrl/login');
       String csrf = '';
-      final m = RegExp(r'name="_token"\s+value="([^"]+)"').firstMatch(r1.data ?? '');
-      if (m != null) csrf = m.group(1) ?? '';
+      final html = r1.data?.toString() ?? '';
+      // v3.0.77: Thử nhiều pattern CSRF (Laravel 8-10 dùng _token, một số dùng csrf-token)
+      final patterns = [
+        RegExp(r'name="_token"\s+value="([^"]+)"'),
+        RegExp(r'<meta\s+name="csrf-token"\s+content="([^"]+)"'),
+        RegExp(r'"csrfToken"\s*:\s*"([^"]+)"'),
+        RegExp(r'name="csrf_token"\s+value="([^"]+)"'),
+      ];
+      for (final p in patterns) {
+        final m = p.firstMatch(html);
+        if (m != null) {
+          csrf = m.group(1) ?? '';
+          if (csrf.isNotEmpty) break;
+        }
+      }
       if (csrf.isEmpty) {
-        debugPrint('Catalog login: no CSRF');
-        return null;
-      }
-      final cookies1 = await jar.loadForRequest(Uri.parse('$publicBaseUrl/login'));
-      final xsrf1 = cookies1.firstWhere(
-        (c) => c.name == 'XSRF-TOKEN',
-        orElse: () => Cookie('XSRF-TOKEN', ''),
-      ).value;
-
-      final r2 = await dio.post(
-        '$publicBaseUrl/login',
-        data: {'email': email, 'password': password, '_token': csrf},
-        options: Options(
-          headers: {
-            'X-XSRF-TOKEN': Uri.encodeQueryComponent(xsrf1),
-            'Referer': '$publicBaseUrl/login',
-          },
-          validateStatus: (s) => s != null && s < 500,
-        ),
-      );
-      if (r2.statusCode != 302) {
-        debugPrint('Catalog login fail: ${r2.statusCode}');
-        return null;
+        // v3.0.77: Không có CSRF - vẫn thử gọi API trực tiếp (một số API không cần CSRF)
+        debugPrint('Catalog login: no CSRF found in /login, will try direct call');
       }
 
-      // Step 2: Gọi endpoint
+      // Step 2: Login (nếu có CSRF)
+      if (csrf.isNotEmpty) {
+        final cookies1 = await jar.loadForRequest(Uri.parse('$publicBaseUrl/login'));
+        final xsrf1 = cookies1.firstWhere(
+          (c) => c.name == 'XSRF-TOKEN',
+          orElse: () => Cookie('XSRF-TOKEN', ''),
+        ).value;
+
+        final r2 = await dio.post(
+          '$publicBaseUrl/login',
+          data: {'email': email, 'password': password, '_token': csrf},
+          options: Options(
+            headers: {
+              'X-XSRF-TOKEN': Uri.encodeQueryComponent(xsrf1),
+              'Referer': '$publicBaseUrl/login',
+            },
+            validateStatus: (s) => s != null && s < 500,
+          ),
+        );
+        if (r2.statusCode != 302) {
+          debugPrint('Catalog login fail: ${r2.statusCode} (${r2.statusMessage})');
+          // v3.0.77: Vẫn thử gọi API (một số trang cho public access)
+        }
+      }
+
+      // Step 3: Gọi endpoint
       String queryStr = '';
       if (params != null && params.isNotEmpty) {
         queryStr = '?' + params.entries
@@ -1658,7 +1749,7 @@ class ThongkeAuthService {
     try {
       final result = await _publicCatalogCall(
         endpoint: '/index/category-department-catalog',
-        email: 'admin', password: 'admin',
+        email: 'nemk', password: '1027',
       );
       if (result == null) return [];
       final data = (result['data'] as List?) ?? [];
@@ -1681,7 +1772,7 @@ class ThongkeAuthService {
     try {
       final result = await _publicCatalogCall(
         endpoint: '/index/category-patient-type',
-        email: 'admin', password: 'admin',
+        email: 'nemk', password: '1027',
       );
       if (result == null) return [];
       final data = (result['data'] as List?) ?? [];
@@ -1701,7 +1792,7 @@ class ThongkeAuthService {
     try {
       final result = await _publicCatalogCall(
         endpoint: '/index/category-treatment-type',
-        email: 'admin', password: 'admin',
+        email: 'nemk', password: '1027',
       );
       if (result == null) return [];
       final data = (result['data'] as List?) ?? [];
@@ -1741,7 +1832,7 @@ class ThongkeAuthService {
       final cookies1 = await jar.loadForRequest(Uri.parse('$publicBaseUrl/login'));
       final xsrf1 = cookies1.firstWhere((c) => c.name == 'XSRF-TOKEN', orElse: () => Cookie('XSRF-TOKEN', '')).value;
       final r2 = await dio.post('$publicBaseUrl/login',
-          data: {'email': 'admin', 'password': 'admin', '_token': csrf},
+          data: {'email': 'nemk', 'password': '1027', '_token': csrf},
           options: Options(headers: {
             'X-XSRF-TOKEN': Uri.encodeQueryComponent(xsrf1),
             'Referer': '$publicBaseUrl/login',

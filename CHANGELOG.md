@@ -1,0 +1,501 @@
+# Changelog - HIS Mobile
+
+## v3.0.87 (build 231) - 11/08/2026
+**"Y tế số UI match XemBenhAn + Performance + Time filter"**
+
+### 🐛 Bug fix - Load nhanh hơn
+**Vấn đề user feedback (11/08/2026 12:50):** Login lâu, "Xem bệnh án" load lâu, có thể stuck vòng loading vô tận. Nguyên nhân:
+1. Login screen chạy HIS Pro auto-fetch + Y Tế Số login **tuần tự** → tổng thời gian = t1 + t2 + t3
+2. YTeSoScreen **auto-select phiếu đầu** khi vào → trigger download ngay (1-2s/phiếu) trước khi user thấy list
+3. YTeSoService **không cache JWT expiry** → mỗi request kèm `Authorization` hết hạn → 401 → retry → chậm gấp đôi
+4. YTeSoService **không dedup login** → mở 2 screen cùng lúc → 2 login song song
+5. YTeSoService **cache vô thời hạn** → nếu data đổi, user phải tự refresh
+
+**Fix v3.0.87:**
+- `login_screen.dart`: chạy HIS Pro + Y Tế Số **song song** với `Future.wait()` → tiết kiệm ~3-5s
+- `YTeSoService`:
+  - Parse **JWT expiry** từ `payload.exp` → tránh gọi API với token hết hạn
+  - **Dedup login** - nếu 1 login đang chạy thì return future đó (nhiều screen có thể share)
+  - **TTL cache** 5 phút cho `listDocuments` - không gọi lại nếu đã cache < 5 phút
+  - **Giảm timeout**: 15s → 8s connect, 30s → 20s receive
+  - **HTTP keep-alive** header
+- `YTeSoScreen`:
+  - **Lazy load**: KHÔNG auto-select phiếu đầu - user phải click → mới download
+  - Show "Chọn 1 phiếu bên trái để xem" placeholder
+  - Có nút **"Tải hết"** ở header list → fire-and-forget download all parallel
+
+### 🆕 Tính năng mới v3.0.87
+- **YTeSoScreen - UI match XemBenhAn** (theo feedback user ảnh 7):
+  - Header xanh navy + patient name + treatmentCode
+  - **List trái với folder-style sub-groups** (icon folder + count badge, indigo theme)
+  - **Items có check xanh nếu signed** + spinner nếu đang load
+  - **Background xanh nhạt** cho phiếu đang chọn (isSelected)
+  - **PDF viewer phải với 4 nút tròn** (fullscreen, download, print, share) - thêm nút Print mới
+  - **Note input + save dưới list** ("Ghi chú nhanh cho phiếu này...")
+  - **"Phiếu (N) ← vuốt"** header
+  - Bottom: "N nhóm • N phiếu • ⏳ M • ✓ K/N"
+- **DepartmentPatientPage - Time filter** (giống Hồ sơ điều trị):
+  - Thêm **chips Thời gian**: Hôm nay / 7 ngày / 30 ngày / 90 ngày
+  - Tách riêng **Trạng thái** (Tất cả / Đang ĐT / Đã XV)
+  - Bấm chips → tự động reload
+
+### 🔧 Sửa đổi
+- `pubspec.yaml`: version 3.0.87+231
+- `lib/data/api/y_te_so_service.dart`:
+  - Thêm `_loginInProgress` dedup
+  - Thêm `_tokenExpiresAt` parse JWT
+  - Thêm `_docCacheTime` TTL 5 phút
+  - `_ensureInit` giảm timeout
+- `lib/presentation/screens/y_te_so_screen.dart`: rewrite UI match XemBenhAn
+- `lib/modules/auth/auth/presentation/screens/login_screen.dart`: parallel Future.wait
+- `lib/presentation/screens/department_patients_screen.dart`: thêm time filter chips
+
+## v3.0.86 (build 230) - 11/08/2026
+**"Y tế số split-view 40/60 + DepartmentPatientPage status filter + YTeScreen 19 mục"**
+
+**"Y tế số split-view + Fix body API + Đơn giản hóa filter"**
+
+### 🐛 Bug fix - API Y tế số body chuẩn
+Test với curl thực tế từ PC (qua public 113.163.187.3:3000), phát hiện server yêu cầu body khác log PLogger:
+- `danh-sach-khoa-quan-ly` body `{USERNAME}` (KHÔNG phải `{DEPARTMENT_ID}`)
+- `buong-benh` body `{USERNAME, DEPARTMENT_ID}` (cần cả 2)
+- `benh-nhan-buong-benh` body thêm `USERNAME`
+- `benh-nhan-buong-benh-is-show` cần `TREATMENT_IDs` không empty
+- `patient-info` body `{MADT}` (KHÔNG phải `{USERNAME}`)
+
+### 🆕 Tính năng mới v3.0.85
+- **YTeSoScreen - Split view giống XemBenhAn**:
+  - Layout responsive: width >= 600 → split 40/60 (list trái + viewer phải)
+  - Auto-select phiếu đầu tiên, auto-load bytes
+  - Header viewer: tên phiếu + code + nút fullscreen + prev/next + counter
+  - Tap phiếu → load + hiển thị ngay
+- **YTeScreen - Menu chức năng cho BN hiện tại**:
+  - 7 chức năng (giảm từ 18), mỗi mục tap mở list screen riêng
+  - Mỗi chức năng auto-dùng BN hiện tại (treatmentCode, treatmentId, deptCode)
+  - Bỏ các API không liên quan đến BN (DS khoa, info user, ...)
+  - List screen hiển thị card đẹp với field extractor + JSON view + copy
+- **YTeSoListScreen mới - Generic list screen**:
+  - Hiển thị list đẹp từ API Y tế số
+  - Mỗi item là card với title, subtitle, các field
+  - Tap card → xem JSON detail
+  - Nút "JSON" trên header → xem raw response
+
+### 🔧 Sửa đổi
+- `pubspec.yaml`: version 3.0.85+229
+- `lib/data/api/y_te_so_extended_service.dart`:
+  - Fix body cho từng API method (theo test thực tế)
+  - Auto-pass `treatment-id` header từ query/body
+  - Auto-pass `room-id`/`room-code`/`department-id`/`department-code` (từ defaults)
+- `lib/presentation/screens/y_te_screen.dart`: refactor thành menu 7 chức năng
+- `lib/presentation/screens/y_te_so_screen.dart`: thêm split-view + auto-load
+- `lib/presentation/widgets/patient_actions_sheet.dart`:
+  - `_openYTe` truyền context BN (treatmentCode, treatmentId, ...)
+  - Lấy treatmentId từ `_g('TDL_TREATMENT_ID', 'TDL_TREATMENT_ID', 'ID')`
+
+### 🆕 Files mới
+- `lib/presentation/screens/y_te_so_list_screen.dart` (11 KB) - Generic list screen
+  - Hiển thị list API với card + JSON viewer + copy
+  - Pull to refresh, empty state, error state
+
+### 🔧 Đơn giản hóa - DepartmentPatientPage
+- Bỏ 3 filter cũ: Treatment Type (Tất cả/Chưa khám/Đang khám), Treatment Type Name (Khám bệnh/Điều trị...), Room chips
+- Chỉ giữ date filter (Hôm nay/7 ngày/30 ngày/90 ngày) + search
+- Filter giống "Hồ sơ điều trị" (Treatment History) - đơn giản, chỉ theo ngày
+
+## v3.0.84 (build 228) - 11/08/2026
+**"Fix Xem bệnh án swipe + Login đồng bộ + Chức năng Y tế 18 API"**
+
+### 🐛 Bug fix
+- **Xem bệnh án fullscreen**: nút `< >` không đồng bộ với vuốt
+  - Root cause: `_goToDoc()` chỉ `setState(_selected)` mà không animate `PageController`
+  - Fix: thêm `_pageController` instance, `_goToDoc()` dùng `animateToPage()` để sync
+  - Bonus: load docBytes cho phiếu mới khi navigate bằng nút (trước chỉ khi swipe)
+
+### 🔧 Cải tiến v3.0.84
+- **Y tế số - Xem bệnh án**: bỏ login dialog / menu đăng nhập-đăng xuất-thông tin server
+  - Login đồng bộ với main login flow (silent)
+  - Không còn mục "Đăng nhập Y Tế Số" lẻ tẻ
+- **YTeSoPdfViewerScreen mới**: PDF viewer với toolbar đầy đủ
+  - Back, Title, Counter, `< >` page nav, Fullscreen, Download, Share
+  - Download: lưu vào `/storage/emulated/0/Download`
+  - Share: qua `Printing.sharePdf` (tương tự XemBenhAn)
+  - Ảnh: `InteractiveViewer` với zoom
+  - Fullscreen toggle: dùng `SystemUiMode.immersiveSticky`
+- **YTeScreen mới - Chức năng Y tế (Bộ Y tế)**: 18 API tổng hợp
+  - 5 tabs: Bệnh nhân | Y lệnh | Điều dưỡng | Vấn đề | Khác
+  - Mỗi tab là grid icon, tap → gọi API → hiển thị JSON response đẹp
+  - Hỗ trợ copy JSON ra clipboard
+  - Auto-login qua YTeSoService (silent)
+
+### 🆕 Files mới
+- `lib/data/api/y_te_so_extended_service.dart` (10.7 KB) - 18 API methods:
+  - BN: `danhSachKhoaQuanLy`, `buongBenh`, `benhNhanBuongBenh`, `benhNhanBuongBenhIsShow`, `patientInfo`
+  - Y lệnh: `yLenhCanLamSang`, `yLenhCanLamSangDetail`, `yLenhCheckDownload`, `yLenhNhomDichVuCls`
+  - Điều dưỡng: `danhSachDieuDuong`
+  - Vấn đề: `vanDeChuyenMon`, `vanDeLuuY`
+  - Báo cáo: `phieuBanGiao`, `taiLieuBn`, `countThietBi`
+  - User: `userProfile`, `serverTime`
+  - Work: `workInfo`, `dichVuKetQua`, `medicalInstruction`
+  - Auto-retry 401 + auto-login
+- `lib/presentation/screens/y_te_screen.dart` (19.6 KB) - Main screen với 5 tabs
+- `lib/presentation/screens/y_te_so_pdf_viewer_screen.dart` (9.3 KB) - PDF viewer với toolbar
+
+### 🔧 Sửa đổi
+- `pubspec.yaml`: version 3.0.84+228
+- `lib/presentation/screens/xem_benh_an_screen.dart`:
+  - Thêm `_pageController` instance
+  - Sửa `_goToDoc()` để animate + load bytes
+  - Fix sync giữa nút < > và PageView swipe
+- `lib/presentation/screens/y_te_so_screen.dart`:
+  - Bỏ `_showLoginDialog`, `_logout`, `_showServerInfo`
+  - Bỏ menu AppBar (chỉ giữ refresh)
+  - Dùng `YTeSoPdfViewerScreen` mới thay vì `_PdfViewerScreen` inline
+  - `_load()`: tự động silent login nếu thiếu token
+- `lib/modules/auth/presentation/screens/login_screen.dart`:
+  - Sau khi login HIS Mobile thành công, tự động gọi `YTeSoService.instance.login(email, pass)` (silent)
+  - Lưu JWT vào SharedPref để dùng cho cả app
+- `lib/presentation/widgets/patient_actions_sheet.dart`:
+  - Thêm tile "Chức năng Y tế" (màu #455A64, icon apps)
+  - Import `y_te_screen.dart`
+
+### 📊 Tổng số API Y Tế Số đã tích hợp
+- v3.0.83: 3 (auth + list + download)
+- v3.0.84: +18 (mở rộng qua YTeScreen)
+- Tổng: **21 API** sẵn sàng (từ 50+ đã khám phá)
+
+## v3.0.83 (build 227) - 11/08/2026
+**"Y tế số - Xem bệnh án native (Bộ Y tế)"**
+
+### 🆕 Phát hiện lớn từ log Y Tế Số
+- **Bộ Y tế có public API mở** tại `http://113.163.187.3:3000` (qua internet, KHÔNG cần VPN)
+- Phát hiện qua PLogger curl logs trong logcat của `com.snd.adbc` ngày 11/08/2026
+- **Dùng CHUNG tài khoản với thongke**: `nemk / 1027`
+- Tổng cộng **50+ endpoints** đã thấy trong log (auth, medical-record, patient, y-lenh, dieu-duong, notifications, ...)
+
+### 🆕 Tính năng mới - v3.0.83
+- **Y tế số - Xem bệnh án native** thay thế "Mở trên EMR web" cũ:
+  - **Auto-login** với default credentials (nemk/1027)
+  - **List documents theo nhóm** (DOCUMENT_TYPE: Phiếu CĐ, Phiếu khác, Bảng kê, ...)
+  - **Tap để download + xem** PDF/ảnh bằng `syncfusion_flutter_pdfviewer` (đã có sẵn trong pubspec)
+  - Hiển thị thông tin BN + khoa/phòng + mã ĐT
+  - Refresh, logout, login lại, xem thông tin server
+
+### 🆕 Files mới
+- `lib/data/api/y_te_so_service.dart` (~20 KB) - Service chính:
+  - `login()` - POST `/v1/auth/login` → JWT, lưu SharedPref
+  - `listDocuments(treatmentCode)` - GET `/v1/medical-record/document-types?treatmentCode=XXX`
+  - `downloadDocument(documentId)` - GET `/v1/medical-record/document-type/download?documentId=XXX` → decode base64 → file
+  - Auto-retry khi 401 (re-login rồi retry)
+  - Cache documents + file paths
+- `lib/presentation/screens/y_te_so_screen.dart` (~22 KB) - Main UI:
+  - Header BN + khoa/phòng
+  - List grouped với ExpansionTile (mặc định expanded)
+  - Document tile với icon (PDF/JPG), code, time, creator
+  - Tap → dialog loading → download → PDF viewer fullscreen
+  - AppBar: refresh + menu (login/logout/info)
+  - Footer: "X nhóm • Y tài liệu" + token preview
+
+### 🔧 Sửa đổi
+- `pubspec.yaml`: version 3.0.83+227
+- `lib/presentation/widgets/patient_actions_sheet.dart`:
+  - **Bỏ tile "Mở trên EMR web" cũ** (EmrWebViewScreen)
+  - **Thêm tile "Y tế số - Xem bệnh án"** (màu teal #00838F)
+  - Bỏ import `emr_web_view_screen.dart`
+  - Thêm import `y_te_so_screen.dart`
+  - Method `_openEmrWeb()` → `_openYTeSo()`
+  - Method `_emrWebTile()` → `_yTeSoTile()`
+
+### 📋 Endpoints Y Tế Số đã tích hợp (3/50+)
+| Method | Path | Mục đích |
+|--------|------|----------|
+| POST | `/v1/auth/login` | Đăng nhập → JWT |
+| GET | `/v1/medical-record/document-types?treatmentCode=XXX` | List documents grouped |
+| GET | `/v1/medical-record/document-type/download?documentId=XXX` | Download file (JSON Base64) |
+
+### 📋 Endpoints đã biết (chưa tích hợp, sẵn sàng mở rộng)
+| Method | Path | Mục đích |
+|--------|------|----------|
+| GET | `/v1/medical-record/emr-document/{id}` | Chi tiết document |
+| POST | `/v1/patient/danh-sach-khoa-quan-ly` | DS khoa quản lý |
+| POST | `/v1/patient/buong-benh` | Buồng bệnh |
+| POST | `/v1/patient/benh-nhan-buong-benh` | BN buồng bệnh |
+| POST | `/v1/patient/info` | Thông tin BN |
+| GET | `/v1/y-lenh-can-lam-sang?TREATMENT_ID=...` | Y lệnh Cận LS |
+| GET | `/v1/y-lenh-can-lam-sang/{id}` | Chi tiết y lệnh |
+| POST | `/v1/y-lenh-can-lam-sang/check-download` | Check download |
+| POST | `/v1/dieu-duong/danh-sach-dieu-duong` | DS điều dưỡng |
+| GET | `/v1/chi-dinh/common/workInfo/{roomId}` | WorkInfo phòng |
+| GET | `/v1/dich-vu-ket-qua` | Dịch vụ kết quả |
+| GET | `/v1/medical-instruction` | Y lệnh thuốc |
+| GET | `/v1/van-de-chuyen-mon` | Vấn đề chuyên môn |
+| GET | `/v1/van-de-luu-y` | Vấn đề lưu ý |
+| GET | `/v1/phieu-ban-giao/danh-sach-phieu` | Phiếu bàn giao |
+| GET | `/v1/tai-lieu-bn/danh-sach-tai-lieu` | Tài liệu BN |
+| GET | `/v1/thiet-bi-y-te/count-thiet-bi-bn/{id}` | Đếm thiết bị Y tế |
+| GET | `/v1/users/profile` | User profile |
+| GET | `/v1/users/server-time` | Server time |
+| GET | `/v1/config/benh-vien/bvdk.ninhthuan` | Config BV |
+| GET | `/v1/open/get-config-app` | App config |
+| GET | `/v1/health` | Health check |
+| POST | `/v1/notifications/update-device-and-last-active-department-code` | Device push |
+| GET | `/v1/notifications/notification-status` | Notification status |
+
+### 🧪 Test đã verify
+- ✓ POST /v1/auth/login → JWT 581 chars
+- ✓ GET /v1/medical-record/document-types?treatmentCode=000002164424 (MẤU THỊ DI)
+  → 50+ docs grouped theo type (21, 20, 28, ...)
+- ✓ GET /v1/medical-record/document-type/download?documentId=34023044
+  → JSON {Base64Data: 421840 chars} → decode → PDF 316 KB hợp lệ
+- Test file: `tools/yte_so_log/test_decoded.pdf`
+
+### 🔑 Credentials
+- Y Tế Số public: `nemk` / `1027` (giống thongke)
+- Base URL: `http://113.163.187.3:3000` (qua internet) hoặc `http://172.16.1.12:3000` (qua VPN LAN)
+- User-id mặc định: `958e768e-61c6-4fed-81f7-525a6ca38263` (có thể cần login lại nếu server rotate)
+
+## v3.0.82 (build 226) - 10/08/2026
+**"Auto-refresh HIS Pro token + WebView EMR công khai"**
+
+### 🆕 New features
+- **`his_proxy_server.py`** - Python server chạy trên PC (port 9999), stdlib only:
+  - `GET /get-his-token` - Đọc `D:\Soft\HISPRO_THAT\Logs\LogSystem.txt`, extract Bearer token từ `___dti:"...|<TOKEN>|..."` mới nhất
+  - `GET /get-his-token-status` - Trả về {token, length, age_seconds, source_file}
+  - `GET /proxy/{port}/{api_path}` - Forward tới HIS Pro LAN + auto-inject Bearer token (vd `/proxy/1408/api/HisTreatment/GetLView`)
+  - `GET /ping` - Health check
+  - `GET /` - Status page HTML
+- **`lib/data/services/his_proxy_token_service.dart`** - App gọi proxy:
+  - `fetchAndSaveToken()` - GET /get-his-token → lưu vào `ThongkeAuthService`
+  - `getStatus()` - GET /get-his-token-status → trả về thông tin token
+  - `ping()` - check proxy reachable
+  - `getProxyUrl()` / `setProxyUrl()` - cấu hình URL proxy (default `http://172.16.200.109:9999`)
+  - `autoFetchEnabled` - bật/tắt auto-refresh
+- **Auto-fetch token khi 401**: `TreatmentHistoryService._get` retry 1 lần sau khi auto-fetch token từ proxy
+- **Nút "Lấy tự động" trong dialog token**: gọi proxy, 1-click lấy token mới
+- **Hiển thị token status trong header**: "🔑 Có token" / "🔒 No token"
+- **`EmrWebViewScreen`** - Hiển thị EMR công khai inline (thay vì external browser):
+  - URL bar, back/forward/reload buttons
+  - Progress indicator
+  - Mở trong Chrome button
+  - Hiển thị tên BN + mã ĐT trên AppBar
+- **"Mở trên EMR web" mở webview inline** thay vì Chrome ngoài (VPN OFF)
+
+### Setup (1 lần trên PC)
+1. Mở PowerShell trên PC
+2. `cd C:\Users\Nem\Desktop\his_mobile-fresh\tools`
+3. `python his_proxy_server.py`
+4. PC IP hiện ra (vd 172.16.200.109) → phone tự động detect
+5. Phone cùng WiFi → tự động lấy token mới mỗi khi 401
+
+### Files
+- **NEW** `tools/his_proxy_server.py` (15.9 KB) - Python stdlib only
+- **NEW** `lib/data/services/his_proxy_token_service.dart` (6.7 KB)
+- **NEW** `lib/presentation/screens/emr_web_view_screen.dart` (6.7 KB)
+- **MOD** `lib/data/api/treatment_history_service.dart` - auto-fetch on 401
+- **MOD** `lib/presentation/screens/treatment_history_screen.dart` - "Lấy tự động" button + token indicator
+- **MOD** `lib/presentation/widgets/patient_actions_sheet.dart` - "Mở trên EMR web" dùng webview
+- **MOD** `pubspec.yaml` (3.0.81+225 → 3.0.82+226)
+
+### Test verify (10/08/2026 12:59)
+- Proxy: `GET /get-his-token` → 200, token `d856353f...edb6` (64 hex, source=`D:\Soft\HISPRO_THAT\Logs\LogSystem.txt`)
+- Proxy forward: `GET /proxy/1408/api/HisTreatment/GetLView` (no auth) → 200, auto-inject token, 1 lần khám PHẠM THẾ DŨNG K59.0
+
+---
+
+## v3.0.81 (build 225) - 10/08/2026
+**"Đính kèm tài liệu - thêm Lưu ký"**
+
+### 🆕 New features
+- **Nút "Lưu ký" trong Đính kèm tài liệu** (cạnh nút "Lưu"):
+  - User vẽ chữ ký tay trên dialog (giống Scan phiếu)
+  - Chữ ký overlay góc dưới phải PDF + tên user
+  - Push qua `EmrPushService.pushSignedPdfToEmr` (IsFinishSign=true, IsSignElectronic=true, SignedImageData=base64PDF)
+  - Workflow giống HIS desktop "Đính kèm → Ký" (theo note2)
+  - Có thể "Ký lại" nếu chưa ưng
+- **Helper `SmartCaService.convertImageToPdf` mở rộng**: nhận `signaturePath` optional → embed chữ ký + text "Đã ký: <tên user>" vào PDF
+- **API từ 2 → 1 method duy nhất** `AttachDocumentService.attachFile(signaturePath: ...)`:
+  - `signaturePath=null` → IsFinishSign=false (đẩy unsigned)
+  - `signaturePath=path` → IsFinishSign=true (đẩy signed, đã embed chữ ký vào PDF)
+
+### Files
+- **MOD** `lib/data/services/smart_ca_service.dart` - `convertImageToPdf` thêm `signaturePath` param, embed chữ ký vào PDF
+- **MOD** `lib/data/api/attach_document_service.dart` - `attachFile(signaturePath:)` route đến `pushSignedPdfToEmr` nếu có signature
+- **MOD** `lib/presentation/screens/attach_document_screen.dart` - thêm `SignatureController`, dialog capture chữ ký, nút "Lưu ký" + "Ký lại"
+- **MOD** `pubspec.yaml` (3.0.80+224 → 3.0.81+225)
+
+### Test
+- Cùng BN 000002164424 MẤU THỊ DI:
+  - "Lưu" → đẩy unsigned (giống v3.0.80, đã verify work)
+  - "Lưu ký" → vẽ chữ ký → embed vào PDF → đẩy signed (IsFinishSign=true)
+- Note2 user yêu cầu: "hãy tạo nút lưu là lưu chỉ đẩy lên EMR chưa ký và Lưu ký là lưu có ký" → ✅ DONE
+
+---
+
+## v3.0.80 (build 224) - 10/08/2026
+**"Fix Đính kèm tài liệu - dùng CreateByTdo SDO đầy đủ"**
+
+### 🔧 Fixes (quan trọng)
+- **Fix "Đính kèm tài liệu" trả 500**: `api/EmrDocument/CreateWithFile` không tồn tại trên EMR server này (trả 500). Refactor sang dùng `api/EmrDocument/CreateByTdo` với SDO đầy đủ (giống `EmrPushService.pushPdfToEmrUnsigned` đã work).
+  - SDO body phải có đủ ~30 trường: `DocumentName`, `DocumentTypeId`, `TreatmentCode`, `WorkingDepartmentName`, `DepartmentCode`, `RoomCode`, `RoomTypeCode`, `MediOrgCode="58001"`, `DocumentTime`, `OriginalVersion.Base64Data`, `Signs=[]`, `imageFile`, ...
+  - **Test verify ngay 10/08/2026 11:30**: POST CreateByTdo với SDO đầy đủ → 200, DocumentCode `000034050535`, lưu vào `\\Upload\EMR\20260809\000002164424\25807441-0518-4581-9731-3747e157af5a.pdf` ✅
+- **Flow mới**: `AttachDocumentService.attachFile()`
+  1. Đọc file local (camera/gallery/PDF)
+  2. Convert ảnh → PDF qua `SmartCaService.convertImageToPdf` (giữ nguyên nếu đã là PDF)
+  3. Push qua `EmrPushService.pushPdfToEmrUnsigned(useFss=false)` → `CreateByTdo` với base64
+- **Cải thiện error banner**: truncate lỗi dài (Dio verbose "validateStatus was configured to throw..."), thêm gợi ý kiểm tra VPN/token/HSCC.
+
+### Files
+- **REWRITE** `lib/data/api/attach_document_service.dart` (5.3 KB) - dùng `EmrPushService.pushPdfToEmrUnsigned` thay vì `CreateWithFile`
+- **MOD** `lib/presentation/screens/attach_document_screen.dart` - bỏ `documentTypeCode` param, error banner thân thiện hơn
+- **MOD** `pubspec.yaml` (3.0.79+223 → 3.0.80+224)
+
+### Test
+- **Patient 000002164424 MẤU THỊ DI** (Khoa Cấp Cứu)
+  - Up 1 PDF test → DocumentCode 000034050535 → vào EMR BN ngon lành
+
+---
+
+## v3.0.79 (build 223) - 10/08/2026
+**"Fix Lịch sử điều trị + Đính kèm tài liệu"**
+
+### 🔧 Fixes (quan trọng)
+- **Fix port HIS Pro: 1429 → 1408**: API `HisTreatment/GetLView`, `Get`, `HisDepartmentTran/GetView`, `HisServiceReq/Get`, `HisSereServ/GetDHisSereServ2` đều ở port **1408** (không phải 1429). Verify bằng test trực tiếp:
+  - `http://172.16.9.6:1429/api/HisTreatment/GetLView` → **404** (sai)
+  - `http://172.16.9.6:1408/api/HisTreatment/GetLView` → **200** (đúng)
+  - Áp dụng cho cả `TreatmentHistoryService` và `ThongkeAuthService.hisProBaseUrl` (cũng dùng port 1408 thay vì mosUrl 1429). `fetchHisProIcd` trước đó cũng bị ảnh hưởng (gọi 1429 trả 404).
+- **Pad mã BN thành 10 chữ số**: HIS Pro filter `PATIENT_CODE__EXACT` yêu cầu string với leading zeros (vd: `"0000475806"`, không phải `"475806"`). Helper `_normalizePatientCode()`.
+- **Token mặc định đã hết hạn**: HIS Pro embedded token (VquHGS...) đã rotate. Thêm nút **"Cập nhật token"** trong error banner 401 → mở dialog paste token mới. Có sẵn nút **"Copy d856..."** để copy token mới từ log HIS.exe (line `___dti:"...|TOKEN|..."`).
+
+### 🆕 New features
+- **Tile "Đính kèm tài liệu"** trong thao tác BN (sau Lịch sử điều trị, màu teal):
+  - Upload ảnh (chụp từ camera hoặc chọn từ thư viện) + PDF/doc lên EMR BN.
+  - Gọi `POST /api/EmrDocument/CreateWithFile` (port 1417) với multipart FormData (file blob + sdo base64).
+  - Form: chọn loại văn bản (20 loại phổ biến, default "20 - Phiếu khác"), tên VB, nhóm VB (optional).
+  - Workflow giống HIS desktop "Chi tiết BA → Đính kèm" (theo note2.docx).
+- **Dialog paste HIS Pro token** (treatment_history_screen.dart): paste 64-char hex token, app tự lưu và retry.
+
+### Files
+- **NEW** `lib/data/api/attach_document_service.dart` (5.9 KB) - `attachFile()` + `fetchDocumentTypes()`
+- **NEW** `lib/presentation/screens/attach_document_screen.dart` (20 KB) - form + camera/gallery
+- **MOD** `lib/data/api/treatment_history_service.dart` - port 1408 + `_normalizePatientCode` + better error messages
+- **MOD** `lib/data/api/thongke_auth_service.dart` - `hisProBaseUrl` ép port 1408
+- **MOD** `lib/presentation/screens/treatment_history_screen.dart` - "Cập nhật token" button + dialog paste
+- **MOD** `lib/presentation/widgets/patient_actions_sheet.dart` - tile "Đính kèm tài liệu"
+- **MOD** `pubspec.yaml` (3.0.78+222 → 3.0.79+223)
+
+### Token workflow (sau khi BV rotate token)
+1. Mở HIS desktop (hoặc PC) → check `D:\Soft\HISPRO_THAT\Logs\LogSystem.txt`
+2. Ctrl+F `___dti:` → tìm dòng mới nhất, copy phần giữa dấu `|` thứ 3 và thứ 4 (vd: `d856353fbe6aa6a21d25083243558387e7487c0f4b8285fe1a92b3b99c6eedb6`)
+3. Trong app: mở "Lịch sử điều trị" → banner đỏ "Token hết hạn" → ấn "Cập nhật token" → paste → Lưu
+
+### Test data (đã verify 10/08/2026 10:52)
+- **Patient 0000475806 PHẠM THỆ DŨNG** (1966, Nam)
+  - 1 lần khám: 2026-08-10 09:46, ICD K59.0 (Táo bón), TreatmentCode 000002166010
+  - Trước fix: API trả 404 (port 1429) → "BN chưa có lần khám" (sai)
+  - Sau fix: API trả 200 + 1 record (đúng)
+
+---
+
+## v3.0.78 (build 222) - 10/08/2026
+**"Lịch sử điều trị — giống HIS desktop"**
+
+### Major changes
+- **🆕 Tile "Lịch sử điều trị"** trong thao tác BN (cùng section "Xem bệnh án"):
+  - Lấy tất cả các lần khám của BN từ HIS Pro (giống HIS desktop plugin `TreatmentHistory.dll`).
+  - **3-pane layout**: trên = list lần khám, dưới trái = khoa điều trị, dưới phải = dịch vụ + thuốc.
+  - Auto-load khi mở, click 1 lần khám → load khoa → click 1 khoa → load DV.
+  - Nhóm DV theo `TDL_SERVICE_TYPE_NAME` (Thuốc, CLS, XN, CĐHA, Khám...).
+  - Error banner thân thiện: "Token hết hạn — vào Cài đặt → EMR Sync", "Không kết nối được HIS Pro", "BN chưa có lần khám".
+
+### API mới (HIS Pro, port 1408 — đã fix ở v3.0.79)
+- `api/HisTreatment/GetLView` — list lần khám (filter `PATIENT_CODE__EXACT`, sort `MODIFY_TIME DESC`)
+- `api/HisDepartmentTran/GetView` — khoa đã điều trị (filter `TREATMENT_ID`, sort `DEPARTMENT_IN_TIME ASC`)
+- `api/HisServiceReq/Get` — y lệnh theo treatment (filter `TREATMENT_ID`)
+- `api/HisSereServ/GetDHisSereServ2` — DV + thuốc theo khoa (filter `TREATMENT_ID`, `INTRUCTION_DATE`)
+- `api/HisServiceReq/GetDynamic` — lấy SAMPLE_TIME/RECEIVE_SAMPLE_TIME (filter `IDs`, `ColumnParams`)
+
+API flow đã verify qua log HIS.exe ngày 10/08 08:32-08:35 (`D:\Soft\HISPRO_THAT\Logs\LogSystem.txt`).
+
+
+### Files
+- **NEW** `lib/data/api/treatment_history_service.dart` (5 API methods + 1 helper)
+- **NEW** `lib/presentation/screens/treatment_history_screen.dart` (3-pane UI)
+- **MOD** `lib/presentation/widgets/patient_actions_sheet.dart` (+ tile "Lịch sử điều trị" + import + method)
+- **MOD** `pubspec.yaml` (3.0.77+221 → 3.0.78+222)
+
+### Requirements
+- HIS Pro token còn hạn (`Settings → EMR Sync` nếu lỗi 401).
+- VPN BV nội bộ (`VpnBenhVienService`) hoặc WiFi BV để tới 172.16.9.6:1429.
+
+---
+
+## v3.0.77 (build 221) - 10/08/2026
+**"Giải lao - clean-up"**
+
+### Major changes
+- **Bỏ "Đăng nhập HIS Pro" dialog** (xóa 323 dòng code thủ công). App tự động dùng bearer token hardcode từ main.dart.
+- **VPN Bệnh viện auto-disconnect** khi user thoát app (lifecycle observer trong main.dart).
+- **Xem bệnh án swipe** đã fix — load docBytes khi swipe tới phiếu mới (trước đây chỉ loading spinner mãi).
+- **Tiện ích "No response"** cải thiện — thử nhiều pattern CSRF, error message thân thiện hơn.
+- **Default API = Public** khi mở app (trước đây mặc định HIS Pro).
+- **Version sync** tất cả UI displays (settings, about, splash, drawer, marquee).
+
+### Removed
+- `_showHisProLoginDialog` method (322 lines)
+- `_syncFromHisPro` method
+- `_buildHisProSyncButton` widget
+- `onSyncFromHisPro` prop on DepartmentPatientPage
+- `PatientDataSource.appCode` + `seed` references (giờ empty state)
+- PatientSeed fallback (4 paths)
+- `HisProService.instance.isLoggedIn` checks in HomeScreen
+
+### Files changed
+- `pubspec.yaml` - bump 3.0.76+220 → 3.0.77+221
+- `lib/main.dart` - WidgetsBindingObserver for VPN auto-disconnect
+- `lib/presentation/screens/home_screen.dart` - removed 323 lines HIS Pro, default API=Public, empty state UI with VPN button
+- `lib/presentation/screens/xem_benh_an_screen.dart` - fix PageView onPageChanged to load docBytes
+- `lib/presentation/screens/catalog_browser_screen.dart` - friendlier error message
+- `lib/data/api/thongke_auth_service.dart` - try 4 CSRF patterns + fallback no-CSRF
+
+---
+
+## v3.0.76 (build 220) - 10/08/2026
+**"Native OpenVPN integration"**
+
+- Added `openvpn_flutter: ^1.3.4` (wraps ics-openvpn - de.blinkt.openvpn)
+- Native VPN client integrated into app (no more external OpenVPN Connect app needed)
+- Bundled `libopenvpn.so` (3.7 MB) + `libgojni.so` (5 MB) for arm64-v8a
+- AndroidManifest: BIND_VPN_SERVICE, FOREGROUND_SERVICE_*, POST_NOTIFICATIONS, extractNativeLibs=true
+- `VpnBenhVienService` rewritten with real OpenVPN engine
+- Default credentials: nemk / Cnttbvnt@321 (password masked as `*****` on UI)
+- Splash screen fix: don't hang on "Kết nối HIS Pro..." when no VPN
+- Removed PatientSeed fallback (4 paths → empty state)
+
+---
+
+## v3.0.75 (build 219) - 09/08/2026
+**"Time filter + swipe"**
+
+- Added `TrDateFilter` enum (today/week/month/year/custom) - HIS Pro desktop style
+- Replaced "Loại ĐT" filter with time filter chips on HomeScreen
+- Date range propagates to DepartmentPatientPage via `setDateRange()`
+- Xem bệnh án fullscreen PageView with swipe + prev/next buttons
+- 4 nav items (removed Báo cáo)
+- Cleared `_selectedPatient` after patient action (bỏ always-on-top)
+
+---
+
+## v3.0.74 (build 218) - 09/08/2026
+**"Hồ sơ + VPN Bệnh viện"**
+
+- Added Hồ sơ điều trị menu (5th nav item)
+- New `treatment_records_screen.dart` (38.7 KB) - copied from v3.0.64 source
+- New `vpn_benh_vien_service.dart` (placeholder, real impl in v3.0.76)
+- New `vpn_benh_vien_screen.dart` with credentials form
+- VPN status indicator in AppBar (login + home)
+- Default credentials: admin/admin → nemk/1027
+- HomeScreen API simplified to 2 sources: HIS Pro + Public
+
+---
+
+## v3.0.63 (build 217) - 08/08/2026
+Last v3.0.63 release with original PatientSeed fallback, all 4 nav items, full HIS Pro login flow.

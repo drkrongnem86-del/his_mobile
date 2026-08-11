@@ -13,6 +13,7 @@ import 'package:his_mobile/data/api/his_tracking_service.dart';
 import 'package:his_mobile/data/api/thongke_auth_service.dart';
 import 'package:his_mobile/modules/auth/presentation/blocs/auth_bloc.dart';
 import 'package:his_mobile/presentation/navigation/app_router.dart';
+import 'package:his_mobile/core/services/vpn_benh_vien_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:his_mobile/data/services/his_pro_api_service.dart';
 
@@ -117,15 +118,46 @@ void main() async {
   runApp(HisMobileApp(prefs: prefs));
 }
 
-class HisMobileApp extends StatelessWidget {
+class HisMobileApp extends StatefulWidget {
   final SharedPreferences prefs;
 
   const HisMobileApp({super.key, required this.prefs});
 
   @override
+  State<HisMobileApp> createState() => _HisMobileAppState();
+}
+
+class _HisMobileAppState extends State<HisMobileApp> with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// v3.0.77: Lifecycle - khi user thoát app / chuyển sang background, auto-disconnect VPN
+  /// để tránh VPN vẫn chạy ngầm (tốn pin + chiếm tunnel)
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
+      // User rời app → đóng VPN (chỉ khi đang connected)
+      final vpn = VpnBenhVienService.instance;
+      if (vpn.isConnected) {
+        debugPrint('HisMobileApp: lifecycle ${state.name} → auto-disconnect VPN');
+        vpn.disconnect();
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return BlocProvider(
-      create: (_) => AuthBloc(prefs: prefs),
+      create: (_) => AuthBloc(prefs: widget.prefs),
       child: ValueListenableBuilder<ThemeMode>(
         valueListenable: ThemeManager.instance.themeModeNotifier,
         builder: (_, mode, __) => MaterialApp.router(
