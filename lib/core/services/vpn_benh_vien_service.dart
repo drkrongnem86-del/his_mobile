@@ -1,6 +1,6 @@
 // VpnBenhVienService v3.0.76 - Native OpenVPN client (ics-openvpn via openvpn_flutter)
 // Quản lý kết nối VPN thật, không qua external app.
-// Default credentials: nemk / Cnttbvnt@321 (mặc định load OVN config + user/pass).
+// v3.0.96: Default password lấy từ Credentials (XOR-encoded) - KHÔNG có plaintext
 // User có thể đổi user/pass khác qua UI (Settings → VPN Bệnh viện).
 // Password được mask kiểu ***** khi hiển thị trên UI (lưu SharedPrefs vẫn là plain text).
 // v3.0.93:
@@ -10,6 +10,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart' show debugPrint, ChangeNotifier;
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:his_mobile/core/security/credentials.dart';
 import 'package:openvpn_flutter/openvpn_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -18,8 +19,9 @@ class VpnBenhVienService extends ChangeNotifier {
   static final VpnBenhVienService instance = VpnBenhVienService._();
 
   // Default credentials - load sẵn cho user mặc định
+  // v3.0.96: Password lấy từ Credentials (XOR-encoded) - KHÔNG có plaintext
   static const String _kDefaultUser = 'nemk';
-  static const String _kDefaultPass = 'Cnttbvnt@321';
+  static final String _kDefaultPass = Credentials.vpnNemkPassword;
   static const String _kConfigAsset = 'assets/vpn/nemk_vpn.ovpn';
   static const String _kConfigName = 'sslvpn-nemk-client-config.ovpn';
 

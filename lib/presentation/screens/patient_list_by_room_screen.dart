@@ -180,7 +180,7 @@ class _PatientListByRoomScreenState extends State<PatientListByRoomScreen> {
               },
               onPatientTap: (p) {
                 // Mở chi tiết BN khi bấm gợi ý
-                final username = ThongkeAuthService().currentUsername ?? 'admin';
+                final username = ThongkeAuthService().currentUsername ?? '';
                 final deptMap = {
                   'id': widget.room['DEPARTMENT_ID'] ?? 0,
                   'code': widget.room['DEPARTMENT_CODE'] ?? '',
@@ -316,7 +316,7 @@ class _PatientListByRoomScreenState extends State<PatientListByRoomScreen> {
               children: [
                 OutlinedButton.icon(
                   onPressed: () {
-                    final username = ThongkeAuthService().currentUsername ?? 'admin';
+                    final username = ThongkeAuthService().currentUsername ?? '';
                     final deptMap = {
                       'id': widget.room['DEPARTMENT_ID'] ?? 0,
                       'code': widget.room['DEPARTMENT_CODE'] ?? '',

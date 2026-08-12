@@ -5,6 +5,7 @@ import 'package:cookie_jar/cookie_jar.dart';
 import 'package:dio/dio.dart';
 import 'package:dio_cookie_manager/dio_cookie_manager.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:his_mobile/core/security/credentials.dart';
 import 'package:his_mobile/data/api/his_catalog_service.dart';
 import 'package:his_mobile/core/services/connection_service.dart';
 import 'package:his_mobile/core/utils/vietnamese.dart';
@@ -1042,10 +1043,10 @@ class ThongkeAuthService {
   ///
   /// Date format: 'YYYY-MM-DD HH:mm:ss' (web format, not just YYYY-MM-DD)
   ///
-  /// Default credentials: nemk/1027
+  /// v3.0.96: Default credentials lấy từ Credentials (XOR-encoded) - không lộ trong code
   Future<List<Map<String, dynamic>>?> fetchPatientsPublic({
-    String? email,                 // default: 'nemk'
-    String? password,              // default: 'nemk'
+    String? email,                 // default: từ Credentials
+    String? password,              // default: từ Credentials
     int? departmentCatalogId,      // PRIMARY: server filter (22=HSCC, 23=CCS, ...)
     String? department,            // fallback dept code for client-side filter
     String? treatmentCode,         // search by treatment code (server supports)
@@ -1058,9 +1059,9 @@ class ThongkeAuthService {
     int start = 0,
   }) async {
     try {
-      // v2.39.0: hardcode nemk/1027 - public Data chỉ có account này
-      final _email = email ?? 'nemk';
-      final _pwd = password ?? '1027';
+      // v3.0.96: Lấy từ Credentials (XOR-encoded) thay vì hardcode
+      final _email = email ?? Credentials.thongkeDefaultEmail;
+      final _pwd = password ?? Credentials.thongkeDefaultPassword;
 
       final dio = Dio(BaseOptions(
         connectTimeout: const Duration(seconds: 8),
@@ -1807,7 +1808,8 @@ class ThongkeAuthService {
     try {
       final result = await _publicCatalogCall(
         endpoint: '/index/category-department-catalog',
-        email: 'nemk', password: '1027',
+        email: Credentials.thongkeDefaultEmail,
+        password: Credentials.thongkeDefaultPassword,
       );
       if (result == null) return [];
       final data = (result['data'] as List?) ?? [];
@@ -1830,7 +1832,8 @@ class ThongkeAuthService {
     try {
       final result = await _publicCatalogCall(
         endpoint: '/index/category-patient-type',
-        email: 'nemk', password: '1027',
+        email: Credentials.thongkeDefaultEmail,
+        password: Credentials.thongkeDefaultPassword,
       );
       if (result == null) return [];
       final data = (result['data'] as List?) ?? [];
@@ -1850,7 +1853,8 @@ class ThongkeAuthService {
     try {
       final result = await _publicCatalogCall(
         endpoint: '/index/category-treatment-type',
-        email: 'nemk', password: '1027',
+        email: Credentials.thongkeDefaultEmail,
+        password: Credentials.thongkeDefaultPassword,
       );
       if (result == null) return [];
       final data = (result['data'] as List?) ?? [];
@@ -1890,7 +1894,7 @@ class ThongkeAuthService {
       final cookies1 = await jar.loadForRequest(Uri.parse('$publicBaseUrl/login'));
       final xsrf1 = cookies1.firstWhere((c) => c.name == 'XSRF-TOKEN', orElse: () => Cookie('XSRF-TOKEN', '')).value;
       final r2 = await dio.post('$publicBaseUrl/login',
-          data: {'email': 'nemk', 'password': '1027', '_token': csrf},
+          data: {'email': Credentials.thongkeDefaultEmail, 'password': Credentials.thongkeDefaultPassword, '_token': csrf},
           options: Options(headers: {
             'X-XSRF-TOKEN': Uri.encodeQueryComponent(xsrf1),
             'Referer': '$publicBaseUrl/login',

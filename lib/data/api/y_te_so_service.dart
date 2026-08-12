@@ -17,6 +17,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:his_mobile/core/security/credentials.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -30,9 +31,10 @@ class YTeSoService {
   static const String lanBaseUrl = 'http://172.16.1.12:3000';
 
   /// v3.0.83: Default credentials - giống thongke public
+  /// v3.0.96: Lấy từ Credentials (XOR-encoded) - KHÔNG có plaintext
   /// Có thể bị rotate, sẽ yêu cầu login lại khi fail
-  static const String defaultEmail = 'nemk';
-  static const String defaultPassword = '1027';
+  static final String defaultEmail = Credentials.thongkeDefaultEmail;
+  static final String defaultPassword = Credentials.yTeSoDefaultPassword;
 
   // v3.0.83: User profile mặc định từ log (khi không gọi /users/profile)
   static const String defaultUserId = '958e768e-61c6-4fed-81f7-525a6ca38263';
@@ -151,7 +153,7 @@ class YTeSoService {
 
   // ============ LOGIN ============
   /// v3.0.83: POST /v1/auth/login
-  /// Body: {"email":"nemk","password":"1027"}
+  /// Body: email + password (lấy từ Credentials v3.0.96)
   /// Response: {accessToken, refreshToken, user, ...}
   /// v3.0.87: Add dedup - nếu đang login thì trả về future đang chạy
   Future<YTeSoLoginResult> login({String? email, String? password}) async {

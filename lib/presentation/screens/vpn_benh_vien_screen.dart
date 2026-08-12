@@ -1,11 +1,12 @@
 // VpnBenhVienScreen v3.0.93 - Native OpenVPN client (ics-openvpn)
 // Quản lý: Connect/Disconnect, Account input (default ẩn pass), Auto-disconnect 5p khi background
 // v3.0.93:
-//   - Tài khoản mặc định nemk: ẩn password (không cho xem, không edit)
+//   - Tài khoản mặc định: ẩn password (không cho xem, không edit)
 //   - Mục "Tài khoản khác" riêng để nhập user + pass
-//   - Bỏ dòng "Mặc định: nemk / Cnttbvnt@321" (lộ pass)
+//   - Bỏ dòng "Mặc định: ..." (lộ pass)
 //   - Thông tin kết nối gọn lại
 //   - Auto-disconnect 5 phút khi thoát/thu gọn app
+// v3.0.96: Comment sạch - không lộ username/password
 //   - WidgetsBindingObserver để track app lifecycle
 import 'package:flutter/material.dart';
 import 'package:his_mobile/core/services/vpn_benh_vien_service.dart';

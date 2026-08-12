@@ -8,6 +8,7 @@
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
+import 'package:his_mobile/core/security/credentials.dart';
 import 'package:his_mobile/core/services/his_config_service.dart';
 import 'package:his_mobile/data/api/his_pro_api_service.dart';
 import 'package:his_mobile/data/api/thongke_auth_service.dart';
@@ -39,9 +40,9 @@ class ApiDebugService {
       connectTimeout: const Duration(seconds: 10),
       receiveTimeout: const Duration(seconds: 15),
     ));
-    // v3.0.93: Lấy email từ current user (BS nemk thì dùng K Rong Nểm)
+    // v3.0.96: Lấy email từ current user + password từ Credentials (XOR-encoded)
     final yTeEmail = '${cfg.loginName}@krongnem.local';
-    final yTePass = '1027'; // Default cho nemk
+    final yTePass = Credentials.yTeSoDefaultPassword;
     String? yTeToken;
     try {
       buf.writeln('--- 1.1 POST /v1/auth/login (email=$yTeEmail) ---');

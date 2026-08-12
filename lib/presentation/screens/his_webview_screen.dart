@@ -1,7 +1,9 @@
 // HisWebviewScreen - "Bệnh án điện tử" như Y Tế Số.
 // Wrap HIS Pro EMR web frontend (http://thongke.benhvienninhthuan.vn:8080/emr/...)
 // trong WebView của app. BS không cần login lại vì cookie web cached.
+// v3.0.96: Auto-fill credentials từ Credentials (XOR-encoded) - không có plaintext
 import 'package:flutter/material.dart';
+import 'package:his_mobile/core/security/credentials.dart';
 import 'package:his_mobile/core/utils/vietnamese.dart';
 import 'package:his_mobile/data/local/clinical_notes_service.dart';
 import 'package:his_mobile/presentation/widgets/patient_header.dart';
@@ -157,12 +159,14 @@ class _HisWebviewScreenState extends State<HisWebviewScreen> {
     if (mounted) setState(() {});
   }
 
-  /// v2.35.11: Auto-fill email=admin, password=admin trên trang login Thongke Laravel
+  /// v3.0.96: Auto-fill email/password từ Credentials (XOR-encoded) trên trang login Thongke Laravel
   /// rồi tự động submit form.
   Future<void> _autoLoginThongke() async {
     // Chờ form render xong (1.5s)
     await Future.delayed(const Duration(milliseconds: 1500));
     if (!mounted) return;
+    final autoEmail = Credentials.thongkeDefaultEmail;
+    final autoPass = Credentials.thongkeDefaultPassword;
     final js = '''
       (function() {
         // Tìm input email/username
@@ -177,9 +181,9 @@ class _HisWebviewScreenState extends State<HisWebviewScreen> {
         if (emailInput && passInput) {
           // Set value qua native setter (React/Vue có thể override)
           var nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
-          nativeInputValueSetter.call(emailInput, 'nemk');
+          nativeInputValueSetter.call(emailInput, '$autoEmail');
           emailInput.dispatchEvent(new Event('input', { bubbles: true }));
-          nativeInputValueSetter.call(passInput, '1027');
+          nativeInputValueSetter.call(passInput, '$autoPass');
           passInput.dispatchEvent(new Event('input', { bubbles: true }));
           // Submit form
           setTimeout(function() {

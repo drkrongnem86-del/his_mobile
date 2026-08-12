@@ -1,11 +1,12 @@
 // CatalogBrowserScreen v2.38.9 - Duyệt danh mục từ Data Public API
 // Dùng chung cho 6 catalog: Thuốc / CLS / Vật tư / Nhăn viên / Khoa-Giường / Thiết bị / ICD / DVKT
+// v3.0.96: Credentials lấy từ Credentials (XOR-encoded) - không có plaintext
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:his_mobile/core/security/credentials.dart';
 import 'package:his_mobile/data/api/thongke_auth_service.dart';
 import 'package:his_mobile/presentation/screens/department_patients_screen.dart';
 import 'package:his_mobile/presentation/screens/icd10_webview_screen.dart';
-// DataService import removed v2.39.0 (admin/admin hardcoded)
 import 'package:his_mobile/core/utils/mojibake_fixer.dart';
 
 enum CatalogType {
@@ -136,10 +137,9 @@ class _CatalogBrowserScreenState extends State<CatalogBrowserScreen> {
 
     try {
       final auth = ThongkeAuthService.instance;
-      // v2.39.0: Public Data API chi co account admin/admin
-      // KHONG can dang nhap Data service truoc - hardcode credentials
-      const email = 'nemk';
-      const password = '1027';
+      // v3.0.96: Credentials từ Credentials (XOR-encoded) - không hardcode
+      final email = Credentials.thongkeDefaultEmail;
+      final password = Credentials.thongkeDefaultPassword;
 
       CatalogFetchResult result;
       switch (widget.type) {
@@ -225,9 +225,9 @@ class _CatalogBrowserScreenState extends State<CatalogBrowserScreen> {
     setState(() => _loadingMore = true);
     try {
       final auth = ThongkeAuthService.instance;
-      // v2.39.0: hardcode nemk/1027
-      const email = 'nemk';
-      const password = '1027';
+      // v3.0.96: Credentials từ Credentials (XOR-encoded) - không hardcode
+      final email = Credentials.thongkeDefaultEmail;
+      final password = Credentials.thongkeDefaultPassword;
 
       CatalogFetchResult result;
       switch (widget.type) {
