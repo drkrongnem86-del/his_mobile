@@ -209,9 +209,17 @@ jobs:
           cat version.json
 
       - name: 📤 Commit version.json
+        # Pull --rebase trước để tránh conflict nếu có commit khác trên main
+        # (vd: BS tự sửa CHANGELOG.md giữa workflow runs)
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main || true
           git add version.json
-          git commit -m "chore: auto-update version.json to ${{ github.ref_name }}" || echo "No changes to commit"
-          git push origin main
+          if git diff --staged --quiet; then
+            echo "No version.json changes to commit"
+          else
+            git commit -m "chore: auto-update version.json to ${{ github.ref_name }}"
+            git push origin main
+            echo "✅ version.json pushed"
+          fi
