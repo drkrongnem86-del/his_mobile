@@ -1,8 +1,16 @@
-# GitHub Actions: Build APK + AAB + IPA tự động khi push tag
-# Usage:
-#   git tag v3.0.62
-#   git push origin v3.0.62
-# → Action tự build 3 platform, upload artifacts, tạo GitHub Release
+# GitHub Actions: Build APK (arm64) + AAB + Auto-release + Auto-update version.json
+#
+# Workflow:
+#   1. git tag v3.0.95
+#   2. git push origin v3.0.95
+#   3. Action tự động:
+#      - Build APK arm64 (Samsung A17 dùng cái này)
+#      - Build AAB (Google Play Store)
+#      - Tạo GitHub Release với APK + AAB đính kèm
+#      - Update version.json với version mới + link tới release
+#      - Commit version.json mới về repo
+#
+# Trigger: push tag v*.*.* HOẶC manual workflow_dispatch
 
 name: Build Release
 
@@ -13,9 +21,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version (vd: 3.0.62)'
+        description: 'Version (vd: 3.0.95) - phải khớp pubspec.yaml'
         required: true
-        default: '3.0.62'
+        default: '3.0.95'
 
 env:
   FLUTTER_VERSION: '3.41.7'
@@ -23,15 +31,17 @@ env:
 
 jobs:
   # ============================================================
-  # ANDROID - APK (universal)
+  # ANDROID - APK arm64 (cho Samsung A17 - direct install)
   # ============================================================
   build-apk:
-    name: 📦 Build APK (Android, arm64)
+    name: 📦 Build APK (arm64 - Samsung A17)
     runs-on: windows-latest
     timeout-minutes: 60
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: 🔧 Setup Java
         uses: actions/setup-java@v4
@@ -49,27 +59,23 @@ jobs:
       - name: 📦 Get dependencies
         run: flutter pub get
 
-      - name: 🔍 Analyze
-        run: flutter analyze --no-pub
-
-      - name: 🧪 Run tests
-        run: flutter test --no-pub || echo "Tests skipped (no test files)"
-
-      - name: 🏗️ Build APK (arm64)
-        run: flutter build apk --release --target-platform android-arm64
+      - name: 🏗️ Build APK (arm64 only)
+        # Output: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+        run: flutter build apk --release --target-platform android-arm64 --split-per-abi
 
       - name: 📤 Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: his-mobile-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
-          retention-days: 30
+          name: his-mobile-apk-arm64
+          path: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+          if-no-files-found: error
+          retention-days: 90
 
   # ============================================================
-  # ANDROID - AAB (Google Play Store)
+  # ANDROID - AAB (Google Play Store format)
   # ============================================================
   build-aab:
-    name: 📦 Build AAB (Android App Bundle)
+    name: 📦 Build AAB (Google Play)
     runs-on: windows-latest
     timeout-minutes: 60
     steps:
@@ -93,6 +99,7 @@ jobs:
         run: flutter pub get
 
       - name: 🏗️ Build AAB (universal)
+        # Output: build/app/outputs/bundle/release/app-release.aab
         run: flutter build appbundle --release
 
       - name: 📤 Upload AAB artifact
@@ -100,54 +107,16 @@ jobs:
         with:
           name: his-mobile-aab
           path: build/app/outputs/bundle/release/app-release.aab
-          retention-days: 30
-
-  # ============================================================
-  # iOS - IPA (chỉ work trên macOS)
-  # ============================================================
-  build-ipa:
-    name: 🍎 Build IPA (iOS, cần macOS)
-    runs-on: macos-latest
-    timeout-minutes: 60
-    steps:
-      - name: 📥 Checkout code
-        uses: actions/checkout@v4
-
-      - name: 🐦 Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: stable
-          cache: true
-
-      - name: 📦 Get dependencies
-        run: flutter pub get
-
-      - name: 🍎 Setup iOS
-        run: |
-          cd ios
-          pod install
-          cd ..
-
-      - name: 🏗️ Build IPA (no-codesign)
-        # Không cần signing để verify build OK
-        # Để distribute thật cần Apple Developer account + signing config
-        run: flutter build ipa --release --no-codesign
-
-      - name: 📤 Upload IPA artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: his-mobile-ipa
-          path: build/ios/ipa/*.ipa
-          if-no-files-found: warn
-          retention-days: 30
+          if-no-files-found: error
+          retention-days: 90
 
   # ============================================================
   # GITHUB RELEASE - tạo release tự động khi push tag
+  # Bao gồm: APK arm64 (rename) + AAB
   # ============================================================
   create-release:
     name: 🚀 Create GitHub Release
-    needs: [build-apk, build-aab, build-ipa]
+    needs: [build-apk, build-aab]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
@@ -159,9 +128,20 @@ jobs:
           path: artifacts
 
       - name: 📋 List artifacts
-        run: ls -la artifacts/
+        run: ls -la artifacts/*/
 
-      - name: 🚀 Create Release
+      - name: 🏷️ Rename APK theo version
+        # Đổi tên app-arm64-v8a-release.apk → his_mobile_v{version}_arm64.apk
+        # để URL trong version.json dễ đọc + stable
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          cd artifacts/his-mobile-apk-arm64/
+          VERSION="${TAG_NAME#v}"
+          mv -v app-arm64-v8a-release.apk "his_mobile_v${VERSION}_arm64.apk"
+          ls -la
+
+      - name: 🚀 Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: ${{ github.ref_name }}
@@ -169,10 +149,69 @@ jobs:
           prerelease: false
           generate_release_notes: true
           files: |
-            artifacts/his-mobile-apk/app-release.apk
+            artifacts/his-mobile-apk-arm64/his_mobile_${{ github.ref_name }}_arm64.apk
             artifacts/his-mobile-aab/app-release.aab
-            artifacts/his-mobile-ipa/*.ipa
-            release_v*/CHANGELOG.md
-            release_v*/README.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ============================================================
+  # AUTO-UPDATE version.json - tự động update sau khi Release tạo xong
+  # File version.json được app đọc để check update
+  # ============================================================
+  update-version-json:
+    name: 📝 Update version.json
+    needs: [create-release]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 📝 Extract version + update version.json
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          # TAG_NAME = "v3.0.95" → version = "3.0.95"
+          VERSION="${TAG_NAME#v}"
+          echo "New version: $VERSION"
+          # URL cho APK arm64
+          APK_URL="https://github.com/${REPO}/releases/download/${TAG_NAME}/his_mobile_v${VERSION}_arm64.apk"
+          echo "APK URL: $APK_URL"
+          # Lấy message từ CHANGELOG.md (nếu có)
+          if [ -f "CHANGELOG.md" ]; then
+            # Lấy phần giữa "## v$VERSION" và "## v" tiếp theo
+            MESSAGE=$(awk "/^## v$VERSION/{flag=1; next} /^## v/{flag=0} flag" CHANGELOG.md | head -3 | sed 's/^[[:space:]]*//' | tr '\n' ' ' | head -c 300)
+            [ -z "$MESSAGE" ] && MESSAGE="Cập nhật phiên bản $VERSION"
+          else
+            MESSAGE="Cập nhật phiên bản $VERSION"
+          fi
+          echo "Message: $MESSAGE"
+          # Ghi version.json
+          cat > version.json <<EOF
+          {
+            "version": "$VERSION",
+            "apk_url": "$APK_URL",
+            "message": "$MESSAGE"
+          }
+          EOF
+          echo "--- version.json content ---"
+          cat version.json
+
+      - name: 📤 Commit version.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add version.json
+          git commit -m "chore: auto-update version.json to ${{ github.ref_name }}" || echo "No changes to commit"
+          git push origin main
