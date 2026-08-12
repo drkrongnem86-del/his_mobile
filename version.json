@@ -1,5 +1,5 @@
 {
-  "version": "3.0.95",
-  "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.95/his_mobile_v3.0.95_arm64.apk",
-  "message": "Test auto-release workflow - APK + AAB build thành công, GitHub Release tự động tạo với file APK đính kèm."
+  "version": "3.0.96",
+  "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.96/his_mobile_v3.0.96_arm64.apk",
+  "message": "Encode all credentials (XOR + Base64) - Xóa plaintext trong source. VPN, Y Tế Số, Thongke đều dùng credentials từ lib/core/security/credentials.dart."
 }
