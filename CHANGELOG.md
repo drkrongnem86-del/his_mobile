@@ -4,7 +4,7 @@
 **"Mã hóa tất cả credentials - XÓA plaintext trong source"**
 
 ### 🔒 Bảo mật: Credentials XOR-encoded
-**vấn đề:** Trước v3.0.96, code có nhiều chỗ hardcoded credentials (Cnttbvnt@321, 1027, admin/admin) - ai grep code hay extract từ APK đều thấy.
+**vấn đề:** Trước v3.0.96, code có nhiều chỗ hardcoded credentials (333, 333, admin/333) - ai grep code hay extract từ APK đều thấy.
 
 **Fix v3.0.96:**
 - Tạo `lib/core/security/credentials.dart` - XOR + Base64 encoded
@@ -12,7 +12,7 @@
 - Helper `Credentials.encode()` để regenerate khi cần rotate key
 
 **Đã sửa:**
-- `vpn_benh_vien_service.dart` - VPN password (Cnttbvnt@321)
+- `vpn_benh_vien_service.dart` - VPN password (333)
 - `y_te_so_service.dart` - Y Tế Số password
 - `thongke_auth_service.dart` - 4 chỗ (fetchPatientsPublic + 3 catalog + login form)
 - `api_debug_service.dart` - Debug Y Tế Số password
@@ -20,7 +20,7 @@
 - `his_webview_screen.dart` - Auto-fill Thongke login form
 - `patient_list_by_room_screen.dart` - Fallback 'admin' → ''
 
-**Verify:** `grep "Cnttbvnt@321|'1027'" lib/` → 0 hits trong code (chỉ còn encoded trong credentials.dart)
+**Verify:** `grep "333|'333'" lib/` → 0 hits trong code (chỉ còn encoded trong credentials.dart)
 
 ⚠️ **Lưu ý:** XOR với key cố định chỉ là obfuscation nhẹ, KHÔNG phải encryption. Để bảo mật thật sự → dùng Android Keystore hoặc fetch từ server.
 
@@ -624,7 +624,7 @@ API flow đã verify qua log HIS.exe ngày 10/08 08:32-08:35 (`D:\Soft\HISPRO_TH
 - New `vpn_benh_vien_service.dart` (placeholder, real impl in v3.0.76)
 - New `vpn_benh_vien_screen.dart` with credentials form
 - VPN status indicator in AppBar (login + home)
-- Default credentials: admin/admin → 333/333
+- Default credentials: admin/333 → 333/333
 - HomeScreen API simplified to 2 sources: HIS Pro + Public
 
 ---
