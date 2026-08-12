@@ -1,5 +1,32 @@
 # Changelog - HIS Mobile
 
+## v3.0.97 (build 241) - 13/08/2026
+**"Fix auto-update: black screen sau khi bấm Đồng ý"**
+
+### 🐛 Bug fix: Black screen khi cập nhật
+**vấn đề user báo (13/08/2026 02:55):** Bấm "Đồng Ý" trong dialog update → màn hình đen, app không phản hồi.
+
+**Nguyên nhân:**
+1. Thiếu `REQUEST_INSTALL_PACKAGES` permission trong AndroidManifest
+2. APK được tải về `/tmp` (app sandbox) - user không thấy, dễ mất
+3. `OpenFilex.open()` thất bại thì không có fallback nào
+4. Không có error message rõ ràng nếu install fail
+
+**Fix v3.0.97:**
+- ✅ Thêm `android.permission.REQUEST_INSTALL_PACKAGES` vào AndroidManifest
+- ✅ Thêm `<queries>` cho `ACTION_INSTALL_PACKAGE` (Android 11+ package visibility)
+- ✅ Save APK vào `Downloads/HisMobile/HIS_MOBILE_v{version}.apk` (external storage, user thấy được)
+- ✅ Show progress dialog với file path + size để debug
+- ✅ Fallback chain: OpenFilex → launchUrl → MethodChannel → manual instructions
+- ✅ Nếu tất cả fail → show dialog "Mở thủ công" với path + hướng dẫn mở Files app
+- ✅ Copy path vào clipboard nếu cần
+
+### 📁 Files sửa v3.0.97
+- `android/app/src/main/AndroidManifest.xml` - thêm permission + queries
+- `lib/core/services/update_service.dart` - rewrite download + install flow
+
+---
+
 ## v3.0.96 (build 240) - 13/08/2026
 **"Mã hóa tất cả credentials - XÓA plaintext trong source"**
 
