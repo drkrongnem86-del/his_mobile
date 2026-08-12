@@ -265,28 +265,30 @@ class HisConfigService {
   // Mode "LAN nội bộ" - WiFi nội bộ BV
   // Mode "Proxy qua PC" - qua PC BS (cần chạy his_proxy_server.py port 9999)
   // v3.0.62: Đổi port MOS 1408→1429 + OCR 1429→1425 (theo HIS_ICU v2.35.13)
+  // v3.0.93: Sửa link BVBM → dùng IP public 113.163.187.3 (DataService publicBaseUrl)
+  //   + sửa FSS/LIS về LAN (qua VPN) - đỡ rối
   static const HisConfigPreset presetPublicVpn = HisConfigPreset(
     label: 'Public VPN',
-    bvbmUrl: 'http://117.2.25.67:3000',
-    emrUrl: 'http://172.16.9.6:1417',
-    mosUrl: 'http://172.16.9.6:1429',     // v3.0.62: 1408→1429
-    sdaUrl: 'http://172.16.9.6:1410',
-    sarUrl: 'http://172.16.9.6:1409',
-    fssUrl: 'http://117.2.25.67:1405',
-    lisUrl: 'http://117.2.25.67:1419',
-    ocrUrl: 'http://172.16.9.6:1425',     // v3.0.62: 1429→1425
-  );
-
-  static const HisConfigPreset presetLan = HisConfigPreset(
-    label: 'LAN nội bộ',
-    bvbmUrl: 'http://172.16.1.12:3000',
-    emrUrl: 'http://172.16.9.6:1417',
-    mosUrl: 'http://172.16.9.6:1429',     // v3.0.62: 1408→1429
+    bvbmUrl: 'http://113.163.187.3:3000',  // v3.0.93: Public IP (Y Tế Số / Data public)
+    emrUrl: 'http://172.16.9.6:1417',      // HIS Pro EMR (LAN, qua VPN tunnel)
+    mosUrl: 'http://172.16.9.6:1429',      // v3.0.62: 1408→1429
     sdaUrl: 'http://172.16.9.6:1410',
     sarUrl: 'http://172.16.9.6:1409',
     fssUrl: 'http://172.16.9.6:1405',
     lisUrl: 'http://172.16.9.6:1419',
-    ocrUrl: 'http://172.16.9.6:1425',     // v3.0.62: 1429→1425
+    ocrUrl: 'http://172.16.9.6:1425',      // v3.0.62: 1429→1425
+  );
+
+  static const HisConfigPreset presetLan = HisConfigPreset(
+    label: 'LAN nội bộ',
+    bvbmUrl: 'http://172.16.1.12:3000',    // BVBM gateway nội bộ
+    emrUrl: 'http://172.16.9.6:1417',
+    mosUrl: 'http://172.16.9.6:1429',      // v3.0.62: 1408→1429
+    sdaUrl: 'http://172.16.9.6:1410',
+    sarUrl: 'http://172.16.9.6:1409',
+    fssUrl: 'http://172.16.9.6:1405',
+    lisUrl: 'http://172.16.9.6:1419',
+    ocrUrl: 'http://172.16.9.6:1425',      // v3.0.62: 1429→1425
   );
 
   // v3.0.49: Proxy qua PC BS (chạy his_proxy_server.py port 9999)

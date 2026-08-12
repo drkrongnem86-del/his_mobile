@@ -243,7 +243,9 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             color: Colors.grey.shade50,
             child: Text(
-              '📁 $_logPath',
+              _logPath.isEmpty
+                  ? '📁 (đang tải...)'
+                  : '📁 $_logPath',
               style: const TextStyle(fontSize: 10, color: Colors.black54),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
@@ -257,16 +259,24 @@ class _LogViewerScreenState extends State<LogViewerScreen> {
                 : _error != null
                     ? Center(child: Text('Lỗi: $_error', style: const TextStyle(color: Colors.red)))
                     : _lines.isEmpty
-                        ? const Center(
+                        ? Center(
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.inbox, size: 64, color: Colors.black26),
-                                SizedBox(height: 12),
-                                Text('Chưa có log hôm nay', style: TextStyle(color: Colors.black45)),
-                                SizedBox(height: 8),
-                                Text('Bấm "Lưu ký" để tạo log đầu tiên',
-                                    style: TextStyle(color: Colors.black38, fontSize: 12)),
+                                const Icon(Icons.inbox, size: 64, color: Colors.black26),
+                                const SizedBox(height: 12),
+                                const Text('Chưa có log hôm nay',
+                                    style: TextStyle(color: Colors.black45)),
+                                const SizedBox(height: 8),
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 32),
+                                  child: Text(
+                                    'Push 1 EMR (Lưu ký) trước, log sẽ xuất hiện ở đây.\n'
+                                    'Nếu cần gửi IT để debug, bấm ⋮ → Chia sẻ log.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(color: Colors.black38, fontSize: 12, height: 1.5),
+                                  ),
+                                ),
                               ],
                             ),
                           )

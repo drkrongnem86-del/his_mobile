@@ -3,6 +3,10 @@
 // Default credentials: nemk / Cnttbvnt@321 (mặc định load OVN config + user/pass).
 // User có thể đổi user/pass khác qua UI (Settings → VPN Bệnh viện).
 // Password được mask kiểu ***** khi hiển thị trên UI (lưu SharedPrefs vẫn là plain text).
+// v3.0.93:
+//   - onAppPaused(): bắt đầu đếm 5 phút (timer)
+//   - onAppResumed(): nếu còn < 5p thì hủy timer, quá 5p thì tự ngắt VPN
+//   - startAppPausedTimer(Duration): cấu hình thời gian auto-disconnect
 import 'dart:async';
 import 'package:flutter/foundation.dart' show debugPrint, ChangeNotifier;
 import 'package:flutter/services.dart' show rootBundle;
@@ -22,6 +26,10 @@ class VpnBenhVienService extends ChangeNotifier {
   // Storage keys
   static const String _kStoredUser = 'vpn_bv_user';
   static const String _kStoredPass = 'vpn_bv_pass';
+  static const String _kStoredAutoDisconnect = 'vpn_bv_auto_disconnect_sec';
+
+  // v3.0.93: Default 5 phút auto-disconnect khi app ở background
+  static const Duration _kDefaultAutoDisconnect = Duration(minutes: 5);
 
   // v3.0.76: Real OpenVPN engine từ openvpn_flutter package
   late final OpenVPN _engine = OpenVPN(
@@ -84,8 +92,20 @@ class VpnBenhVienService extends ChangeNotifier {
   String? _cachedUser;
   String? _cachedPass;
 
+  // v3.0.93: Auto-disconnect timer (khi app ở background quá lâu)
+  Timer? _autoDisconnectTimer;
+  DateTime? _pausedAt;
+  Duration _autoDisconnectAfter = _kDefaultAutoDisconnect;
+  bool _wasConnectedBeforePause = false;
+
   String get currentUser => _cachedUser ?? _kDefaultUser;
   String get currentPass => _cachedPass ?? _kDefaultPass;
+
+  /// v3.0.93: True nếu user/pass là default (không hiển thị password trên UI)
+  bool get isUsingDefaultAccount {
+    return (_cachedUser ?? _kDefaultUser) == _kDefaultUser &&
+        (_cachedPass ?? _kDefaultPass) == _kDefaultPass;
+  }
 
   /// v3.0.76: Mask password cho UI hiển thị
   String get maskedPassword {
@@ -94,11 +114,31 @@ class VpnBenhVienService extends ChangeNotifier {
     return '*' * p.length;
   }
 
+  /// v3.0.93: Auto-disconnect duration (mặc định 5 phút)
+  Duration get autoDisconnectAfter => _autoDisconnectAfter;
+
+  /// v3.0.93: True nếu đang đếm giờ auto-disconnect
+  bool get isAutoDisconnectPending => _autoDisconnectTimer != null;
+
+  /// v3.0.93: Số giây còn lại trước khi tự ngắt (null nếu không đếm)
+  int? get remainingAutoDisconnectSeconds {
+    if (_pausedAt == null) return null;
+    final elapsed = DateTime.now().difference(_pausedAt!);
+    final remaining = _autoDisconnectAfter - elapsed;
+    if (remaining.isNegative) return 0;
+    return remaining.inSeconds;
+  }
+
   /// v3.0.76: Initialize engine - phải gọi 1 lần trước khi connect
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     _cachedUser = prefs.getString(_kStoredUser);
     _cachedPass = prefs.getString(_kStoredPass);
+    // v3.0.93: Load auto-disconnect duration từ prefs
+    final autoDisconnectSec = prefs.getInt(_kStoredAutoDisconnect);
+    if (autoDisconnectSec != null && autoDisconnectSec > 0) {
+      _autoDisconnectAfter = Duration(seconds: autoDisconnectSec);
+    }
     if (_initialized) {
       notifyListeners();
       return;
@@ -202,6 +242,56 @@ class VpnBenhVienService extends ChangeNotifier {
       await prefs.remove(_kStoredPass);
     } catch (e) {
       debugPrint('VpnBenhVienService: resetToDefault error: $e');
+    }
+    notifyListeners();
+  }
+
+  // ========== v3.0.93: Auto-disconnect sau khi app ở background ==========
+
+  /// App vừa vào background (paused) - bắt đầu đếm giờ auto-disconnect
+  void onAppPaused() {
+    if (!isConnected) {
+      _wasConnectedBeforePause = false;
+      return;
+    }
+    _wasConnectedBeforePause = true;
+    _pausedAt = DateTime.now();
+    _autoDisconnectTimer?.cancel();
+    _autoDisconnectTimer = Timer(_autoDisconnectAfter, () {
+      debugPrint('VpnBenhVienService: auto-disconnect after ${_autoDisconnectAfter.inMinutes} min in background');
+      if (isConnected) {
+        disconnect();
+        _lastError = 'Auto-disconnect: app ở background quá ${_autoDisconnectAfter.inMinutes} phút';
+      }
+      _autoDisconnectTimer = null;
+      _pausedAt = null;
+      notifyListeners();
+    });
+    debugPrint('VpnBenhVienService: app paused, auto-disconnect in ${_autoDisconnectAfter.inMinutes} min');
+    notifyListeners();
+  }
+
+  /// App vừa resume (foreground lại) - hủy timer nếu chưa quá hạn
+  void onAppResumed() {
+    if (_autoDisconnectTimer != null) {
+      _autoDisconnectTimer!.cancel();
+      _autoDisconnectTimer = null;
+      _pausedAt = null;
+      _wasConnectedBeforePause = false;
+      debugPrint('VpnBenhVienService: app resumed, cancelled auto-disconnect');
+      notifyListeners();
+    }
+  }
+
+  /// Cập nhật thời gian auto-disconnect (phút, 0 = tắt)
+  Future<void> setAutoDisconnectMinutes(int minutes) async {
+    if (minutes < 0) minutes = 0;
+    _autoDisconnectAfter = Duration(minutes: minutes);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_kStoredAutoDisconnect, minutes * 60);
+    } catch (e) {
+      debugPrint('VpnBenhVienService: setAutoDisconnectMinutes error: $e');
     }
     notifyListeners();
   }

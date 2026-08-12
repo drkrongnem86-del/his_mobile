@@ -1,5 +1,5 @@
-// v3.0.9: Màn hình chính "Y tế số" - grid 15 chức năng
-// Mở từ drawer hoặc tab vào tên BN
+// v3.0.9: Màn hình chính "Y tế số" - grid chức năng
+// v3.0.93: Bỏ 'Bệnh án' (dư - đã có ở patient actions sheet). Còn 19 chức năng.
 import 'package:flutter/material.dart';
 import 'package:his_mobile/data/models/y_te_so_feature.dart';
 import 'package:his_mobile/data/models/y_te_so_router.dart';
@@ -90,15 +90,15 @@ class YTeSoHomeScreen extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     const Text(
-                      'App Y tế số v1.0.44',
+                      'API Y tế số Bộ Y tế (113.163.187.3:3000)',
                       style: TextStyle(color: Colors.white70, fontSize: 11),
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
-                const Text(
-                  '15 chức năng y tế số',
-                  style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                Text(
+                  '${features.length} chức năng y tế số',
+                  style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(height: 2),
                 Text(
@@ -205,30 +205,30 @@ class YTeSoHomeScreen extends StatelessWidget {
             Text('Y tế số'),
           ],
         ),
-        content: const SingleChildScrollView(
+        content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '15 chức năng y tế số (Bộ Y tế)',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                '${YTeSoFeatures.all.length} chức năng y tế số (Bộ Y tế)',
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
               ),
-              SizedBox(height: 8),
-              Text(
-                'Copy toàn bộ từ app Y tế số thật (com.snd.adbc v1.0.44) - phân tích từ file Y Tế Số.apk (29.9MB).',
+              const SizedBox(height: 8),
+              const Text(
+                'Đồng bộ từ app Y tế số gốc (com.snd.adbc) - phân tích từ file APK + test với API thật.',
                 style: TextStyle(fontSize: 12, height: 1.4),
               ),
-              SizedBox(height: 12),
-              Text(
+              const SizedBox(height: 12),
+              const Text(
                 'Cách dùng:',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
               ),
-              SizedBox(height: 4),
-              Text(
+              const SizedBox(height: 4),
+              const Text(
                 '• Bấm vào 1 chức năng để mở màn hình chi tiết\n'
-                '• Mở từ drawer "Y tế số" - dùng chung\n'
-                '• Tab vào tên BN → bottom sheet có grid 15 chức năng cho BN đó',
+                '• API: http://113.163.187.3:3000/v1/...\n'
+                '• Tab vào tên BN → bottom sheet có grid chức năng cho BN đó',
                 style: TextStyle(fontSize: 12, height: 1.5),
               ),
             ],

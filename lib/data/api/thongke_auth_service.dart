@@ -53,13 +53,11 @@ class ThongkeAuthService {
   static const Duration _hisProTokenMaxAge = Duration(hours: 1);
 
   /// v3.0.93: Các nguồn token được hỗ trợ
-  /// - emrscan: Auto-fetch từ EmrScanApp Windows service (port 18080) - TỐT NHẤT
   /// - hisproxy: Auto-fetch từ HIS desktop proxy (port 9999, đọc log file)
   /// - manual: User paste tay từ Settings
   /// - file: Đọc từ file local trên thiết bị
   /// - embedded: Token mặc định XOR-embedded trong code
   /// - unknown: Không rõ (legacy)
-  static const String _kSrcEmrScan = 'emrscan';
   static const String _kSrcHisProxy = 'hisproxy';
   static const String _kSrcManual = 'manual';
   static const String _kSrcFile = 'file';
@@ -193,7 +191,6 @@ class ThongkeAuthService {
   Future<String> getTokenSourceText() async {
     final src = await getTokenSource();
     switch (src) {
-      case _kSrcEmrScan: return 'EmrScanApp';
       case _kSrcHisProxy: return 'HIS Proxy';
       case _kSrcManual: return 'Thủ công';
       case _kSrcFile: return 'File local';
@@ -206,7 +203,6 @@ class ThongkeAuthService {
   Future<String> getTokenSourceIcon() async {
     final src = await getTokenSource();
     switch (src) {
-      case _kSrcEmrScan: return '🛰️'; // EmrScanApp Windows service
       case _kSrcHisProxy: return '🖥️'; // HIS desktop proxy
       case _kSrcManual: return '✋'; // User paste tay
       case _kSrcFile: return '📁'; // File local

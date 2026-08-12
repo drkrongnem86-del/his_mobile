@@ -1,7 +1,7 @@
 name: his_mobile
 description: "HIS Pro Mobile - Khoa Cap Cuu"
 publish_to: 'none'
-version: 3.0.93+237
+version: 3.0.94+238
 environment:
   sdk: ^3.11.5
 
@@ -60,6 +60,9 @@ dependencies:
   device_info_plus: ^12.0.0
   # v3.0.58: Share log file qua Zalo/Facebook/Email
   share_plus: ^10.0.2
+
+  # v3.0.93: Update check từ GitHub - mở APK installer sau khi tải
+  open_filex: ^4.5.0
 
 dev_dependencies:
   flutter_test:

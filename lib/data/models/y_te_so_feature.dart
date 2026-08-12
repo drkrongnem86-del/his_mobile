@@ -139,13 +139,7 @@ class YTeSoFeatures {
       icon: Icons.qr_code_scanner,
       color: Color(0xFF1A237E),
     ),
-    YTeSoFeature(
-      id: 'benh_an',
-      name: 'Bệnh án',
-      description: 'Xem bệnh án đầy đủ (PDF từ EMR / Data public)',
-      icon: Icons.folder_special,
-      color: Color(0xFF6D4C41),
-    ),
+    // v3.0.93: Bỏ mục 'Bệnh án' (dư - đã có 'Xem bệnh án' ở patient actions sheet)
     YTeSoFeature(
       id: 'cham_soc_suc_khoe',
       name: 'Chăm sóc sức khỏe',

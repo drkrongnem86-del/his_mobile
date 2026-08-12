@@ -1,13 +1,12 @@
-// HisConfigScreen v2.75.1 → v3.0.63
+// HisConfigScreen v2.75.1 → v3.0.93
 // Màn hình "Cấu hình HIS" - giống app v0.3.0 (team BS)
 // - 3 nút chọn nhanh: "Public VPN" / "LAN nội bộ" / "Proxy qua PC" (v3.0.49)
 // - 3 URL chính: BVBM (login), HIS EMR (fallback), HIS MOS (ICD)
 // - Tài khoản, Mã khoa (mặc định 22), Tên khoa
 // - Nút Lưu cấu hình + Test kết nối
-// v3.0.63:
-//   + Thêm 7 thongke URL fields (collapsible section "Thongke public")
-//   + Thêm "Thời gian chờ API" (giây) - default 5s, configurable
-//   + Ẩn KCB test button (không dùng nữa)
+// v3.0.63: Thêm "Thời gian chờ API" (giây) - default 5s, configurable
+// v3.0.93: Bỏ mục "Thongke public (7 endpoints)" collapsible - rườm rà, ít dùng
+//          + sửa link preset Public VPN BVBM = 113.163.187.3:3000 (public IP)
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:his_mobile/core/services/his_config_service.dart';
@@ -29,17 +28,8 @@ class _HisConfigScreenState extends State<HisConfigScreen> {
   late TextEditingController _loginCtrl;
   late TextEditingController _deptIdCtrl;
   late TextEditingController _deptNameCtrl;
-  // v3.0.63: 7 thongke controllers
-  late TextEditingController _thongkeBaseCtrl;
-  late TextEditingController _thongkeLoginCtrl;
-  late TextEditingController _thongkeHomeCtrl;
-  late TextEditingController _thongkeInsuranceCheckCtrl;
-  late TextEditingController _thongkeInsuranceSearchCtrl;
-  late TextEditingController _thongkeEmrIndexCtrl;
-  late TextEditingController _thongkeEmrSearchCtrl;
   // v3.0.63: Timeout (giây) - default 5
   late TextEditingController _apiTimeoutCtrl;
-  // v3.0.63: Ẩn KCB section (không dùng nữa)
   bool _useKcb = true;
   late String _mode;
   // v3.0.11: Bearer tùy chỉnh (paste từ app Y tế số)
@@ -48,8 +38,6 @@ class _HisConfigScreenState extends State<HisConfigScreen> {
 
   bool _testing = false;
   String? _testResult;
-  // v3.0.63: Collapsible state cho Thongke section
-  bool _showThongke = false;
 
   @override
   void initState() {
@@ -61,14 +49,6 @@ class _HisConfigScreenState extends State<HisConfigScreen> {
     _loginCtrl = TextEditingController(text: c.loginName);
     _deptIdCtrl = TextEditingController(text: c.defaultDeptId.toString());
     _deptNameCtrl = TextEditingController(text: c.defaultDeptName);
-    // v3.0.63: Init 7 thongke controllers
-    _thongkeBaseCtrl = TextEditingController(text: c.thongkeBaseUrl);
-    _thongkeLoginCtrl = TextEditingController(text: c.thongkeLoginUrl);
-    _thongkeHomeCtrl = TextEditingController(text: c.thongkeHomeUrl);
-    _thongkeInsuranceCheckCtrl = TextEditingController(text: c.thongkeInsuranceCheckUrl);
-    _thongkeInsuranceSearchCtrl = TextEditingController(text: c.thongkeInsuranceSearchUrl);
-    _thongkeEmrIndexCtrl = TextEditingController(text: c.thongkeEmrIndexUrl);
-    _thongkeEmrSearchCtrl = TextEditingController(text: c.thongkeEmrSearchUrl);
     // v3.0.63: Init timeout
     _apiTimeoutCtrl = TextEditingController(text: '5');
     _useKcb = c.useKcbForEmr;
@@ -86,13 +66,6 @@ class _HisConfigScreenState extends State<HisConfigScreen> {
     _loginCtrl.dispose();
     _deptIdCtrl.dispose();
     _deptNameCtrl.dispose();
-    _thongkeBaseCtrl.dispose();
-    _thongkeLoginCtrl.dispose();
-    _thongkeHomeCtrl.dispose();
-    _thongkeInsuranceCheckCtrl.dispose();
-    _thongkeInsuranceSearchCtrl.dispose();
-    _thongkeEmrIndexCtrl.dispose();
-    _thongkeEmrSearchCtrl.dispose();
     _apiTimeoutCtrl.dispose();
     super.dispose();
   }
@@ -109,14 +82,6 @@ class _HisConfigScreenState extends State<HisConfigScreen> {
       _bvbmCtrl.text = preset.bvbmUrl;
       _emrCtrl.text = preset.emrUrl;
       _mosCtrl.text = preset.mosUrl;
-      // v3.0.62: Thongke cũng apply theo preset (mặc định là thongke public)
-      _thongkeBaseCtrl.text = preset.thongkeBaseUrl;
-      _thongkeLoginCtrl.text = preset.thongkeLoginUrl;
-      _thongkeHomeCtrl.text = preset.thongkeHomeUrl;
-      _thongkeInsuranceCheckCtrl.text = preset.thongkeInsuranceCheckUrl;
-      _thongkeInsuranceSearchCtrl.text = preset.thongkeInsuranceSearchUrl;
-      _thongkeEmrIndexCtrl.text = preset.thongkeEmrIndexUrl;
-      _thongkeEmrSearchCtrl.text = preset.thongkeEmrSearchUrl;
     });
   }
 
@@ -137,14 +102,14 @@ class _HisConfigScreenState extends State<HisConfigScreen> {
       emrWebUrl: prev.emrWebUrl,
       redisUrl: prev.redisUrl,
       vvaUrl: prev.vvaUrl,
-      // v3.0.62/63: Lưu 7 thongke fields
-      thongkeBaseUrl: _thongkeBaseCtrl.text.trim(),
-      thongkeLoginUrl: _thongkeLoginCtrl.text.trim(),
-      thongkeHomeUrl: _thongkeHomeCtrl.text.trim(),
-      thongkeInsuranceCheckUrl: _thongkeInsuranceCheckCtrl.text.trim(),
-      thongkeInsuranceSearchUrl: _thongkeInsuranceSearchCtrl.text.trim(),
-      thongkeEmrIndexUrl: _thongkeEmrIndexCtrl.text.trim(),
-      thongkeEmrSearchUrl: _thongkeEmrSearchCtrl.text.trim(),
+      // v3.0.93: thongke fields giữ từ prev (không hiển thị trong UI nữa)
+      thongkeBaseUrl: prev.thongkeBaseUrl,
+      thongkeLoginUrl: prev.thongkeLoginUrl,
+      thongkeHomeUrl: prev.thongkeHomeUrl,
+      thongkeInsuranceCheckUrl: prev.thongkeInsuranceCheckUrl,
+      thongkeInsuranceSearchUrl: prev.thongkeInsuranceSearchUrl,
+      thongkeEmrIndexUrl: prev.thongkeEmrIndexUrl,
+      thongkeEmrSearchUrl: prev.thongkeEmrSearchUrl,
       kcbBaseUrl: prev.kcbBaseUrl,
       kcbToken: prev.kcbToken,
       kcbHospitalCode: prev.kcbHospitalCode,
@@ -181,7 +146,6 @@ class _HisConfigScreenState extends State<HisConfigScreen> {
       'BVBM': _bvbmCtrl.text.trim(),
       'EMR': _emrCtrl.text.trim(),
       'MOS': _mosCtrl.text.trim(),
-      'Thongke': _thongkeBaseCtrl.text.trim() + _thongkeHomeCtrl.text.trim(),
     };
     final results = <String>[];
     for (final entry in urls.entries) {
@@ -331,83 +295,8 @@ class _HisConfigScreenState extends State<HisConfigScreen> {
               style: const TextStyle(fontSize: 13),
             ),
             const SizedBox(height: 20),
-
-            // v3.0.63: Thongke public - collapsible section (7 endpoints)
-            InkWell(
-              onTap: () => setState(() => _showThongke = !_showThongke),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-                decoration: BoxDecoration(
-                  color: const Color(0xFF1976D2).withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFF1976D2).withValues(alpha: 0.3)),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.bar_chart, color: Color(0xFF1976D2), size: 20),
-                    const SizedBox(width: 8),
-                    const Expanded(
-                      child: Text(
-                        'Thongke public (7 endpoints)',
-                        style: TextStyle(
-                          color: Color(0xFF1976D2),
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                    Icon(
-                      _showThongke ? Icons.expand_less : Icons.expand_more,
-                      color: const Color(0xFF1976D2),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            if (_showThongke) ...[
-              const SizedBox(height: 12),
-              _urlField(
-                label: 'Thongke Base URL',
-                controller: _thongkeBaseCtrl,
-                icon: Icons.cloud,
-              ),
-              const SizedBox(height: 12),
-              _urlField(
-                label: 'Thongke Login (/login)',
-                controller: _thongkeLoginCtrl,
-                icon: Icons.login,
-              ),
-              const SizedBox(height: 12),
-              _urlField(
-                label: 'Thongke Home (/home)',
-                controller: _thongkeHomeCtrl,
-                icon: Icons.home,
-              ),
-              const SizedBox(height: 12),
-              _urlField(
-                label: 'Thongke Insurance Check (/insurance/check-card)',
-                controller: _thongkeInsuranceCheckCtrl,
-                icon: Icons.health_and_safety,
-              ),
-              const SizedBox(height: 12),
-              _urlField(
-                label: 'Thongke Insurance Search (/insurance/medicine-search)',
-                controller: _thongkeInsuranceSearchCtrl,
-                icon: Icons.search,
-              ),
-              const SizedBox(height: 12),
-              _urlField(
-                label: 'Thongke EMR Index (/emr/index)',
-                controller: _thongkeEmrIndexCtrl,
-                icon: Icons.folder_shared,
-              ),
-              const SizedBox(height: 12),
-              _urlField(
-                label: 'Thongke EMR Search (/emr/index/search)',
-                controller: _thongkeEmrSearchCtrl,
-                icon: Icons.search,
-              ),
-            ],
+            // v3.0.93: Bỏ mục "Thongke public" (rườm rà, ít dùng)
+            // Thongke URLs giữ trong config nhưng ẩn khỏi UI
             const SizedBox(height: 20),
 
             // Test result

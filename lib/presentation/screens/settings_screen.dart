@@ -7,6 +7,7 @@ import 'package:his_mobile/core/services/api_debug_service.dart';
 import 'package:his_mobile/core/services/connection_service.dart';
 import 'package:his_mobile/core/services/department_service.dart';
 import 'package:his_mobile/core/services/his_config_service.dart';
+import 'package:his_mobile/core/services/update_service.dart';
 import 'package:his_mobile/core/theme/theme_manager.dart';
 import 'package:his_mobile/data/services/data_service.dart';
 import 'package:his_mobile/data/api/emr_push_service.dart';
@@ -17,7 +18,6 @@ import 'package:his_mobile/presentation/screens/log_viewer_screen.dart';
 import 'package:his_mobile/presentation/widgets/user_header.dart';
 import 'package:his_mobile/presentation/screens/his_config_screen.dart';
 import 'package:his_mobile/presentation/screens/vpn_benh_vien_screen.dart';
-import 'package:his_mobile/presentation/screens/emr_scan_config_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Màn hình Cài đặt v2.66.0
@@ -325,25 +325,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         builder: (_) => const VpnBenhVienScreen(),
                       ),
                     );
-                  },
-                ),
-                // v3.0.93: EmrScanApp Token Service - auto-fetch HIS Pro token
-                _menuItem(
-                  icon: Icons.satellite_alt,
-                  color: const Color(0xFF00838F),
-                  title: 'EmrScanApp Token Service',
-                  subtitle: 'Tự động lấy + refresh HIS Pro token từ Windows service',
-                  onTap: () async {
-                    final r = await Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const EmrScanConfigScreen(),
-                      ),
-                    );
-                    if (r == true && mounted) {
-                      // Cập nhật trạng thái nếu user vừa lưu token mới
-                      setState(() {});
-                    }
                   },
                 ),
 
@@ -678,35 +659,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  // v2.76.5: Debug API response - gọi Data + HIS Pro
+  // v3.0.93: Debug API response - gọi Y Tế Số public + HIS Pro
   Future<void> _showApiDebugDialog() async {
-    final data = DataService.instance;
-    final cfg = HisConfigService.instance.config;
-    final loginName = data.user?.loginName ?? cfg.loginName;
-    final password = cfg.password;
-    final dataBaseUrl = data.baseUrl;
-    final hisProBaseUrl = ConnectionService.instance.acsUrl;
-    final mosBaseUrl = ConnectionService.instance.mosUrl;
-    final buf = StringBuffer();
-    buf.writeln('Đang gọi API $dataBaseUrl/v1/patient/benh-nhan-buong-benh ...');
-    buf.writeln('Login: $loginName');
-    buf.writeln('');
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Debug API Response'),
+        title: const Row(children: [
+          Icon(Icons.bug_report, color: Color(0xFFFF6F00), size: 20),
+          SizedBox(width: 8),
+          Text('Debug: Raw API Response'),
+        ]),
         content: SizedBox(
           width: double.maxFinite,
           height: 400,
           child: SingleChildScrollView(
             child: FutureBuilder<String>(
-                future: ApiDebugService.debugPatientsInRooms(
-                dataBaseUrl: dataBaseUrl,
-                hisProBaseUrl: hisProBaseUrl,
-                mosBaseUrl: mosBaseUrl,
-                loginName: loginName,
-                password: password,
-              ),
+              future: ApiDebugService.debugApis(),
               builder: (ctx, snap) {
                 if (snap.connectionState == ConnectionState.waiting) {
                   return const Padding(
@@ -716,7 +684,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       children: [
                         CircularProgressIndicator(),
                         SizedBox(height: 12),
-                        Text('Đang gọi API...'),
+                        Text('Đang gọi Y Tế Số + HIS Pro...'),
                       ],
                     ),
                   );
@@ -737,19 +705,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
             icon: const Icon(Icons.copy, size: 14),
             label: const Text('Copy'),
             onPressed: () async {
-              final snap = await ApiDebugService.debugPatientsInRooms(
-                dataBaseUrl: dataBaseUrl,
-                hisProBaseUrl: hisProBaseUrl,
-                mosBaseUrl: mosBaseUrl,
-                loginName: loginName,
-                password: password,
-              );
+              final snap = await ApiDebugService.debugApis();
               await Clipboard.setData(ClipboardData(text: snap));
               if (ctx.mounted) {
                 Navigator.pop(ctx);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Đã copy raw response. Gửi cho dev.')),
-                );
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Đã copy raw response. Gửi cho dev.')),
+                  );
+                }
               }
             },
           ),
@@ -759,14 +723,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  // v2.66.0: Hiển thị version động từ AppVersionService (package_info_plus)
+  // v3.0.93: Update check từ GitHub version.json
   Future<void> _checkForUpdates() async {
     final appVer = AppVersionService.instance;
-    _showInfo('Phiên bản',
-        '${appVer.appName} v${appVer.version}\n'
-        'Build: ${appVer.buildNumber}\n'
-        'Package: ${appVer.packageName}\n\n'
-        'Đây là phiên bản mới nhất.');
+    _showInfo('Đang kiểm tra cập nhật…', 'Đang gọi GitHub để check bản mới.');
+    final info = await UpdateService.checkUpdate();
+    if (!mounted) return;
+    if (info == null) {
+      _showInfo('Đã là bản mới nhất',
+          '${appVer.appName} v${appVer.version} (build ${appVer.buildNumber})\n\n'
+          'Bạn đang dùng bản mới nhất. Tự động check lại sau khi có bản mới trên GitHub.');
+      return;
+    }
+    UpdateService.showUpdateDialog(context, info);
   }
 
   void _showAppInfo(BuildContext context) {

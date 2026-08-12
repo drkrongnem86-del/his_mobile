@@ -344,8 +344,8 @@ class PatientActionsSheet extends StatelessWidget {
 
   /// v3.0.83: Tile Y tế số (Bộ Y tế) - native, thay thế "Mở trên EMR web"
   /// Tích hợp trực tiếp Y Tế Số public API (113.163.187.3:3000)
-  /// 50+ endpoints: xem bệnh án, y lệnh, điều dưỡng, phiếu bàn giao, ...
   /// Không cần VPN, không cần HIS Pro token, dùng chung tài khoản thongke
+  /// v3.0.93: Bỏ badge "Bộ Y tế • 50+ API" (rườm rà)
   Widget _yTeSoTile(BuildContext context) {
     final color1 = const Color(0xFF00838F);
     final color2 = const Color(0xFF006064);
@@ -372,18 +372,8 @@ class PatientActionsSheet extends StatelessWidget {
             ),
             const SizedBox(width: 10),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Expanded(
-                  child: Text('Y tế số - Xem bệnh án',
-                    style: TextStyle(color: color1, fontSize: 14, fontWeight: FontWeight.bold)),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(color: color1.withOpacity(0.12), borderRadius: BorderRadius.circular(4)),
-                  child: const Text('Bộ Y tế • 50+ API',
-                    style: TextStyle(color: Color(0xFF00838F), fontSize: 9, fontWeight: FontWeight.bold)),
-                ),
-              ]),
+              const Text('Y tế số - Xem bệnh án',
+                style: TextStyle(color: Color(0xFF00838F), fontSize: 14, fontWeight: FontWeight.bold)),
               const SizedBox(height: 2),
               const Text(
                 'List tài liệu theo nhóm, xem PDF/ảnh native, không cần VPN • dùng chung tk thongke',

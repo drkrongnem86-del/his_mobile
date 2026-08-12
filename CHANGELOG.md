@@ -1,5 +1,66 @@
 # Changelog - HIS Mobile
 
+## v3.0.94 (build 238) - 13/08/2026
+**"Bỏ EmrScanApp + Auto-update từ GitHub + VPN auto-disconnect"**
+
+### 🗑️ Bỏ EmrScanApp (rườm rà)
+- Xóa `emr_scan_config_screen.dart` + `emr_scan_token_service.dart`
+- Bỏ menu "EmrScanApp Token Service" trong Settings
+- Bỏ nút 🛰️ 1-chạm ở Lịch sử điều trị patient header
+- Bỏ dòng "Nguồn token" ở header
+- Bỏ nút "Lấy từ EmrScanApp" trong dialog paste token
+- Giữ HIS Proxy + paste tay (đơn giản, đủ dùng)
+
+### 🆕 Tính năng mới v3.0.94
+- **Auto-update từ GitHub** (`UpdateService`):
+  - Settings → Kiểm tra cập nhật → gọi `https://raw.githubusercontent.com/drkrongnem86-del/his_mobile/main/version.json`
+  - So sánh version → nếu mới hơn hiện dialog
+  - Bấm Đồng ý → tải APK → mở installer Android
+  - File `version.json` ở repo root
+- **VPN bệnh viện - cải tiến**:
+  - Ẩn password cho account mặc định `nemk` (không có con mắt, không edit)
+  - Mục "Tài khoản khác" riêng để nhập user + pass
+  - Bỏ dòng "Mặc định: nemk / Cnttbvnt@321" (lộ pass)
+  - **Auto-disconnect VPN 5 phút** khi app ở background (thoát/thu gọn)
+  - Banner countdown "Sẽ tự ngắt sau Xs" (mở lại app để hủy)
+- **Y tế số - Xem bệnh án**: bỏ badge "Bộ Y tế • 50+ API" (rườm rà)
+- **Y TẾ SỐ (BỘ Y TẾ)**: bỏ mục "Bệnh án" (đã có ở patient actions sheet - dư)
+  - Cập nhật count + URL info trong home screen
+- **Cấu hình HIS - dọn dẹp**:
+  - Bỏ mục "Thongke public (7 endpoints)" collapsible (rườm rà)
+  - Sửa link preset "Public VPN" BVBM = `http://113.163.187.3:3000` (public IP thay vì cũ)
+  - Test kết nối bỏ check "Thongke" (chỉ còn BVBM/EMR/MOS)
+- **Debug API Response** (Settings):
+  - Test cả **Y Tế Số public** (POST /v1/auth/login + GET /v1/medical-record/document-types)
+  - Test **HIS Pro 1408** (GET /api/HisTreatment/GetView)
+  - Hiển thị field name thật từ response (copy gửi dev)
+
+### 🔧 Workflow
+1. **Update check**: Cài v3.0.94 → lần sau vào Settings → "Kiểm tra cập nhật" → tự động check GitHub
+2. **VPN 5 phút**: Bấm Kết nối → dùng → thoát app → 5 phút sau tự ngắt (tránh tốn pin)
+3. **Y tế số**: tab BN → "Y tế số - Xem bệnh án" (vào thẳng) HOẶC mở Drawer → "Y tế số" (grid 19 chức năng, bỏ Bệnh án)
+
+### 📁 Files sửa v3.0.94
+- **Mới**: `lib/core/services/update_service.dart`, `version.json`
+- **Xóa**: `lib/data/services/emr_scan_token_service.dart`, `lib/presentation/screens/emr_scan_config_screen.dart`
+- **Sửa**:
+  - `lib/core/services/vpn_benh_vien_service.dart` - thêm `onAppPaused/Resumed` + `setAutoDisconnectMinutes`
+  - `lib/core/services/his_config_service.dart` - sửa link preset Public VPN BVBM
+  - `lib/core/services/api_debug_service.dart` - test cả Y Tế Số + HIS Pro
+  - `lib/presentation/screens/settings_screen.dart` - dùng `UpdateService`
+  - `lib/presentation/screens/vpn_benh_vien_screen.dart` - rewrite form + auto-disconnect
+  - `lib/presentation/screens/his_config_screen.dart` - bỏ Thongke public section
+  - `lib/presentation/screens/treatment_history_screen.dart` - bỏ EmrScanApp UI
+  - `lib/presentation/screens/y_te_so_home_screen.dart` - count + URL info
+  - `lib/presentation/widgets/patient_actions_sheet.dart` - bỏ badge 50+ API
+  - `lib/data/api/thongke_auth_service.dart` - bỏ `_kSrcEmrScan`
+  - `lib/data/models/y_te_so_feature.dart` - bỏ 'Bệnh án' item
+  - `lib/data/models/y_te_so_router.dart` - bỏ route 'benh_an'
+  - `lib/data/api/y_te_so_service.dart` - dùng YTeSoService (đã có)
+  - `pubspec.yaml` - thêm `open_filex: ^4.5.0`
+
+---
+
 ## v3.0.93 (build 237) - 12/08/2026
 **"Tích hợp EmrScanApp auto-token service (port 18080) vào Lịch sử điều trị"**
 

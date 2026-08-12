@@ -24,8 +24,8 @@ class YTeSoRoute {
 }
 
 class YTeSoRouter {
-  /// v3.0.9: Mapping 20 chức năng → màn hình tương ứng
-  /// Các chức năng dùng screen có sẵn: canlamsang, scan_tai_lieu, benh_an, qr_code_scanner, ...
+  /// v3.0.9: Mapping 19 chức năng → màn hình tương ứng (v3.0.93: bỏ benh_an)
+  /// Các chức năng dùng screen có sẵn: canlamsang, scan_tai_lieu, qr_code_scanner, ...
   /// Các chức năng chưa có: tạo form generic (YTeSoFormScreen)
   static final Map<String, YTeSoRoute> _routes = {
     // 1. bacsidibuong - Bác sĩ đi buồng (form generic)
@@ -298,14 +298,9 @@ class YTeSoRouter {
       requiresTreatment: false,
     ),
 
-    // 17. benh_an - Bệnh án (dùng XemBenhAnScreen)
-    'benh_an': YTeSoRoute(
-      id: 'benh_an',
-      feature: YTeSoFeatures.byId('benh_an')!,
-      builder: (ctx, p, d) => XemBenhAnScreen(patient: p),
-    ),
+    // v3.0.93: Bỏ route 'benh_an' (dư - đã có 'Xem bệnh án' ở patient actions sheet)
 
-    // 18. cham_soc_suc_khoe - Chăm sóc sức khỏe
+    // 17. cham_soc_suc_khoe - Chăm sóc sức khỏe
     'cham_soc_suc_khoe': YTeSoRoute(
       id: 'cham_soc_suc_khoe',
       feature: YTeSoFeatures.byId('cham_soc_suc_khoe')!,
