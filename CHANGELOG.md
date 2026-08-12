@@ -18,9 +18,9 @@
   - Bấm Đồng ý → tải APK → mở installer Android
   - File `version.json` ở repo root
 - **VPN bệnh viện - cải tiến**:
-  - Ẩn password cho account mặc định `nemk` (không có con mắt, không edit)
+  - Ẩn password cho account mặc định `333` (không có con mắt, không edit)
   - Mục "Tài khoản khác" riêng để nhập user + pass
-  - Bỏ dòng "Mặc định: nemk / Cnttbvnt@321" (lộ pass)
+  - Bỏ dòng "Mặc định: 333 / 333" (lộ pass)
   - **Auto-disconnect VPN 5 phút** khi app ở background (thoát/thu gọn)
   - Banner countdown "Sẽ tự ngắt sau Xs" (mở lại app để hủy)
 - **Y tế số - Xem bệnh án**: bỏ badge "Bộ Y tế • 50+ API" (rườm rà)
@@ -275,12 +275,12 @@ Test với curl thực tế từ PC (qua public 113.163.187.3:3000), phát hiệ
 ### 🆕 Phát hiện lớn từ log Y Tế Số
 - **Bộ Y tế có public API mở** tại `http://113.163.187.3:3000` (qua internet, KHÔNG cần VPN)
 - Phát hiện qua PLogger curl logs trong logcat của `com.snd.adbc` ngày 11/08/2026
-- **Dùng CHUNG tài khoản với thongke**: `nemk / 1027`
+- **Dùng CHUNG tài khoản với thongke**: `333 / 333`
 - Tổng cộng **50+ endpoints** đã thấy trong log (auth, medical-record, patient, y-lenh, dieu-duong, notifications, ...)
 
 ### 🆕 Tính năng mới - v3.0.83
 - **Y tế số - Xem bệnh án native** thay thế "Mở trên EMR web" cũ:
-  - **Auto-login** với default credentials (nemk/1027)
+  - **Auto-login** với default credentials (333/333)
   - **List documents theo nhóm** (DOCUMENT_TYPE: Phiếu CĐ, Phiếu khác, Bảng kê, ...)
   - **Tap để download + xem** PDF/ảnh bằng `syncfusion_flutter_pdfviewer` (đã có sẵn trong pubspec)
   - Hiển thị thông tin BN + khoa/phòng + mã ĐT
@@ -355,7 +355,7 @@ Test với curl thực tế từ PC (qua public 113.163.187.3:3000), phát hiệ
 - Test file: `tools/yte_so_log/test_decoded.pdf`
 
 ### 🔑 Credentials
-- Y Tế Số public: `nemk` / `1027` (giống thongke)
+- Y Tế Số public: `333` / `333` (giống thongke)
 - Base URL: `http://113.163.187.3:3000` (qua internet) hoặc `http://172.16.1.12:3000` (qua VPN LAN)
 - User-id mặc định: `958e768e-61c6-4fed-81f7-525a6ca38263` (có thể cần login lại nếu server rotate)
 
@@ -572,7 +572,7 @@ API flow đã verify qua log HIS.exe ngày 10/08 08:32-08:35 (`D:\Soft\HISPRO_TH
 - Bundled `libopenvpn.so` (3.7 MB) + `libgojni.so` (5 MB) for arm64-v8a
 - AndroidManifest: BIND_VPN_SERVICE, FOREGROUND_SERVICE_*, POST_NOTIFICATIONS, extractNativeLibs=true
 - `VpnBenhVienService` rewritten with real OpenVPN engine
-- Default credentials: nemk / Cnttbvnt@321 (password masked as `*****` on UI)
+- Default credentials: 333 / 333 (password masked as `*****` on UI)
 - Splash screen fix: don't hang on "Kết nối HIS Pro..." when no VPN
 - Removed PatientSeed fallback (4 paths → empty state)
 
@@ -598,7 +598,7 @@ API flow đã verify qua log HIS.exe ngày 10/08 08:32-08:35 (`D:\Soft\HISPRO_TH
 - New `vpn_benh_vien_service.dart` (placeholder, real impl in v3.0.76)
 - New `vpn_benh_vien_screen.dart` with credentials form
 - VPN status indicator in AppBar (login + home)
-- Default credentials: admin/admin → nemk/1027
+- Default credentials: admin/admin → 333/333
 - HomeScreen API simplified to 2 sources: HIS Pro + Public
 
 ---
