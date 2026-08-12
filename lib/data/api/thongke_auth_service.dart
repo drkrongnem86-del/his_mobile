@@ -43,12 +43,28 @@ class ThongkeAuthService {
   }
   static const String _kHisProToken = 'hispro_bearer_token';
   static const String _kHisProTokenSavedAt = 'hispro_token_saved_at';
+  // v3.0.93: Track source của token (emrscan / hisproxy / manual / file / embedded)
+  static const String _kHisProTokenSource = 'hispro_token_source';
   static const String _kUsername = 'hispro_username';
   static const String _kEmail = 'hispro_email';
   static const String _kRecentUsers = 'hispro_recent_users';
   static const int _kMaxRecent = 5;
   // v3.0.90: Token expiry window (HIS Pro tokens typically valid 1 hour)
   static const Duration _hisProTokenMaxAge = Duration(hours: 1);
+
+  /// v3.0.93: Các nguồn token được hỗ trợ
+  /// - emrscan: Auto-fetch từ EmrScanApp Windows service (port 18080) - TỐT NHẤT
+  /// - hisproxy: Auto-fetch từ HIS desktop proxy (port 9999, đọc log file)
+  /// - manual: User paste tay từ Settings
+  /// - file: Đọc từ file local trên thiết bị
+  /// - embedded: Token mặc định XOR-embedded trong code
+  /// - unknown: Không rõ (legacy)
+  static const String _kSrcEmrScan = 'emrscan';
+  static const String _kSrcHisProxy = 'hisproxy';
+  static const String _kSrcManual = 'manual';
+  static const String _kSrcFile = 'file';
+  static const String _kSrcEmbedded = 'embedded';
+  static const String _kSrcUnknown = 'unknown';
 
   /// v2.52.0: Embedded default token (XOR + Base64) — auto-load khi không có token
   /// Mục đích: Bác sĩ mở app → tự động có ICD cho 218 BN HSCC mà KHÔNG cần paste
@@ -153,16 +169,51 @@ class ThongkeAuthService {
   final Map<String, Map<String, dynamic>> _icdCache = {};
 
   /// Lưu/đọc HIS Pro Bearer token (lấy từ log D:\Nem\HISPRO_THAT\Logs\LogSystem.txt)
-  Future<void> setHisProToken(String token) async {
+  /// v3.0.93: Thêm [source] để track token đến từ đâu (emrscan/hisproxy/manual/...)
+  Future<void> setHisProToken(String token, {String source = _kSrcManual}) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_kHisProToken, token.trim());
     // v3.0.90: Lưu timestamp để check expiry
     await prefs.setString(_kHisProTokenSavedAt, DateTime.now().toIso8601String());
+    // v3.0.93: Lưu source
+    await prefs.setString(_kHisProTokenSource, source);
     _hisProToken = token.trim();
   }
 
   String? get hisProToken => _hisProToken;
   bool get hasHisProToken => (_hisProToken ?? '').isNotEmpty;
+
+  /// v3.0.93: Lấy source hiện tại của token (emrscan/hisproxy/manual/file/embedded/unknown)
+  Future<String> getTokenSource() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_kHisProTokenSource) ?? _kSrcUnknown;
+  }
+
+  /// v3.0.93: Text tiếng Việt ngắn gọn cho source
+  Future<String> getTokenSourceText() async {
+    final src = await getTokenSource();
+    switch (src) {
+      case _kSrcEmrScan: return 'EmrScanApp';
+      case _kSrcHisProxy: return 'HIS Proxy';
+      case _kSrcManual: return 'Thủ công';
+      case _kSrcFile: return 'File local';
+      case _kSrcEmbedded: return 'Mặc định';
+      default: return '—';
+    }
+  }
+
+  /// v3.0.93: Icon phù hợp cho source
+  Future<String> getTokenSourceIcon() async {
+    final src = await getTokenSource();
+    switch (src) {
+      case _kSrcEmrScan: return '🛰️'; // EmrScanApp Windows service
+      case _kSrcHisProxy: return '🖥️'; // HIS desktop proxy
+      case _kSrcManual: return '✋'; // User paste tay
+      case _kSrcFile: return '📁'; // File local
+      case _kSrcEmbedded: return '🔒'; // Token mặc định
+      default: return '❓';
+    }
+  }
 
   /// v3.0.90: Lấy thời điểm token được lưu (null nếu chưa có)
   Future<DateTime?> getHisProTokenSavedAt() async {
@@ -311,10 +362,12 @@ class ThongkeAuthService {
   /// v2.52.0: FALLBACK xuống embedded default token (XOR-encoded) để auto hiện ICD
   /// ưu tiên: SharedPreferences > file local > embedded default
   /// v3.0.90: Khi load từ file/embedded, set savedAt = now (vì coi như "vừa lấy")
+  /// v3.0.93: Set source khi load từ file/embedded (nếu chưa có source)
   Future<void> loadHisProToken() async {
     final prefs = await SharedPreferences.getInstance();
     final fromPrefs = prefs.getString(_kHisProToken);
     final hasSavedAt = prefs.getString(_kHisProTokenSavedAt) != null;
+    final existingSource = prefs.getString(_kHisProTokenSource);
     _hisProToken = fromPrefs;
     // Nếu chưa có token, thử đọc file local
     if ((_hisProToken ?? '').isEmpty) {
@@ -323,6 +376,10 @@ class ThongkeAuthService {
         // v3.0.90: Lưu cả token + savedAt khi lấy từ file
         await prefs.setString(_kHisProToken, _hisProToken!);
         await prefs.setString(_kHisProTokenSavedAt, DateTime.now().toIso8601String());
+        // v3.0.93: Đánh dấu source là 'file'
+        if (existingSource == null) {
+          await prefs.setString(_kHisProTokenSource, _kSrcFile);
+        }
       }
     }
     // v2.52.0: Fallback cuối cùng — embedded default token (BS không cần paste)
@@ -333,10 +390,15 @@ class ThongkeAuthService {
         // Cache luôn vào SharedPreferences để các lần sau khỏi decode
         await prefs.setString(_kHisProToken, _hisProToken!);
         await prefs.setString(_kHisProTokenSavedAt, DateTime.now().toIso8601String());
+        // v3.0.93: Đánh dấu source là 'embedded'
+        await prefs.setString(_kHisProTokenSource, _kSrcEmbedded);
       }
     } else if (!hasSavedAt) {
       // v3.0.90: Có token từ prefs nhưng thiếu savedAt → set = now
       await prefs.setString(_kHisProTokenSavedAt, DateTime.now().toIso8601String());
+    } else if (existingSource == null && (_hisProToken ?? '').isNotEmpty) {
+      // v3.0.93: Có token từ prefs nhưng thiếu source (legacy data) → mặc định 'manual'
+      await prefs.setString(_kHisProTokenSource, _kSrcManual);
     }
     debugPrint('HIS Pro token loaded: ${_hisProToken != null ? "OK (len=${_hisProToken!.length})" : "null"}');
   }

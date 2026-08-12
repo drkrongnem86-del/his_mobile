@@ -21,6 +21,7 @@ import 'package:his_mobile/core/services/vpn_benh_vien_service.dart';
 import 'package:his_mobile/data/api/thongke_auth_service.dart';
 import 'package:his_mobile/data/api/treatment_history_service.dart';
 import 'package:his_mobile/data/services/his_proxy_token_service.dart';
+import 'package:his_mobile/data/services/emr_scan_token_service.dart';
 
 class TreatmentHistoryScreen extends StatefulWidget {
   final Map<String, dynamic> patient;
@@ -67,6 +68,11 @@ class _TreatmentHistoryScreenState extends State<TreatmentHistoryScreen> {
   List<Map<String, dynamic>> _sereServs = [];
   // v3.0.90: Token age text (refresh khi navigate back từ Settings)
   String _tokenAgeText = '';
+  // v3.0.93: Token source display
+  String _tokenSourceIcon = '❓';
+  String _tokenSourceText = '—';
+  // v3.0.93: EmrScanApp last fetch status
+  bool _emrScanBusy = false;
 
   @override
   void initState() {
@@ -76,12 +82,17 @@ class _TreatmentHistoryScreenState extends State<TreatmentHistoryScreen> {
   }
 
   /// v3.0.90: Load lại thông tin token (gọi khi init + sau khi user paste token)
+  /// v3.0.93: Thêm token source (emrscan/hisproxy/manual/...) + icon
   Future<void> _refreshTokenAge() async {
     final text = await ThongkeAuthService.instance.hisProTokenAgeText();
     final expired = await ThongkeAuthService.instance.isHisProTokenExpired();
+    final srcIcon = await ThongkeAuthService.instance.getTokenSourceIcon();
+    final srcText = await ThongkeAuthService.instance.getTokenSourceText();
     if (!mounted) return;
     setState(() {
       _tokenAgeText = expired && text != 'chưa rõ' ? '⚠️ $text' : text;
+      _tokenSourceIcon = srcIcon;
+      _tokenSourceText = srcText;
     });
   }
 
@@ -245,7 +256,7 @@ class _TreatmentHistoryScreenState extends State<TreatmentHistoryScreen> {
           colors: [Color(0xFFE3F2FD), Color(0xFFBBDEFB)],
         ),
       ),
-      child: Row(children: [
+      child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
         const Icon(Icons.person, color: Color(0xFF1565C0), size: 20),
         const SizedBox(width: 6),
         Expanded(
@@ -257,6 +268,7 @@ class _TreatmentHistoryScreenState extends State<TreatmentHistoryScreen> {
                 style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0D47A1)),
                 overflow: TextOverflow.ellipsis,
               ),
+              // Line 1: Mã BN + VPN + token age
               Text(
                 'Mã BN: ${_patientCode.isEmpty ? '—' : _patientCode}'
                 '${hasVpn ? ' • 🟢 VPN' : ' • 🔴 No VPN'}'
@@ -267,8 +279,31 @@ class _TreatmentHistoryScreenState extends State<TreatmentHistoryScreen> {
                         ? const Color(0xFFC62828)
                         : const Color(0xFF1565C0)),
               ),
+              // v3.0.93: Line 2 - Token source (EmrScanApp / HIS Proxy / Manual / ...)
+              if (hasToken)
+                Text(
+                  '$_tokenSourceIcon Nguồn token: $_tokenSourceText',
+                  style: const TextStyle(
+                      fontSize: 10,
+                      color: Color(0xFF455A64),
+                      fontWeight: FontWeight.w500),
+                ),
             ],
           ),
+        ),
+        // v3.0.93: Nút 1-chạm lấy token từ EmrScanApp
+        IconButton(
+          icon: _emrScanBusy
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF00838F)),
+                )
+              : const Icon(Icons.satellite_alt, color: Color(0xFF00838F)),
+          tooltip: 'Lấy token tự động từ EmrScanApp',
+          onPressed: _emrScanBusy ? null : _quickFetchEmrScan,
+          padding: const EdgeInsets.all(4),
+          constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
         ),
         if (_treatments.isNotEmpty)
           Container(
@@ -284,6 +319,51 @@ class _TreatmentHistoryScreenState extends State<TreatmentHistoryScreen> {
           ),
       ]),
     );
+  }
+
+  /// v3.0.93: Quick fetch token từ EmrScanApp (1 chạm, không cần dialog)
+  /// Hiển thị snackbar kết quả. Tự reload data sau khi lấy token thành công.
+  Future<void> _quickFetchEmrScan() async {
+    setState(() => _emrScanBusy = true);
+    final messenger = ScaffoldMessenger.of(context);
+    final info = await EmrScanTokenService.instance.fetchAndSaveToken();
+    if (!mounted) return;
+    setState(() => _emrScanBusy = false);
+    await _refreshTokenAge(); // refresh source + age display
+
+    if (!info.reachable) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('❌ EmrScanApp: ${info.error}'),
+          backgroundColor: const Color(0xFFC62828),
+          duration: const Duration(seconds: 4),
+        ),
+      );
+      return;
+    }
+    if (!info.hasToken) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: const Text(
+              '⚠️ EmrScanApp chưa có token. Vào Settings → EmrScanApp → Force login.'),
+          backgroundColor: const Color(0xFFEF6C00),
+          duration: const Duration(seconds: 5),
+        ),
+      );
+      return;
+    }
+    final userInfo = info.userName ?? info.user ?? '?';
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('✅ Đã lấy token từ EmrScanApp ($userInfo, ${info.token!.length} ký tự)'),
+        backgroundColor: const Color(0xFF2E7D32),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+    // Reload data nếu trước đó bị lỗi auth
+    if (_errorCode == THistoryErr.tokenExpired || _errorCode == THistoryErr.noToken) {
+      _load();
+    }
   }
 
   /// v3.0.79: Error banner phân biệt các loại lỗi với icon + button phù hợp
@@ -374,6 +454,7 @@ class _TreatmentHistoryScreenState extends State<TreatmentHistoryScreen> {
   /// Flow: user mở D:\Soft\HISPRO_THAT\Logs\LogSystem.txt → Ctrl+F "___dti:" →
   /// copy phần TOKEN (64 hex chars giữa 2 dấu | thứ 3 và 4) → paste vào đây
   /// v3.0.82: Thêm nút "Lấy tự động" - gọi proxy server (his_proxy_server.py)
+  /// v3.0.93: Thêm nút "Lấy từ EmrScanApp" - gọi EmrScanApp Windows service (port 18080)
   Future<void> _showPasteTokenDialog() async {
     final controller = TextEditingController(
       text: ThongkeAuthService.instance.hisProToken ?? '',
@@ -392,10 +473,13 @@ class _TreatmentHistoryScreenState extends State<TreatmentHistoryScreen> {
                 style: TextStyle(fontSize: 13)),
             const SizedBox(height: 8),
             const Text(
-              '💡 Cách 1 (tự động - khuyến nghị): Bật proxy server trên PC\n'
-              '   Chạy: python tools/his_proxy_server.py\n'
-              '   App sẽ tự lấy token mới từ log HIS.exe\n\n'
-              '💡 Cách 2 (thủ công): Mở D:\\Soft\\HISPRO_THAT\\Logs\\LogSystem.txt\n'
+              '💡 Cách 1 (tự động - EmrScanApp - KHUYẾN NGHỊ):\n'
+              '   Bật EmrScanApp Windows service trên máy HIS\n'
+              '   Chạy: python windows-service\\his_token_service.py\n'
+              '   App sẽ tự lấy + refresh token liên tục (mỗi 5 phút)\n\n'
+              '💡 Cách 2 (tự động - HIS Proxy): Đọc log HIS.exe\n'
+              '   Chạy: python tools/his_proxy_server.py\n\n'
+              '💡 Cách 3 (thủ công): Mở D:\\Soft\\HISPRO_THAT\\Logs\\LogSystem.txt\n'
               '   Ctrl+F "___dti:" → copy phần giữa dấu | thứ 3 và thứ 4',
               style: TextStyle(fontSize: 11, color: Colors.black54, height: 1.4),
             ),
@@ -413,9 +497,18 @@ class _TreatmentHistoryScreenState extends State<TreatmentHistoryScreen> {
           ]),
         ),
         actions: [
+          // v3.0.93: 2 nút auto-fetch (EmrScanApp + HIS Proxy)
+          TextButton(
+            onPressed: () => _autoFetchEmrScan(ctx),
+            child: const Text('Lấy từ EmrScanApp',
+                style: TextStyle(
+                    color: Color(0xFF00838F), fontWeight: FontWeight.bold)),
+          ),
           TextButton(
             onPressed: () => _autoFetchToken(ctx),
-            child: const Text('Lấy tự động', style: TextStyle(color: Color(0xFF00838F), fontWeight: FontWeight.bold)),
+            child: const Text('Lấy từ HIS Proxy',
+                style: TextStyle(
+                    color: Color(0xFF455A64), fontWeight: FontWeight.bold)),
           ),
           TextButton(
             onPressed: () {
@@ -491,6 +584,67 @@ class _TreatmentHistoryScreenState extends State<TreatmentHistoryScreen> {
         content: Text('✅ Đã lấy token tự động từ HIS desktop (${newToken.length} ký tự)'),
         backgroundColor: const Color(0xFF2E7D32),
         duration: const Duration(seconds: 2),
+      ),
+    );
+    _load();
+    return true;
+  }
+
+  /// v3.0.93: Auto-fetch token từ EmrScanApp Windows service (port 18080)
+  /// Tốt hơn HIS Proxy vì service tự refresh token mỗi 5 phút
+  Future<bool> _autoFetchEmrScan(BuildContext dialogContext) async {
+    final messenger = ScaffoldMessenger.of(dialogContext);
+    messenger.showSnackBar(
+      const SnackBar(
+        content: Row(children: [
+          SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                  strokeWidth: 2, color: Colors.white)),
+          SizedBox(width: 10),
+          Text('Đang gọi EmrScanApp service...'),
+        ]),
+        duration: Duration(seconds: 3),
+      ),
+    );
+    final info = await EmrScanTokenService.instance.fetchAndSaveToken();
+    if (!info.reachable) {
+      if (!mounted) return false;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+              '❌ ${info.error ?? "Không kết nối được EmrScanApp"}\nHãy chạy trên PC: python windows-service\\his_token_service.py'),
+          duration: const Duration(seconds: 5),
+          backgroundColor: const Color(0xFFC62828),
+        ),
+      );
+      return false;
+    }
+    if (!info.hasToken) {
+      if (!mounted) return false;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+              '⚠️ EmrScanApp không có token. Cần login trước:\nGET /login?user=nemk&pass=1027'),
+          duration: const Duration(seconds: 6),
+          backgroundColor: const Color(0xFFEF6C00),
+        ),
+      );
+      return false;
+    }
+    // Đóng dialog
+    if (dialogContext.mounted) Navigator.pop(dialogContext, info.token);
+    if (!mounted) return true;
+    await _refreshTokenAge();
+    final userInfo = info.userName ?? info.user ?? '?';
+    final expireInfo = info.expireTime != null ? ' • HSD: ${info.expireTime}' : '';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+            '✅ Đã lấy token từ EmrScanApp ($userInfo, ${info.token!.length} ký tự$expireInfo)'),
+        backgroundColor: const Color(0xFF2E7D32),
+        duration: const Duration(seconds: 3),
       ),
     );
     _load();

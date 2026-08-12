@@ -156,8 +156,8 @@ class HisProxyTokenService {
         final m = r.data as Map;
         if (m['success'] == true && m['token'] is String) {
           final token = m['token'] as String;
-          // Lưu token qua ThongkeAuthService
-          await ThongkeAuthService.instance.setHisProToken(token);
+          // Lưu token qua ThongkeAuthService (v3.0.93: đánh dấu source = hisproxy)
+          await ThongkeAuthService.instance.setHisProToken(token, source: 'hisproxy');
           await ThongkeAuthService.instance.loadHisProToken();
           // Lưu thời gian fetch
           final prefs = await SharedPreferences.getInstance();

@@ -17,6 +17,7 @@ import 'package:his_mobile/presentation/screens/log_viewer_screen.dart';
 import 'package:his_mobile/presentation/widgets/user_header.dart';
 import 'package:his_mobile/presentation/screens/his_config_screen.dart';
 import 'package:his_mobile/presentation/screens/vpn_benh_vien_screen.dart';
+import 'package:his_mobile/presentation/screens/emr_scan_config_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Màn hình Cài đặt v2.66.0
@@ -324,6 +325,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         builder: (_) => const VpnBenhVienScreen(),
                       ),
                     );
+                  },
+                ),
+                // v3.0.93: EmrScanApp Token Service - auto-fetch HIS Pro token
+                _menuItem(
+                  icon: Icons.satellite_alt,
+                  color: const Color(0xFF00838F),
+                  title: 'EmrScanApp Token Service',
+                  subtitle: 'Tự động lấy + refresh HIS Pro token từ Windows service',
+                  onTap: () async {
+                    final r = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const EmrScanConfigScreen(),
+                      ),
+                    );
+                    if (r == true && mounted) {
+                      // Cập nhật trạng thái nếu user vừa lưu token mới
+                      setState(() {});
+                    }
                   },
                 ),
 

@@ -1,5 +1,50 @@
 # Changelog - HIS Mobile
 
+## v3.0.93 (build 237) - 12/08/2026
+**"Tích hợp EmrScanApp auto-token service (port 18080) vào Lịch sử điều trị"**
+
+### 🆕 Tính năng mới v3.0.93
+- **Tích hợp EmrScanApp Windows service** (Python HTTP trên port 18080):
+  - Service tự động login + refresh HIS Pro token mỗi 5 phút (gọi HISLoginTool.exe chuẩn HIS)
+  - HIS Mobile gọi `GET /token` hoặc `GET /login?user=X&pass=Y` để lấy token về dùng
+  - **Tốt hơn HIS Proxy** (đọc log file) vì auto-refresh, không bị miss khi HIS restart
+- **Token source tracking** trong `ThongkeAuthService`:
+  - Lưu source khi set token: `emrscan` / `hisproxy` / `manual` / `file` / `embedded`
+  - 3 method mới: `getTokenSource()`, `getTokenSourceText()` ("EmrScanApp" / "HIS Proxy" / "Thủ công"), `getTokenSourceIcon()` ("🛰️" / "🖥️" / "✋" / "📁" / "🔒")
+  - `setHisProToken(token, {source = 'manual'})` - thêm param optional
+  - `loadHisProToken()` tự set source cho legacy data
+- **Cấu hình EmrScanApp trong Settings** (màn hình mới `EmrScanConfigScreen`):
+  - Sửa URL service (default: `http://172.16.200.109:18080`)
+  - **Test kết nối** (ping `/health` - hiển thị có token sẵn không)
+  - **Lấy token** (GET `/token` - lưu vào ThongkeAuthService)
+  - **Force login** (GET `/login?user=X&pass=Y` - dùng khi service chưa có token)
+  - Hiển thị trạng thái real-time: URL, user, tên, hết hạn, refresh lần cuối, còn lại
+  - Hướng dẫn cài đặt service trên máy BV
+- **Lịch sử điều trị - Patient header cải tiến**:
+  - **Nút 1-chạm 🛰️** ở header: bấm → auto-fetch token từ EmrScanApp (không cần mở dialog)
+  - **Hiển thị nguồn token**: "🛰️ Nguồn token: EmrScanApp" / "🖥️ HIS Proxy" / "✋ Thủ công"
+  - Tự reload data nếu trước đó lỗi 401
+- **Dialog paste token** (khi 401): thêm 2 nút "Lấy từ EmrScanApp" + "Lấy từ HIS Proxy" (v3.0.93)
+
+### 📁 Files mới / sửa v3.0.93
+- **Mới**: `lib/data/services/emr_scan_token_service.dart` (250 dòng)
+  - `EmrScanTokenInfo` class (reachable, hasToken, token, user, userName, expireTime, lastRefresh, error, pcUrl)
+  - `EmrScanTokenService` singleton với `ping()`, `fetchAndSaveToken()`, `forceLogin()`
+  - Lưu `emrscan_service_url` + `emrscan_last_fetch` vào SharedPreferences
+- **Mới**: `lib/presentation/screens/emr_scan_config_screen.dart` (~480 dòng)
+- **Sửa**: `lib/data/api/thongke_auth_service.dart` - thêm source tracking
+- **Sửa**: `lib/data/services/his_proxy_token_service.dart` - set source = 'hisproxy'
+- **Sửa**: `lib/data/services/emr_scan_token_service.dart` - set source = 'emrscan'
+- **Sửa**: `lib/presentation/screens/settings_screen.dart` - thêm menu "EmrScanApp Token Service"
+- **Sửa**: `lib/presentation/screens/treatment_history_screen.dart` - nút 1-chạm + source display
+
+### 🔧 Workflow đề xuất
+1. **Trên PC BV (1 lần)**: Cài EmrScanApp Windows service → auto login + refresh mỗi 5 phút
+2. **Trên phone**: Mở Settings → EmrScanApp Token Service → nhập URL → Test kết nối → Lấy token
+3. **Hàng ngày**: Mở app → vào Lịch sử điều trị → bấm 🛰️ nếu cần refresh token
+
+---
+
 ## v3.0.87 (build 231) - 11/08/2026
 **"Y tế số UI match XemBenhAn + Performance + Time filter"**
 
