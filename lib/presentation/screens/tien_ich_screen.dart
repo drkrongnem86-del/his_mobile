@@ -140,6 +140,13 @@ class TienIchScreen extends StatelessWidget {
       _TI('DVKT 30 ngày', Icons.medical_information, const Color(0xFFC62828), () {
         Navigator.push(context, MaterialPageRoute(builder: (_) => const CatalogBrowserScreen(type: CatalogType.dvkt)));
       }),
+      // v3.0.98: Điều trị tăng/hạ Kali máu
+      _TI('Tăng K+ máu', Icons.arrow_upward, const Color(0xFFB71C1C), () {
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const TangKaiMauScreen()));
+      }),
+      _TI('Hạ K+ máu', Icons.arrow_downward, const Color(0xFF1565C0), () {
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const HaKaiMauScreen()));
+      }),
     ];
     return GridView.builder(
       padding: const EdgeInsets.all(8),
@@ -265,6 +272,290 @@ class _GCSCalculatorState extends State<GCSCalculator> {
             const Text('Thang đánh giá: 13-15 nhẹ, 9-12 trung bình, 3-8 nặng', style: TextStyle(fontSize: 11, color: Colors.black54)),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// === v3.0.98: Điều trị tăng Kali máu (Hyperkalemia) ===
+class TangKaiMauScreen extends StatelessWidget {
+  const TangKaiMauScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: const Color(0xFFB71C1C),
+        foregroundColor: Colors.white,
+        title: const Text('Điều trị tăng Kali máu'),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(12),
+        children: [
+          Card(
+            color: const Color(0xFFFFEBEE),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    Icon(Icons.warning, color: Color(0xFFB71C1C), size: 24),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: const Text('Mức K+ máu & biểu hiện',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFFB71C1C))),
+                    ),
+                  ]),
+                  const SizedBox(height: 8),
+                  _kLevel('5.0 - 5.5 mEq/L', 'Nhẹ', Colors.orange),
+                  _kLevel('5.5 - 6.5 mEq/L', 'Trung bình - có thể có triệu chứng cơ', Colors.deepOrange),
+                  _kLevel('6.5 - 7.0 mEq/L', 'Nặng - EKG thay đổi (sóng T cao nhọn)', Colors.red),
+                  _kLevel('> 7.0 mEq/L', 'RẤT NẶNG - nguy cơ rung thất, ngừng tim', const Color(0xFFB71C1C)),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          _kStep(
+            '1️⃣ ỔN ĐỊNH TIM MẠCH (nếu có thay đổi EKG)',
+            'Calcium gluconate 10% - 10-20ml (1-2 ống 10ml) pha trong NaCl 0.9%, truyền TM trong 2-5 phút',
+            const [
+              '⚡ Tác dụng trong 1-3 phút, kéo dài 30-60 phút',
+              '⚠️ KHÔNG trộn với bicarbonate (kết tủa CaCO3)',
+              '⚠️ Thận trọng nếu đang dùng digoxin (gây ngừng tim)',
+              '🔄 Có thể lặp lại sau 5-10 phút nếu EKG không cải thiện',
+            ],
+            const Color(0xFFB71C1C),
+          ),
+          const SizedBox(height: 8),
+          _kStep(
+            '2️⃣ ĐẨY K+ VÀO TRONG TẾ BÀO (30-60 phút)',
+            'Insulin Regular + Glucose (truyền TM 30 phút):',
+            const [
+              '💉 Insulin Regular: 10 UI pha trong 50ml Glucose 50%',
+              '🩸 Nếu đường huyết < 250 mg/dL: truyền thêm Glucose 50% 50ml trước/sau',
+              '⏱️ Tác dụng trong 10-20 phút, đỉnh 30-60 phút, kéo dài 4-6 giờ',
+              '📉 Hạ K+ được 0.6-1.0 mEq/L',
+              '🔍 Theo dõi đường huyết mỗi 1 giờ trong 6 giờ đầu (nguy cơ hạ đường huyết)',
+            ],
+            const Color(0xFFE65100),
+          ),
+          const SizedBox(height: 8),
+          _kStep(
+            '3️⃣ TĂNG THẢI K+ RA NGOÀI (kéo dài hơn)',
+            'Các biện pháp thải trừ:',
+            const [
+              '💊 Kayexalate (Polystyrene sulfonate) 15-30g uống + sorbitol 20g',
+              '   → Tác dụng 1-2 giờ, có thể dùng qua sonde dạ dày (rectal cũng OK)',
+              '   ⚠️ Cẩn thận nguy cơ hoại tử ruột, tránh dùng sau phẫu thuật ruột',
+              '💧 Lợi tiểu: Furosemide 40-80mg TM (nếu chức năng thận còn)',
+              '🏥 LỌC MÁU cấp cứu nếu: K+ > 6.5 dai dẳng, EKG không cải thiện, suy thận, toan chuyển hóa nặng',
+              '🧪 Sodium bicarbonate 50-100 mEq TM (CHỈ khi pH < 7.2, toan chuyển hóa)',
+            ],
+            const Color(0xFF1565C0),
+          ),
+          const SizedBox(height: 8),
+          Card(
+            color: const Color(0xFFFFF3E0),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Row(children: [
+                    Icon(Icons.monitor_heart, color: Color(0xFFE65100)),
+                    SizedBox(width: 8),
+                    Text('Theo dõi', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  ]),
+                  SizedBox(height: 6),
+                  Text('• EKG liên tục cho đến khi K+ < 6.0 và ổn định', style: TextStyle(fontSize: 12)),
+                  Text('• K+ máu mỗi 1-2 giờ trong 6 giờ đầu, sau đó mỗi 4-6 giờ', style: TextStyle(fontSize: 12)),
+                  Text('• Đường huyết mỗi 1 giờ (sau dùng insulin) trong 6 giờ', style: TextStyle(fontSize: 12)),
+                  Text('• Ngưng thuốc tăng K+: ACEi, ARB, K-sparing diuretic, NSAIDs, TMP-SMX, heparin', style: TextStyle(fontSize: 12)),
+                  Text('• Chế độ ăn GIẢM K+ (tránh chuối, cam, cà chua, khoai, rau lá xanh)', style: TextStyle(fontSize: 12)),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Card(
+            color: Colors.grey.shade50,
+            child: const Padding(
+              padding: EdgeInsets.all(10),
+              child: Text(
+                '⚠️ Ghi chú: Liều Insulin/Glucose ở trên dành cho người lớn. Trẻ em dùng liều 0.1 UI/kg insulin + 2 ml/kg glucose 25%. Luôn tham khảo BS Nhi khoa.\n\n'
+                '📚 Tham khảo: Uptodate 2026, Tintinalli Emergency Medicine 9th ed.',
+                style: TextStyle(fontSize: 11, color: Colors.black54, height: 1.4),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// === v3.0.98: Helper widgets dùng chung cho 2 screen Kali máu ===
+Widget _kLevel(String k, String label, Color color) {
+  return Padding(
+    padding: const EdgeInsets.symmetric(vertical: 2),
+    child: Row(children: [
+      Container(
+        width: 10, height: 10,
+        decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+      ),
+      const SizedBox(width: 8),
+      Expanded(
+        child: Text.rich(TextSpan(children: [
+          TextSpan(text: '$k: ', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+          TextSpan(text: label, style: TextStyle(color: color, fontSize: 12)),
+        ])),
+      ),
+    ]),
+  );
+}
+
+Widget _kStep(String title, String subtitle, List<String> bullets, Color color) {
+  return Card(
+    child: Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: color)),
+          const SizedBox(height: 6),
+          Text(subtitle, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+          const SizedBox(height: 6),
+          ...bullets.map((b) => Padding(
+            padding: const EdgeInsets.only(bottom: 4, left: 4),
+            child: Text(b, style: const TextStyle(fontSize: 11, height: 1.4)),
+          )),
+        ],
+      ),
+    ),
+  );
+}
+
+// === v3.0.98: Điều trị hạ Kali máu (Hypokalemia) ===
+class HaKaiMauScreen extends StatelessWidget {
+  const HaKaiMauScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF1565C0),
+        foregroundColor: Colors.white,
+        title: const Text('Điều trị hạ Kali máu'),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(12),
+        children: [
+          Card(
+            color: const Color(0xFFE3F2FD),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(children: [
+                    Icon(Icons.info, color: Color(0xFF1565C0), size: 24),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: const Text('Mức K+ máu & biểu hiện',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1565C0))),
+                    ),
+                  ]),
+                  const SizedBox(height: 8),
+                  _kLevel('3.5 - 3.0 mEq/L', 'Nhẹ - thường không triệu chứng', Colors.blue),
+                  _kLevel('3.0 - 2.5 mEq/L', 'Trung bình - yếu cơ, mệt mỏi, chuột rút', Colors.indigo),
+                  _kLevel('< 2.5 mEq/L', 'Nặng - liệt cơ, loạn nhịp tim, nguy cơ tử vong', Colors.deepPurple),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          _kStep(
+            '1️⃣ BỔ SUNG ĐƯỜNG UỐNG (ưu tiên)',
+            'Dùng cho K+ > 3.0 và không có triệu chứng nặng:',
+            const [
+              '💊 KCl viên uống: 600-1200 mg/lần × 2-3 lần/ngày (8-12 mEq/liều)',
+              '   → Mỗi 600mg KCl = ~8 mEq K+',
+              '🍊 Nên uống với nước cam hoặc nước nhiều (tránh kích ứng dạ dày)',
+              '🕐 Uống SAU ĂN (giảm nguy cơ viêm loét dạ dày)',
+              '📈 Bù 40-60 mEq K+ mỗi 24h để tăng K+ máu ~0.25 mEq/L/ngày',
+            ],
+            const Color(0xFF1565C0),
+          ),
+          const SizedBox(height: 8),
+          _kStep(
+            '2️⃣ TRUYỀN TĨNH MẠCH (khi K+ < 3.0 hoặc có triệu chứng)',
+            'KCl truyền TM - CẨN THẬN nguy cơ loạn nhịp:',
+            const [
+              '💉 Liều khởi đầu: 20-40 mEq KCl trong 1L NaCl 0.9%, truyền 4-6 giờ',
+              '   → Tốc độ: KHÔNG quá 10-20 mEq/giờ qua TM ngoại vi',
+              '   → TM trung tâm (CVC): max 20-40 mEq/giờ (có monitor tim liên tục)',
+              '⚠️ TUYỆT ĐỐI KHÔNG:',
+              '   ❌ Tiêm KCl bolus TM (gây ngừng tim tức thì)',
+              '   ❌ Pha KCl với Glucose 5% hoặc Ringer Lactat (Ca2+ + K+ gây tủa)',
+              '❌ Truyền > 20 mEq/giờ qua TM ngoại vi (gây đau, viêm tĩnh mạch)',
+              '🔍 MONITOR: EKG liên tục + K+ máu mỗi 4-6 giờ',
+            ],
+            const Color(0xFFD32F2F),
+          ),
+          const SizedBox(height: 8),
+          _kStep(
+            '3️⃣ MỤC TIÊU BÙ K+',
+            'Tính toán nhanh:',
+            const [
+              '📊 Thiếu hụt K+ (mEq) ≈ 0.4 × cân nặng (kg) × (K+ bình thường - K+ hiện tại)',
+              '   → Ví dụ: BN 60kg, K+ = 2.5: thiếu ≈ 0.4 × 60 × (4 - 2.5) = 36 mEq',
+              '🎯 Mục tiêu: K+ ≥ 3.5 mEq/L (an toàn cho phẫu thuật, digoxin)',
+              '⏱️ Tốc độ bù tối đa 20 mEq/giờ (TM ngoại vi) / 40 mEq/giờ (TM trung tâm)',
+              '📈 Mỗi 20 mEq KCl tăng K+ máu ~0.25 mEq/L (trung bình)',
+              '⚠️ KHÔNG cố bù nhanh - cơ thể cần 12-24h để cân bằng K+ nội bào',
+            ],
+            const Color(0xFF388E3C),
+          ),
+          const SizedBox(height: 8),
+          Card(
+            color: const Color(0xFFFFF3E0),
+            child: Padding(
+              padding: const EdgeInsets.all(12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Row(children: [
+                    Icon(Icons.search, color: Color(0xFFE65100)),
+                    SizedBox(width: 8),
+                    Text('Tìm nguyên nhân gốc (quan trọng!)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  ]),
+                  SizedBox(height: 6),
+                  Text('• Mất qua thận: lợi tiểu (Furosemide, Thiazide), corticosteroid', style: TextStyle(fontSize: 12)),
+                  Text('• Mất qua tiêu hóa: nôn, tiêu chảy, sonde dạ dày, lỗ rò', style: TextStyle(fontSize: 12)),
+                  Text('• Vào nội bào: insulin, beta-agonist (salbutamol), toan kiềm', style: TextStyle(fontSize: 12)),
+                  Text('• Ăn uống kém: nghiện rượu, ăn chay, suy dinh dưỡng', style: TextStyle(fontSize: 12)),
+                  Text('• Bệnh lý: cường Aldosteron, h/c Cushing, Bartter, Gitelman', style: TextStyle(fontSize: 12)),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Card(
+            color: Colors.grey.shade50,
+            child: const Padding(
+              padding: EdgeInsets.all(10),
+              child: Text(
+                '⚠️ Ghi chú: KHÔNG dùng Salbutamol trong cơn hen cấp nếu K+ < 3.0 (làm hạ K+ thêm, nguy cơ loạn nhịp). Bù K+ trước khi dùng Insulin cho bệnh nhân ĐTĐ có K+ thấp.\n\n'
+                '📚 Tham khảo: Uptodate 2026, Harrison 21st ed.',
+                style: TextStyle(fontSize: 11, color: Colors.black54, height: 1.4),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

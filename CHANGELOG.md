@@ -1,5 +1,29 @@
 # Changelog - HIS Mobile
 
+## v3.0.98 (build 242) - 13/08/2026
+**"Thêm Điều trị tăng/hạ Kali máu vào Tiện ích"**
+
+### 🆕 Tính năng mới v3.0.98
+- **Điều trị tăng Kali máu (Hyperkalemia)** - màn hình tham khảo protocol:
+  - Mức độ nặng theo K+ máu (5.0 → > 7.0 mEq/L)
+  - Bước 1: Ổn định tim (Calcium gluconate 10% IV)
+  - Bước 2: Đẩy K+ vào tế bào (Insulin + Glucose)
+  - Bước 3: Thải K+ ra ngoài (Kayexalate, lợi tiểu, lọc máu)
+  - Theo dõi: EKG, K+ máu, đường huyết
+- **Điều trị hạ Kali máu (Hypokalemia)** - màn hình tham khảo protocol:
+  - Mức độ nặng theo K+ máu (3.5 → < 2.5 mEq/L)
+  - Bước 1: Bổ sung đường uống (KCl viên)
+  - Bước 2: Truyền tĩnh mạch (KCl 20-40 mEq/L)
+  - Bước 3: Mục tiêu bù K+ (công thức tính)
+  - Tìm nguyên nhân gốc
+  - Tương tác thuốc (Salbutamol, Insulin, Digoxin)
+- **2 tile mới** trong Tiện ích: "Tăng K+ máu" (đỏ) + "Hạ K+ máu" (xanh)
+
+### 📁 Files sửa v3.0.98
+- `lib/presentation/screens/tien_ich_screen.dart` - thêm 2 screen widget + 2 tile
+
+---
+
 ## v3.0.97 (build 241) - 13/08/2026
 **"Fix auto-update: black screen sau khi bấm Đồng ý"**
 
