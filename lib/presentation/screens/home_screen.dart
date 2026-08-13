@@ -985,6 +985,14 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _pickDept(int i) {
+    // v3.0.103: Special index 99001 = Phòng TT Khoa Cấp Cứu (từ card nổi bật ở dialog)
+    if (i == 99001) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const PhongTTKccScreen()),
+      );
+      return;
+    }
     if (i == _currentDeptIndex) return;
     // v3.0.101: Check "Phòng" đặc biệt từ AppConstants (dialog dùng list này)
     // Tránh index lệch khi DepartmentService load từ API (số entry khác 53)

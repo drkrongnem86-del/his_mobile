@@ -80,7 +80,62 @@ class _DeptPickerDialogState extends State<DeptPickerDialog> {
           ),
         ),
 
-        // List 52 khoa (không search, không filter)
+        // v3.0.103: Card nổi bật "Phòng TT Khoa Cấp Cứu" ở trên cùng - không thể bỏ sót
+        InkWell(
+          onTap: () {
+            // Return special index 99001 (Phòng TT KCC id)
+            Navigator.pop(context, 99001);
+          },
+          child: Container(
+            margin: const EdgeInsets.fromLTRB(8, 8, 8, 4),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFFB71C1C), Color(0xFFD32F2F)],
+              ),
+              borderRadius: BorderRadius.circular(10),
+              boxShadow: [
+                BoxShadow(color: Colors.red.shade200, blurRadius: 6, offset: const Offset(0, 2)),
+              ],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(color: Colors.white24, shape: BoxShape.circle),
+                  child: const Icon(Icons.medical_services, color: Colors.white, size: 24),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text('PHÒNG TT KHOA CẤP CỨU',
+                          style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 2),
+                      Text('📋 Danh sách BN + điện tim (ECG)',
+                          style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 11)),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.arrow_forward_ios, color: Colors.white, size: 16),
+              ],
+            ),
+          ),
+        ),
+        const Padding(
+          padding: EdgeInsets.fromLTRB(16, 8, 16, 4),
+          child: Row(children: [
+            Expanded(child: Divider(color: Color(0xFFE0E0E0), thickness: 1)),
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: 8),
+              child: Text('— KHOA —', style: TextStyle(color: Colors.black45, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+            ),
+            Expanded(child: Divider(color: Color(0xFFE0E0E0), thickness: 1)),
+          ]),
+        ),
+
+        // List 53 khoa (không search, không filter)
         Flexible(
           child: ListView.builder(
             shrinkWrap: true,
