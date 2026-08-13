@@ -562,7 +562,7 @@ class _EcgViewer extends StatefulWidget {
 }
 
 class _EcgViewerState extends State<_EcgViewer> {
-  final YTeSoService _yTeSo = YTeSoService();
+  final YTeSoService _yTeSo = YTeSoService.instance;
   bool _loading = true;
   String? _error;
   List<YTeSoDocument> _docs = [];
