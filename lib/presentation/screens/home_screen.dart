@@ -35,6 +35,7 @@ import 'package:his_mobile/presentation/screens/qr_scanner_screen.dart';
 import 'package:his_mobile/presentation/screens/department_patients_screen.dart';
 import 'package:his_mobile/presentation/screens/tien_ich_screen.dart';
 import 'package:his_mobile/presentation/screens/y_te_so_home_screen.dart';
+import 'package:his_mobile/presentation/screens/phong_tt_kcc_screen.dart';
 import 'package:his_mobile/presentation/widgets/marquee_banner.dart';
 
 /// Nguồn dữ liệu BN hiển thị - "Thật" (từ Data/HIS Pro API) vs "Từ app code" (PatientSeed).
@@ -975,12 +976,20 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _pickDept(int i) {
     if (i == _currentDeptIndex) return;
+    final d = _departments[i];
+    // v3.0.100: Nếu là "Phòng" đặc biệt (isPhong=true) → mở màn hình riêng
+    if (d['isPhong'] == true) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const PhongTTKccScreen()),
+      );
+      return;
+    }
     setState(() {
       _currentDeptIndex = i;
       _selectedRoom = null; // v2.75.5: reset room filter khi đổi khoa
     });
     _saveDeptIndex();  // v2.94.0: Lưu khoa đã chọn
-    final d = _departments[i];
     _thongkeAuth.setCurrentDepartment(
       d['code']?.toString(),
       d['name']?.toString(),

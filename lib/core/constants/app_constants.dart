@@ -150,6 +150,8 @@ class AppConstants {
     {'id': 502, 'code': 'DTTN', 'name': 'Khu Điều Trị Trong Ngày', 'icon': '🏥'},
     // v2.47.0: thêm các khoa phát hiện từ data thật (500 BN từ EMR-Checker)
     {'id': 522, 'code': 'KSKCB', 'name': 'Khoa Khám sức khỏe cán bộ', 'icon': '🩺'},
+    // v3.0.100: Phòng đặc biệt - dùng để mở màn hình PhongTTKccScreen riêng
+    {'id': 99001, 'code': 'PTTT.KCC', 'name': 'Phòng TT Khoa Cấp Cứu', 'icon': '🩺', 'isPhong': true},
   ];
 
   /// Danh sách PHÒNG (buồng) đầy đủ 53 buồng - từ ảnh chụp danh sách BV (2026-07-07)

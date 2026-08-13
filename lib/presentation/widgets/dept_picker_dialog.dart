@@ -107,14 +107,32 @@ class _DeptPickerDialogState extends State<DeptPickerDialog> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              d['name'] as String,
-                              style: TextStyle(
-                                color: isSelected ? Colors.indigo : Colors.black,
-                                fontSize: 14,
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                              ),
-                              maxLines: 1, overflow: TextOverflow.ellipsis,
+                            Row(
+                              children: [
+                                Flexible(
+                                  child: Text(
+                                    d['name'] as String,
+                                    style: TextStyle(
+                                      color: isSelected ? Colors.indigo : Colors.black,
+                                      fontSize: 14,
+                                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                    ),
+                                    maxLines: 1, overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (d['isPhong'] == true) ...[
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFB71C1C),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: const Text('Phòng',
+                                        style: TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)),
+                                  ),
+                                ],
+                              ],
                             ),
                             const SizedBox(height: 2),
                             Text(

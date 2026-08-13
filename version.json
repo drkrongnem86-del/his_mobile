@@ -1,5 +1,5 @@
 ﻿{
-  "version": "3.0.100",
-  "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.100/his_mobile_v3.0.100_arm64.apk",
-  "message": "Phòng TT khoa cấp cứu + ECG PDF"
+  "version": "3.0.101",
+  "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.101/his_mobile_v3.0.101_arm64.apk",
+  "message": "Phòng TT KCC chuyển vào chỗ chọn khoa (DeptPicker)"
 }
