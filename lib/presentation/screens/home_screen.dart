@@ -256,10 +256,20 @@ class _HomeScreenState extends State<HomeScreen> {
   // v2.66.0: Helper - lấy list khoa từ DepartmentService (ưu tiên API) hoặc AppConstants
   List<Map<String, dynamic>> get _departments {
     // v2.79.0: Fix infinite recursion - fallback AppConstants khi DepartmentService rỗng
+    List<Map<String, dynamic>> base;
     if (DepartmentService.instance.departments.isNotEmpty) {
-      return DepartmentService.instance.departments;
+      base = DepartmentService.instance.departments;
+    } else {
+      base = List<Map<String, dynamic>>.from(AppConstants.departments);
     }
-    return List<Map<String, dynamic>>.from(AppConstants.departments);
+    // v3.0.101: Luôn append Phòng đặc biệt (Phòng TT KCC) vào cuối
+    // Tránh DepartmentService API không có entry này
+    for (final d in AppConstants.departments) {
+      if (d['isPhong'] == true && !base.any((e) => e['code'] == d['code'])) {
+        base = [...base, d];
+      }
+    }
+    return base;
   }
   String _searchQuery = '';
   // v2.85.0: Search query riêng cho mỗi khoa - không bị reset khi chuyển khoa
@@ -976,15 +986,19 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _pickDept(int i) {
     if (i == _currentDeptIndex) return;
-    final d = _departments[i];
-    // v3.0.100: Nếu là "Phòng" đặc biệt (isPhong=true) → mở màn hình riêng
-    if (d['isPhong'] == true) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const PhongTTKccScreen()),
-      );
-      return;
+    // v3.0.101: Check "Phòng" đặc biệt từ AppConstants (dialog dùng list này)
+    // Tránh index lệch khi DepartmentService load từ API (số entry khác 53)
+    if (i >= 0 && i < AppConstants.departments.length) {
+      final d = AppConstants.departments[i];
+      if (d['isPhong'] == true) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const PhongTTKccScreen()),
+        );
+        return;
+      }
     }
+    final d = _departments[i];
     setState(() {
       _currentDeptIndex = i;
       _selectedRoom = null; // v2.75.5: reset room filter khi đổi khoa
