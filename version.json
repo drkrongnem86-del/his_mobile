@@ -1,5 +1,5 @@
 ﻿{
-  "version": "3.0.98",
-  "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.98/his_mobile_v3.0.98_arm64.apk",
-  "message": "Thêm Điều trị tăng/hạ Kali máu vào Tiện ích (2 protocol screens)"
+  "version": "3.0.99",
+  "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.99/his_mobile_v3.0.99_arm64.apk",
+  "message": "Fix black screen auto-update (v2) - dùng FileProvider + app's documents dir"
 }

@@ -1,0 +1,10 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<!-- v3.0.99: FileProvider paths cho app update -->
+<!-- Cho phép share file trong app's documents dir qua content:// URI -->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- App's internal documents dir (/data/data/<pkg>/app_flutter/) -->
+    <files-path name="internal_files" path="." />
+    <cache-path name="internal_cache" path="." />
+    <external-files-path name="external_files" path="." />
+    <external-cache-path name="external_cache" path="." />
+</paths>

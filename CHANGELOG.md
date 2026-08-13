@@ -1,5 +1,39 @@
 # Changelog - HIS Mobile
 
+## v3.0.99 (build 243) - 13/08/2026
+**"Fix black screen auto-update v2: dùng FileProvider + app's documents dir"**
+
+### 🐛 Bug fix: Black screen vẫn còn sau v3.0.97
+**User báo (13/08/2026 07:20):** Bấm "ĐỒNG Ý" trong dialog update v3.0.97 → v3.0.98 → màn hình đen, app không phản hồi (vẫn lỗi y như v3.0.96).
+
+**Root cause (v3.0.99):**
+- Code cũ lưu APK vào `/storage/emulated/0/Download/HisMobile/` (hacky: `ext.parent.parent.parent`)
+- Trên Android 11+ (API 30+) với scoped storage, app **KHÔNG CÓ quyền ghi** vào shared storage từ app context
+- `Directory.create(recursive: true)` có thể fail, hoặc `Dio.download()` throw Permission denied
+- Exception bị nuốt trong try-catch → nhưng `context.mounted` false (vì context bị dispose) → black screen
+- `OpenFilex.open()` với file không tồn tại cũng không có fallback
+
+**Fix v3.0.99:**
+- ✅ **Đổi download path** về `getApplicationDocumentsDirectory()` (app's own storage `/data/data/<pkg>/app_flutter/`, always writable, không cần permission)
+- ✅ **Add FileProvider** trong AndroidManifest với authority `${applicationId}.fileprovider`
+- ✅ **Tạo `res/xml/file_paths.xml`** với paths: files-path, cache-path, external-files-path, external-cache-path
+- ✅ **Native MethodChannel** `his_mobile/installer` trong `MainActivity.kt`:
+  - Dùng `FileProvider.getUriForFile()` cho Android 7+ (API 24+) - tạo content:// URI
+  - Start `Intent.ACTION_VIEW` với `FLAG_GRANT_READ_URI_PERMISSION` để cho phép installer đọc
+  - File < API 24 dùng `Uri.fromFile()` (file://)
+- ✅ **Bỏ dependency `open_filex`** (không cần nữa - dùng native)
+- ✅ **Capture `Navigator` + `ScaffoldMessenger` sớm** trước await để tránh `context.mounted` issue
+- ✅ **Error handling**: nếu MethodChannel fail → SnackBar với path + Copy button
+
+### 📁 Files sửa v3.0.99
+- `lib/core/services/update_service.dart` - rewrite: app docs dir + MethodChannel install
+- `android/app/src/main/AndroidManifest.xml` - thêm `<provider>` FileProvider
+- `android/app/src/main/kotlin/.../MainActivity.kt` - thêm INSTALL_CHANNEL MethodChannel
+- `android/app/src/main/res/xml/file_paths.xml` (NEW) - FileProvider paths
+- `pubspec.yaml` - bỏ `open_filex`
+
+---
+
 ## v3.0.98 (build 242) - 13/08/2026
 **"Thêm Điều trị tăng/hạ Kali máu vào Tiện ích"**
 
