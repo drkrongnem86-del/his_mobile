@@ -1,5 +1,31 @@
 # Changelog - HIS Mobile
 
+## v3.0.100 (build 244) - 13/08/2026
+**"Thêm Phòng TT khoa cấp cứu + ECG PDF"**
+
+### 🆕 Tính năng mới v3.0.100
+- **Phòng TT khoa cấp cứu** - màn hình mới (dạng như desktop HIS):
+  - Tile mới trong Tiện ích: icon đỏ 🩺
+  - Mở → danh sách BN trong phòng (API `/api/HisServiceReq/GetLView` với `EXECUTE_ROOM_ID`)
+  - **Filter tên BN** - TextField search, hỗ trợ tên/mã BN/mã điều trị
+  - **Card BN** - Row API data: Tên, Mã BN, Giới tính, Tuổi, BHYT, Mã ĐT, Mã YL, Khoa YC, Trạng thái (CHỜ/ĐANG/XONG)
+  - Bấm BN → **Bottom sheet 2 tab**:
+    - Tab "Thông tin" - 14 trường API: Mã BN, Tên, Giới tính, Năm sinh, BHYT, Mã ĐT, Mã YL, Khoa YC, ICD, Chẩn đoán...
+    - Tab "Điện tim" - Load danh sách phiếu điện tim từ **Y Tế Số API** (lọc type 160/65 hoặc tên "điện tim")
+  - Bấm phiếu ECG → **Download Base64 → lưu file PDF → mở bằng Syncfusion PDF Viewer**
+
+### 📁 Files sửa v3.0.100
+- `lib/presentation/screens/phong_tt_kcc_screen.dart` (NEW ~600 dòng) - màn hình chính + ECG viewer
+- `lib/presentation/screens/tien_ich_screen.dart` - thêm tile "Phòng TT KCC"
+- `pubspec.yaml` - 3.0.100+244
+
+### 💡 Ghi chú
+- Room ID mặc định: 39 (Phòng Khám Cấp Cứu) - có thể đổi sau bằng cách truyền `roomId:` vào widget
+- ECG PDF chỉ hiển thị nếu đã được đẩy lên EMR Y Tế Số trước đó
+- Filter `TDL_PATIENT_TYPE_IDs` giống các API khác (lấy đúng BN Cấp Cứu + Ngoại trú)
+
+---
+
 ## v3.0.99 (build 243) - 13/08/2026
 **"Fix black screen auto-update v2: dùng FileProvider + app's documents dir"**
 

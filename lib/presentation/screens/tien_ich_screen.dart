@@ -12,6 +12,7 @@ import 'package:his_mobile/presentation/screens/tra_thuoc_screen.dart';
 import 'package:his_mobile/presentation/screens/benh_an_cu_screen.dart';
 import 'package:his_mobile/presentation/screens/eric_calculators.dart';
 import 'package:his_mobile/presentation/screens/catalog_browser_screen.dart';
+import 'package:his_mobile/presentation/screens/phong_tt_kcc_screen.dart';
 import 'package:his_mobile/presentation/widgets/local_patient_search_field.dart';
 import 'package:his_mobile/presentation/widgets/user_header.dart';
 
@@ -146,6 +147,10 @@ class TienIchScreen extends StatelessWidget {
       }),
       _TI('Hạ K+ máu', Icons.arrow_downward, const Color(0xFF1565C0), () {
         Navigator.push(context, MaterialPageRoute(builder: (_) => const HaKaiMauScreen()));
+      }),
+      // v3.0.100: Phòng TT khoa cấp cứu - danh sách BN + ECG PDF
+      _TI('Phòng TT KCC', Icons.medical_services, const Color(0xFFB71C1C), () {
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const PhongTTKccScreen()));
       }),
     ];
     return GridView.builder(
