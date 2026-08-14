@@ -35,7 +35,7 @@ import 'package:his_mobile/presentation/screens/qr_scanner_screen.dart';
 import 'package:his_mobile/presentation/screens/department_patients_screen.dart';
 import 'package:his_mobile/presentation/screens/tien_ich_screen.dart';
 import 'package:his_mobile/presentation/screens/y_te_so_home_screen.dart';
-import 'package:his_mobile/presentation/screens/phong_tt_kcc_screen.dart';
+import 'package:his_mobile/presentation/screens/phong_thu_thuat_hscc_screen.dart';
 import 'package:his_mobile/presentation/widgets/marquee_banner.dart';
 
 /// Nguồn dữ liệu BN hiển thị - "Thật" (từ Data/HIS Pro API) vs "Từ app code" (PatientSeed).
@@ -985,11 +985,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _pickDept(int i) {
-    // v3.0.103: Special index 99001 = Phòng TT Khoa Cấp Cứu (từ card nổi bật ở dialog)
+    // v3.0.109: Special index 99001 = Phòng thủ thuật HSCC (từ card nổi bật ở dialog)
     if (i == 99001) {
       Navigator.push(
         context,
-        MaterialPageRoute(builder: (_) => const PhongTTKccScreen()),
+        MaterialPageRoute(builder: (_) => const PhongThuThuatHsccScreen()),
       );
       return;
     }
@@ -1001,7 +1001,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (d['isPhong'] == true) {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const PhongTTKccScreen()),
+          MaterialPageRoute(builder: (_) => const PhongThuThuatHsccScreen()),
         );
         return;
       }

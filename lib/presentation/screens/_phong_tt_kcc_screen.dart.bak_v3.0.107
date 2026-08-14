@@ -1,33 +1,33 @@
-// PhongTTKccScreen v3.0.100 - "Phòng TT khoa cấp cứu"
+// PhongTTKccScreen v3.0.100+ - "Phòng TT khoa cấp cứu"
 // v3.0.100: Tạo mới theo yêu cầu BS Nem - dạng như desktop HIS
-//   - Danh sách BN trong phòng (API getServiceRequests)
-//   - Filter tên BN
-//   - Card BN hiển thị: Tên, Mã BN, BHYT, Mã ĐT, Mã YL, TT
-//   - Bấm BN → bottom sheet 2 tab: Thông tin / ECG (PDF scan)
+// v3.0.104: Debug log + dump response ra file local
+// v3.0.105: Fix ROOM_ID 39 → 36 (từ log HIS Pro thật) - vẫn fail HTTP 404 do VPN chặn
+// v3.0.106: Dùng Public API thongke (113.163.187.3:8080) giống HomeScreen
+// v3.0.107: THÊM NÚT CHỌN API (3 nguồn): Public / HIS Pro 1408 / Proxy 9999
+// v3.0.108: BỎ PROXY 9999 + ĐỔI FILTER REQUEST_ROOM_ID=39
+//   - Chỉ còn 2 nguồn: Public 8080 (luôn chạy) + HIS Pro 1408 (cần LAN/VPN BV)
+//   - Filter theo REQUEST_ROOM_ID = 39 (PTTT_KCC - phòng BS Nem đang chọn từ)
+//     thay vì EXECUTE_ROOM_ID = 36 (PKCC - phòng khám BN sẽ chuyển tới)
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:his_mobile/core/constants/app_constants.dart';
-import 'package:his_mobile/data/api/his_api_service.dart';
+import 'package:flutter/services.dart';
+import 'package:his_mobile/core/services/phong_tt_api_sources.dart';
 import 'package:his_mobile/data/api/y_te_so_service.dart';
 import 'package:his_mobile/presentation/navigation/safe_navigator.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:syncfusion_flutter_pdfviewer/pdfviewer.dart';
 
 /// Màn hình Phòng TT khoa cấp cứu
-/// v3.0.100: tạo mới theo yêu cầu BS
 class PhongTTKccScreen extends StatefulWidget {
-  /// Room ID để query BN (mặc định 39 = Phòng Khám Cấp Cứu)
-  /// User có thể đổi trong tương lai qua config
-  final int roomId;
-
-  /// Tên phòng hiển thị
+  final int deptCatalogId;
   final String roomName;
-
   const PhongTTKccScreen({
     super.key,
-    this.roomId = 39, // ROOM_ID_KHAM_CAP_CUU - có thể đổi
+    this.deptCatalogId = 22,
     this.roomName = 'Phòng TT Khoa Cấp Cứu',
   });
 
@@ -36,17 +36,42 @@ class PhongTTKccScreen extends StatefulWidget {
 }
 
 class _PhongTTKccScreenState extends State<PhongTTKccScreen> {
-  final HisApiService _api = HisApiService();
+  static const _kApiSourcePref = 'phong_tt_kcc_api_source';
+  PhongTTApiSource _selectedSource = PhongTTApiSource.public8080;
   bool _loading = false;
   String? _error;
   List<Map<String, dynamic>> _allPatients = [];
   String _searchQuery = '';
   final TextEditingController _searchCtrl = TextEditingController();
+  String? _apiSource;        // hiển thị API đang dùng
+  DateTime? _lastSynced;     // thời gian sync cuối
+  String? _lastApiUrl;       // URL gọi
 
   @override
   void initState() {
     super.initState();
+    _loadSavedSource();
+  }
+
+  Future<void> _loadSavedSource() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString(_kApiSourcePref);
+      if (saved != null) {
+        _selectedSource = PhongTTApiSource.values.firstWhere(
+          (e) => e.name == saved,
+          orElse: () => PhongTTApiSource.public8080,
+        );
+      }
+    } catch (_) {}
     _loadData();
+  }
+
+  Future<void> _saveSource(PhongTTApiSource s) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_kApiSourcePref, s.name);
+    } catch (_) {}
   }
 
   @override
@@ -62,29 +87,34 @@ class _PhongTTKccScreenState extends State<PhongTTKccScreen> {
     });
 
     try {
-      final result = await _api.getServiceRequests(
-        executeRoomId: widget.roomId,
-        limit: 100,
+      debugPrint('🔍 [PHONG_TT_KCC] load from ${_selectedSource.label}');
+      final res = await PhongTTApiService.instance.loadPatients(
+        source: _selectedSource,
+        requestRoomId: 39,    // v3.0.108: PTTT_KCC
+        executeRoomId: 36,    // PKCC (reference)
+        deptCatalogId: widget.deptCatalogId,
       );
+
+      debugPrint('🔍 [PHONG_TT_KCC] result: success=${res.success} count=${res.patients.length} msg=${res.message}');
+      if (res.patients.isNotEmpty) {
+        debugPrint('🔍 [PHONG_TT_KCC] first BN: ${res.patients.first}');
+      }
+      await _dumpResponseToFile(res);
 
       if (mounted) {
         setState(() {
-          if (result.success && result.data is Map) {
-            final data = result.data as Map;
-            if (data['Success'] == true && data['Data'] is List) {
-              _allPatients = List<Map<String, dynamic>>.from(data['Data']);
-            } else if (data['Data'] == null) {
-              _allPatients = [];
-            } else {
-              _error = 'Không có dữ liệu';
-            }
-          } else {
-            _error = result.message ?? 'Lỗi kết nối HIS Pro';
-          }
+          _allPatients = res.patients;
+          _apiSource = res.success
+              ? '${_selectedSource.label} → ${res.patients.length} BN'
+              : '❌ ${_selectedSource.shortLabel}: ${res.message}';
+          _lastApiUrl = res.apiUrl;
+          _lastSynced = res.loadedAt;
+          _error = res.success ? null : res.message;
           _loading = false;
         });
       }
     } catch (e) {
+      debugPrint('🔍 [PHONG_TT_KCC] EXCEPTION: $e');
       if (mounted) {
         setState(() {
           _loading = false;
@@ -94,6 +124,146 @@ class _PhongTTKccScreenState extends State<PhongTTKccScreen> {
     }
   }
 
+  /// Đổi nguồn API và reload
+  Future<void> _changeSource(PhongTTApiSource newSource) async {
+    if (newSource == _selectedSource) return;
+    setState(() {
+      _selectedSource = newSource;
+      _allPatients = [];
+      _apiSource = '⏳ Đang chuyển sang ${newSource.label}...';
+    });
+    await _saveSource(newSource);
+    await _loadData();
+  }
+
+  /// Hiện bottom sheet chọn API source
+  Future<void> _showApiSourcePicker() async {
+    final picked = await showModalBottomSheet<PhongTTApiSource>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        ),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40, height: 4, margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            const Row(
+              children: [
+                Icon(Icons.cloud, size: 20, color: Color(0xFFB71C1C)),
+                SizedBox(width: 8),
+                Text('Chọn nguồn API', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            const SizedBox(height: 4),
+            const Text('Lấy danh sách BN trong Phòng TT KCC từ nguồn nào:',
+              style: TextStyle(color: Colors.black54, fontSize: 12)),
+            const SizedBox(height: 12),
+            ...PhongTTApiSource.values.map((s) {
+              final selected = s == _selectedSource;
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                decoration: BoxDecoration(
+                  color: selected ? const Color(0xFFFFEBEE) : Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: selected ? const Color(0xFFB71C1C) : Colors.grey.shade300,
+                    width: selected ? 1.5 : 1,
+                  ),
+                ),
+                child: ListTile(
+                  onTap: () => Navigator.pop(ctx, s),
+                  leading: Container(
+                    width: 36, height: 36,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: selected ? const Color(0xFFB71C1C) : Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: Text(s.label.substring(0, 1),
+                      style: TextStyle(color: selected ? Colors.white : Colors.black54, fontSize: 16, fontWeight: FontWeight.bold)),
+                  ),
+                  title: Text(s.shortLabel, style: const TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Text(s.hint, style: const TextStyle(fontSize: 11)),
+                  trailing: selected ? const Icon(Icons.check_circle, color: Color(0xFFB71C1C)) : null,
+                ),
+              );
+            }),
+            const SizedBox(height: 8),
+            Text('💡 Mẹo: Dùng "Public 8080" nếu không ở BV (luôn chạy). Dùng "HIS Pro 1408" khi ở BV/LAN. Dùng "Proxy 9999" khi có VPN BV.',
+              style: TextStyle(color: Colors.black45, fontSize: 11)),
+          ],
+        ),
+      ),
+    );
+    if (picked != null) {
+      await _changeSource(picked);
+    }
+  }
+
+  /// v3.0.107: Dump sample response ra file local để debug
+  Future<void> _dumpResponseToFile(PhongTTResult res) async {
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final f = File('${dir.path}/last_phong_tt_response.json');
+      final buf = StringBuffer();
+      buf.writeln('=== PHONG_TT_KCC DEBUG DUMP v3.0.107 ===');
+      buf.writeln('Time: ${DateTime.now().toIso8601String()}');
+      buf.writeln('Source: ${_selectedSource.name} (${_selectedSource.label})');
+      buf.writeln('URL: ${res.apiUrl}');
+      buf.writeln('Success: ${res.success}');
+      buf.writeln('Message: ${res.message ?? ""}');
+      buf.writeln('Count: ${res.patients.length}');
+      if (res.patients.isNotEmpty) {
+        buf.writeln('--- First 2 BNs ---');
+        for (var i = 0; i < (res.patients.length < 2 ? res.patients.length : 2); i++) {
+          buf.writeln('--- BN ${i + 1} ---');
+          try {
+            buf.writeln(const JsonEncoder.withIndent('  ').convert(res.patients[i]));
+          } catch (e) {
+            buf.writeln(res.patients[i].toString());
+          }
+        }
+      }
+      await f.writeAsString(buf.toString(), flush: true);
+      debugPrint('🔍 [PHONG_TT_KCC] Dumped response to: ${f.path}');
+    } catch (e) {
+      debugPrint('🔍 [PHONG_TT_KCC] dump error: $e');
+    }
+  }
+
+  /// v3.0.104: Helper lấy tên BN thông minh - thử nhiều field name
+  /// Trả về Map {name, source} để biết tên lấy từ field nào
+  Map<String, String> _pickPatientName(Map<String, dynamic> p) {
+    // Thử theo thứ tự ưu tiên (Vietnamese có dấu trước)
+    final candidates = <String>[
+      'TDL_PATIENT_NAME',         // Có dấu (vd: HUỲNH HIÊN)
+      'TDL_PATIENT_UNSIGNED_NAME', // Không dấu (vd: HUYNH HIEN)
+      'VIR_PATIENT_NAME',
+      'PATIENT_NAME',
+      'tdl_patient_name',
+      'patientName',
+      'patient_name',
+      'VIR_PATIENT_NAME__UNSIGN',
+    ];
+    for (final k in candidates) {
+      final v = p[k];
+      if (v != null && v.toString().trim().isNotEmpty) {
+        return {'name': v.toString().trim(), 'source': k};
+      }
+    }
+    return {'name': 'N/A', 'source': '(no name field)'};
+  }
+
   @override
   Widget build(BuildContext context) {
     // Filter BN theo tên
@@ -101,12 +271,7 @@ class _PhongTTKccScreenState extends State<PhongTTKccScreen> {
     final filtered = q.isEmpty
         ? _allPatients
         : _allPatients.where((p) {
-            final name = (p['TDL_PATIENT_UNSIGNED_NAME'] ??
-                    p['TDL_PATIENT_NAME'] ??
-                    p['VIR_PATIENT_NAME'] ??
-                    '')
-                .toString()
-                .toLowerCase();
+            final name = _pickPatientName(p)['name']!.toLowerCase();
             final code = (p['TDL_PATIENT_CODE'] ?? '').toString().toLowerCase();
             final tcode = (p['TDL_TREATMENT_CODE'] ?? '').toString().toLowerCase();
             return name.contains(q) || code.contains(q) || tcode.contains(q);
@@ -132,14 +297,26 @@ class _PhongTTKccScreenState extends State<PhongTTKccScreen> {
                 children: [
                   Text(widget.roomName,
                       style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                  Text('Room ID: ${widget.roomId}',
-                      style: const TextStyle(fontSize: 10, color: Colors.white70)),
+                  const Text('REQUEST_ROOM_ID: 39 (PTTT_KCC)',
+                      style: TextStyle(fontSize: 10, color: Colors.white70)),
                 ],
               ),
             ),
           ],
         ),
         actions: [
+          // v3.0.107: Nút chọn API source
+          IconButton(
+            icon: const Icon(Icons.cloud),
+            onPressed: _showApiSourcePicker,
+            tooltip: 'Chọn API nguồn',
+          ),
+          // v3.0.104: Nút copy log path
+          IconButton(
+            icon: const Icon(Icons.bug_report),
+            onPressed: _showLogDialog,
+            tooltip: 'Debug log',
+          ),
           IconButton(icon: const Icon(Icons.refresh), onPressed: _loadData, tooltip: 'Tải lại'),
         ],
       ),
@@ -156,34 +333,65 @@ class _PhongTTKccScreenState extends State<PhongTTKccScreen> {
                 colors: [Color(0xFFB71C1C), Color(0xFFD32F2F)],
               ),
             ),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('BỆNH NHÂN TRONG PHÒNG',
-                          style: TextStyle(color: Colors.white70, fontSize: 10, letterSpacing: 1)),
-                      const SizedBox(height: 2),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.baseline,
-                        textBaseline: TextBaseline.alphabetic,
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('${filtered.length}',
-                              style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
-                          const SizedBox(width: 4),
-                          Text('/ ${_allPatients.length} ca',
-                              style: const TextStyle(color: Colors.white70, fontSize: 14)),
+                          const Text('BỆNH NHÂN TRONG PHÒNG',
+                              style: TextStyle(color: Colors.white70, fontSize: 10, letterSpacing: 1)),
+                          const SizedBox(height: 2),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.baseline,
+                            textBaseline: TextBaseline.alphabetic,
+                            children: [
+                              Text('${filtered.length}',
+                                  style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
+                              const SizedBox(width: 4),
+                              Text('/ ${_allPatients.length} ca',
+                                  style: const TextStyle(color: Colors.white70, fontSize: 14)),
+                            ],
+                          ),
                         ],
                       ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), shape: BoxShape.circle),
+                      child: const Icon(Icons.people, color: Colors.white, size: 28),
+                    ),
+                  ],
+                ),
+                // v3.0.106: API source + thời gian sync (giống HomeScreen)
+                if (_apiSource != null || _lastSynced != null) ...[
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      const Icon(Icons.cloud, size: 11, color: Colors.white60),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          _apiSource ?? '',
+                          style: const TextStyle(color: Colors.white60, fontSize: 10),
+                          maxLines: 1, overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (_lastSynced != null) ...[
+                        const SizedBox(width: 8),
+                        const Icon(Icons.access_time, size: 11, color: Colors.white60),
+                        const SizedBox(width: 2),
+                        Text(
+                          '${_two(_lastSynced!.hour)}:${_two(_lastSynced!.minute)}:${_two(_lastSynced!.second)} ${_two(_lastSynced!.day)}/${_two(_lastSynced!.month)}/${_lastSynced!.year}',
+                          style: const TextStyle(color: Colors.white60, fontSize: 10),
+                        ),
+                      ],
                     ],
                   ),
-                ),
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), shape: BoxShape.circle),
-                  child: const Icon(Icons.people, color: Colors.white, size: 28),
-                ),
+                ],
               ],
             ),
           ),
@@ -271,27 +479,22 @@ class _PhongTTKccScreenState extends State<PhongTTKccScreen> {
   }
 
   /// Card BN - Row API data
+  /// v3.0.106: dùng Public API fields (TDL_PATIENT_NAME, TDL_HEIN_CARD_NUMBER, IN_TIME, etc.)
   Widget _buildPatientCard(Map<String, dynamic> p, int index) {
-    final name = (p['TDL_PATIENT_UNSIGNED_NAME'] ??
-            p['TDL_PATIENT_NAME'] ??
-            p['VIR_PATIENT_NAME'] ??
-            'N/A')
-        .toString();
+    final nameInfo = _pickPatientName(p);
+    final name = nameInfo['name']!;
     final code = (p['TDL_PATIENT_CODE'] ?? p['PATIENT_CODE'] ?? '').toString();
-    final gender = (p['TDL_PATIENT_GENDER_NAME'] ?? '').toString();
     final dob = p['TDL_PATIENT_DOB'];
     final age = _age(dob);
-    final stt = p['SERVICE_REQ_STT_ID'] ?? 1;
-    final sttName = stt == 1 ? 'CHỜ' : stt == 2 ? 'ĐANG' : 'XONG';
-    final sttColor = stt == 1
-        ? Colors.red.shade600
-        : stt == 2
-            ? Colors.orange.shade600
-            : Colors.green.shade600;
+    final isBHYT = p['IS_BHYT'] == true;
+    final sttColor = isBHYT ? Colors.blue.shade600 : Colors.purple.shade600;
     final heinCard = (p['TDL_HEIN_CARD_NUMBER'] ?? '').toString();
     final treatmentCode = (p['TDL_TREATMENT_CODE'] ?? '').toString();
-    final serviceCode = (p['SERVICE_REQ_CODE'] ?? '').toString();
-    final reqDeptName = (p['REQUEST_DEPARTMENT_NAME'] ?? '').toString();
+    final patientTypeName = (p['PATIENT_TYPE_NAME'] ?? '').toString();
+    final treatmentTypeName = (p['TREATMENT_TYPE_NAME'] ?? '').toString();
+    final inTime = (p['IN_TIME'] ?? '').toString();
+    final deptName = (p['DEPARTMENT_NAME'] ?? p['LAST_DEPARTMENT_RAW'] ?? '').toString();
+    final address = (p['TDL_PATIENT_ADDRESS'] ?? '').toString();
 
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -309,7 +512,7 @@ class _PhongTTKccScreenState extends State<PhongTTKccScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Row 1: STT + Tên + trạng thái
+              // Row 1: STT + Tên + trạng thái BHYT
               Row(
                 children: [
                   Container(
@@ -321,7 +524,7 @@ class _PhongTTKccScreenState extends State<PhongTTKccScreen> {
                         style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
                   ),
                   const SizedBox(width: 8),
-                  Icon(gender.contains('Nữ') ? Icons.female : Icons.male, color: Colors.pink.shade300, size: 16),
+                  Icon(isBHYT ? Icons.verified_user : Icons.person_outline, color: sttColor, size: 16),
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
@@ -331,17 +534,18 @@ class _PhongTTKccScreenState extends State<PhongTTKccScreen> {
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(color: sttColor, borderRadius: BorderRadius.circular(8)),
-                    child: Text(sttName,
-                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                  ),
+                  if (patientTypeName.isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(color: sttColor, borderRadius: BorderRadius.circular(8)),
+                      child: Text(patientTypeName,
+                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                    ),
                 ],
               ),
               const SizedBox(height: 6),
-              // Row 2: Mã BN • Giới tính • Tuổi
-              Text('$code  •  $gender  •  ${age}Y',
+              // Row 2: Mã BN • Năm sinh
+              Text('$code  •  ${dob ?? ''}  •  ${age}Y',
                   style: const TextStyle(color: Colors.black87, fontSize: 12)),
               const SizedBox(height: 8),
               // Row 3: API data
@@ -353,10 +557,12 @@ class _PhongTTKccScreenState extends State<PhongTTKccScreen> {
                 ),
                 child: Column(
                   children: [
-                    if (heinCard.isNotEmpty) _apiRow('BHYT', heinCard, Icons.credit_card),
                     if (treatmentCode.isNotEmpty) _apiRow('Mã ĐT', treatmentCode, Icons.medical_information),
-                    if (serviceCode.isNotEmpty) _apiRow('Mã YL', serviceCode, Icons.assignment),
-                    if (reqDeptName.isNotEmpty) _apiRow('Khoa YC', reqDeptName, Icons.local_hospital),
+                    if (heinCard.isNotEmpty) _apiRow('BHYT', heinCard, Icons.credit_card),
+                    if (treatmentTypeName.isNotEmpty) _apiRow('Loại ĐT', treatmentTypeName, Icons.local_hospital),
+                    if (deptName.isNotEmpty) _apiRow('Khoa', deptName, Icons.business),
+                    if (inTime.isNotEmpty) _apiRow('Giờ vào', _formatInTime(inTime), Icons.access_time),
+                    if (address.isNotEmpty) _apiRow('Địa chỉ', address, Icons.place),
                   ],
                 ),
               ),
@@ -365,6 +571,16 @@ class _PhongTTKccScreenState extends State<PhongTTKccScreen> {
         ),
       ),
     );
+  }
+
+  /// Format IN_TIME từ server (e.g. "2026-08-14 08:30:00" → "08:30 14/08/2026")
+  String _formatInTime(String t) {
+    try {
+      final dt = DateTime.parse(t);
+      return '${_two(dt.hour)}:${_two(dt.minute)} ${_two(dt.day)}/${_two(dt.month)}/${dt.year}';
+    } catch (_) {
+      return t;
+    }
   }
 
   Widget _apiRow(String label, String value, IconData icon) {
@@ -400,9 +616,107 @@ class _PhongTTKccScreenState extends State<PhongTTKccScreen> {
     }
   }
 
+  String _two(int n) => n.toString().padLeft(2, '0');
+
+  /// v3.0.104: Hiển thị dialog debug với path file log + preview tên các field
+  Future<void> _showLogDialog() async {
+    String logPath = '(chưa có)';
+    String preview = '(chưa load)';
+    try {
+      final dir = await getApplicationDocumentsDirectory();
+      final f = File('${dir.path}/last_phong_tt_response.json');
+      if (await f.exists()) {
+        logPath = f.path;
+        final content = await f.readAsString();
+        // Lấy 1500 ký tự đầu
+        preview = content.length > 1500
+            ? '${content.substring(0, 1500)}...'
+            : content;
+      } else {
+        logPath = '(file chưa tồn tại - hãy bấm 🔄 Tải lại)';
+      }
+    } catch (e) {
+      preview = 'Lỗi đọc file: $e';
+    }
+
+    // Thống kê field names
+    String fieldStats = '';
+    if (_allPatients.isNotEmpty) {
+      final first = _allPatients.first;
+      final nameFields = <String, dynamic>{};
+      for (final k in first.keys) {
+        if (k.toString().toUpperCase().contains('NAME')) {
+          nameFields[k.toString()] = first[k];
+        }
+      }
+      fieldStats = 'NAME fields trong BN đầu tiên:\n$nameFields\n\n'
+          '=> Tên lấy từ: ${_pickPatientName(first)['source']}\n'
+          '=> Giá trị: ${_pickPatientName(first)['name']}';
+    }
+
+    if (!mounted) return;
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.bug_report, color: Color(0xFFB71C1C)),
+            SizedBox(width: 8),
+            Text('Debug log v3.0.104'),
+          ],
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('📂 File log:', style: TextStyle(fontWeight: FontWeight.bold)),
+                SelectableText(logPath, style: const TextStyle(fontSize: 11)),
+                const SizedBox(height: 12),
+                const Text('📊 Thống kê field:', style: TextStyle(fontWeight: FontWeight.bold)),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  color: Colors.grey.shade100,
+                  child: SelectableText(fieldStats, style: const TextStyle(fontSize: 11, fontFamily: 'monospace')),
+                ),
+                const SizedBox(height: 12),
+                const Text('📄 Preview (1.5KB đầu):', style: TextStyle(fontWeight: FontWeight.bold)),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  color: Colors.grey.shade100,
+                  child: SelectableText(preview, style: const TextStyle(fontSize: 10, fontFamily: 'monospace')),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton.icon(
+            icon: const Icon(Icons.copy, size: 16),
+            label: const Text('Copy path'),
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: logPath));
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Đã copy đường dẫn log')),
+                );
+              }
+            },
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Đóng'),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// Bottom sheet chi tiết BN với 2 tab: Thông tin / ECG
   Future<void> _showPatientSheet(Map<String, dynamic> p) async {
-    final name = (p['TDL_PATIENT_UNSIGNED_NAME'] ?? p['TDL_PATIENT_NAME'] ?? p['VIR_PATIENT_NAME'] ?? 'N/A').toString();
+    final name = _pickPatientName(p)['name']!;
     final code = (p['TDL_PATIENT_CODE'] ?? '').toString();
     final treatmentCode = (p['TDL_TREATMENT_CODE'] ?? '').toString();
 
@@ -483,23 +797,27 @@ class _PhongTTKccScreenState extends State<PhongTTKccScreen> {
     );
   }
 
-  /// Tab Thông tin - hiển thị chi tiết
+  /// Tab Thông tin - hiển thị chi tiết (v3.0.106 dùng Public API fields)
   Widget _infoTab(Map<String, dynamic> p) {
+    final name = _pickPatientName(p)['name']!;
+    final inTime = (p['IN_TIME'] ?? '').toString();
+    final outTime = (p['OUT_TIME'] ?? '').toString();
     final fields = <MapEntry<String, String>>[
       MapEntry('Mã BN', (p['TDL_PATIENT_CODE'] ?? '').toString()),
-      MapEntry('Tên BN', (p['TDL_PATIENT_UNSIGNED_NAME'] ?? p['TDL_PATIENT_NAME'] ?? '').toString()),
-      MapEntry('Giới tính', (p['TDL_PATIENT_GENDER_NAME'] ?? '').toString()),
+      MapEntry('Tên BN', name),
       MapEntry('Năm sinh', (p['TDL_PATIENT_DOB'] ?? '').toString()),
       MapEntry('Tuổi', _age(p['TDL_PATIENT_DOB']).toString()),
       MapEntry('BHYT', (p['TDL_HEIN_CARD_NUMBER'] ?? '').toString()),
       MapEntry('Mã điều trị', (p['TDL_TREATMENT_CODE'] ?? '').toString()),
-      MapEntry('Mã y lệnh', (p['SERVICE_REQ_CODE'] ?? '').toString()),
-      MapEntry('Trạng thái', (p['SERVICE_REQ_STT_ID'] ?? '').toString()),
-      MapEntry('Khoa YC', (p['REQUEST_DEPARTMENT_NAME'] ?? '').toString()),
-      MapEntry('Phòng YC', (p['REQUEST_ROOM_NAME'] ?? '').toString()),
-      MapEntry('Phòng thực hiện', (p['EXECUTE_ROOM_NAME'] ?? '').toString()),
-      MapEntry('ICD', (p['ICDS_TEXT'] ?? p['TDL_ICD_CODE'] ?? '').toString()),
-      MapEntry('Chẩn đoán', (p['TDL_ICD_NAME'] ?? '').toString()),
+      MapEntry('Loại ĐT', (p['TREATMENT_TYPE_NAME'] ?? '').toString()),
+      MapEntry('Đối tượng', (p['PATIENT_TYPE_NAME'] ?? '').toString()),
+      MapEntry('Khoa', (p['DEPARTMENT_NAME'] ?? p['LAST_DEPARTMENT_RAW'] ?? '').toString()),
+      MapEntry('Địa chỉ', (p['TDL_PATIENT_ADDRESS'] ?? '').toString()),
+      MapEntry('SĐT', (p['TDL_PATIENT_PHONE'] ?? '').toString()),
+      MapEntry('SDT người nhà', (p['TDL_PATIENT_RELATIVE_MOBILE'] ?? '').toString()),
+      MapEntry('Giờ vào', inTime.isNotEmpty ? _formatInTime(inTime) : ''),
+      MapEntry('Giờ ra', outTime.isNotEmpty ? _formatInTime(outTime) : ''),
+      MapEntry('Nguồn', (p['_DATA_SOURCE'] ?? '').toString()),
     ];
     return ListView.separated(
       padding: const EdgeInsets.all(12),

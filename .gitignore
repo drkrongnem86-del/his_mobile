@@ -109,3 +109,17 @@ ios/.symlinks/
 ios/Flutter/Flutter.podspec
 ios/Flutter/Flutter.framework
 ios/Flutter/flutter_export_environment.sh
+
+# Build artifacts (moved aside during cleanup)
+.dart_tool_old/
+android/.gradle_old/
+build_old/
+
+# Build logs (transient - keep only current in repo)
+build_log_v*.txt
+
+# Backup/OLD files (renamed with _ prefix to skip Dart import)
+lib/presentation/screens/_*.dart
+lib/presentation/screens/_*.bak
+lib/**/_*.dart
+lib/**/_*.bak

@@ -84,7 +84,7 @@ class AppConstants {
   static const int DEPARTMENT_ID_CAP_CUU = 22;  // HSCC
   static const int DEPARTMENT_ID_HS_TICH_CUC = 24;  // Hồi sức tích cực chống độc
   static const int DEPARTMENT_ID_GAY_ME = 25;  // Gây mê hồi sức
-  static const int ROOM_ID_KHAM_CAP_CUU = 39;  // PKCC
+  static const int ROOM_ID_KHAM_CAP_CUU = 36;  // PKCC - v3.0.105: từ log HIS Pro thật 14/08/2026, dùng 36 (KHÔNG phải 39)
   static const String DEPARTMENT_CODE_CAP_CUU = 'HSCC';
 
   /// Danh sách các khoa trong BV - Mapping từ Y Tế Số mobile (log 2026-07-06)
@@ -150,8 +150,8 @@ class AppConstants {
     {'id': 502, 'code': 'DTTN', 'name': 'Khu Điều Trị Trong Ngày', 'icon': '🏥'},
     // v2.47.0: thêm các khoa phát hiện từ data thật (500 BN từ EMR-Checker)
     {'id': 522, 'code': 'KSKCB', 'name': 'Khoa Khám sức khỏe cán bộ', 'icon': '🩺'},
-    // v3.0.100: Phòng đặc biệt - dùng để mở màn hình PhongTTKccScreen riêng
-    {'id': 99001, 'code': 'PTTT.KCC', 'name': 'Phòng TT Khoa Cấp Cứu', 'icon': '🩺', 'isPhong': true},
+    // v3.0.109: Phòng đặc biệt - dùng để mở màn hình PhongThuThuatHsccScreen
+    {'id': 99001, 'code': 'PTTT.HSCC', 'name': 'Phòng thủ thuật HSCC', 'icon': '🩺', 'isPhong': true},
   ];
 
   /// Danh sách PHÒNG (buồng) đầy đủ 53 buồng - từ ảnh chụp danh sách BV (2026-07-07)

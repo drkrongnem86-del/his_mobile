@@ -42,7 +42,7 @@ class _PatientListByRoomScreenState extends State<PatientListByRoomScreen> {
       print('📡 Loading BN cho phòng $roomId ($roomName)');
 
       final result = await _api.getServiceRequests(
-        executeRoomId: (roomId is int) ? roomId : 39,
+        executeRoomId: (roomId is int) ? roomId : 36, // v3.0.105: PKCC = 36
         limit: 100,
       );
 

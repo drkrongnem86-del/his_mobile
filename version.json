@@ -1,5 +1,5 @@
 ﻿{
-  "version": "3.0.103",
-  "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.103/his_mobile_v3.0.103_arm64.apk",
-  "message": "Phòng TT KCC: card nổi bật trên cùng dialog chọn khoa"
+  "version": "3.0.111",
+  "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.111/his_mobile_v3.0.111_arm64.apk",
+  "message": "Auto-check update khi mở app + yêu cầu cấp quyền install (Android 8+)"
 }

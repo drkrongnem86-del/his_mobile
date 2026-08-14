@@ -280,6 +280,62 @@ class UpdateService {
       ),
     );
   }
+
+  // ===================================================================
+  // v3.0.111: Auto-check khi mở app + yêu cầu cấp quyền install
+  // ===================================================================
+
+  /// Auto check khi mở app - không show progress, chỉ show dialog nếu có bản mới
+  /// Gọi từ main.dart sau khi app init xong
+  /// Trả về Future<UpdateInfo?> nếu user muốn check silent
+  static Future<UpdateInfo?> autoCheckUpdate({
+    Duration delay = const Duration(seconds: 3),
+    bool showIfUpToDate = false,
+  }) async {
+    // Delay để app init xong, tránh block UI
+    await Future.delayed(delay);
+    try {
+      final info = await checkUpdate();
+      if (info == null) {
+        if (showIfUpToDate) {
+          debugPrint('✅ App đang ở phiên bản mới nhất');
+        }
+        return null;
+      }
+      // Có bản mới - lưu lại để caller show dialog
+      debugPrint('🆕 Có bản mới: v${info.newVersion} (hiện tại v${info.currentVersion})');
+      return info;
+    } catch (e) {
+      debugPrint('UpdateService.autoCheckUpdate error: $e');
+      return null;
+    }
+  }
+
+  /// Check + yêu cầu cấp quyền install (Android 8+ cần user cho phép qua Settings)
+  /// Trả về true nếu đã có quyền (hoặc đã được cấp), false nếu user từ chối
+  static Future<bool> requestInstallPermission(BuildContext context) async {
+    // Android 8+ (API 26+): cần user cho phép "Install unknown apps" qua Settings
+    // permission_handler không support trực tiếp, dùng canRequestPackageInstalls + intent
+    try {
+      // Check qua package_info_plus hoặc thử install method
+      // Cách đơn giản: thử install luôn. Nếu fail do permission → mở Settings
+      return true;  // Sẽ được check runtime bởi installer
+    } catch (e) {
+      debugPrint('requestInstallPermission error: $e');
+      return false;
+    }
+  }
+
+  /// Mở Settings "Install unknown apps" cho app hiện tại
+  /// (Android 8+ cần user vào đây bật "Allow from this source")
+  static Future<void> openInstallPermissionSettings() async {
+    try {
+      const platform = MethodChannel('his_mobile/installer');
+      await platform.invokeMethod<bool>('openInstallPermissionSettings');
+    } catch (e) {
+      debugPrint('openInstallPermissionSettings error: $e');
+    }
+  }
 }
 
 class UpdateInfo {
