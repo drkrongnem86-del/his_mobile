@@ -1,8 +1,11 @@
 package com.drnem.ccdk.his_mobile
 
+import android.content.ContentValues
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import android.provider.Settings
 import androidx.core.content.FileProvider
 import io.flutter.embedding.android.FlutterActivity
@@ -10,12 +13,15 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import id.laskarmedia.openvpn_flutter.OpenVPNFlutterPlugin
 import java.io.File
+import java.io.IOException
 
 /// v3.0.28: Tích hợp VNPT SmartCA Deeplink SDK
 /// MethodChannel: com.drnem.ccdk.his_mobile/vnpt_smartca
 /// v3.0.76: Thêm OpenVPNFlutterPlugin.connectWhileGranted để xử lý VpnService permission prompt
 /// v3.0.99: Thêm MethodChannel 'his_mobile/installer' cho auto-update
 /// v3.0.111: Thêm method 'openInstallPermissionSettings' + 'canRequestPackageInstalls'
+/// v3.0.122: Thêm method 'saveApkToDownloads' - copy APK vào thư mục Download public
+///            (Android 10+ dùng MediaStore.Downloads, Android < 10 direct write)
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.drnem.ccdk.his_mobile/vnpt_smartca"
     private val INSTALL_CHANNEL = "his_mobile/installer"
@@ -130,6 +136,72 @@ class MainActivity : FlutterActivity() {
                             }
                         } catch (e: Exception) {
                             result.error("OPEN_SETTINGS_FAILED", e.message, e.stackTrace.toString())
+                        }
+                    }
+                    "saveApkToDownloads" -> {
+                        // v3.0.122: Copy APK từ internal storage vào thư mục Download public
+                        // Android 10+ (API 29+): MediaStore.Downloads (scoped storage, no permission)
+                        // Android 9- (API <29): Direct file write to Environment.DIRECTORY_DOWNLOADS
+                        //   cần WRITE_EXTERNAL_STORAGE permission
+                        val srcPath = call.argument<String>("path")
+                        val displayName = call.argument<String>("displayName")
+                        if (srcPath == null || displayName == null) {
+                            result.error("INVALID_ARGS", "path and displayName are required", null)
+                            return@setMethodCallHandler
+                        }
+                        try {
+                            val srcFile = File(srcPath)
+                            if (!srcFile.exists()) {
+                                result.error("FILE_NOT_FOUND", "APK not found: $srcPath", null)
+                                return@setMethodCallHandler
+                            }
+                            val publicUri: Uri? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                // Android 10+ - MediaStore.Downloads API
+                                val contentValues = ContentValues().apply {
+                                    put(MediaStore.Downloads.DISPLAY_NAME, displayName)
+                                    put(MediaStore.Downloads.MIME_TYPE, "application/vnd.android.package-archive")
+                                    put(MediaStore.Downloads.RELATIVE_PATH, "${Environment.DIRECTORY_DOWNLOADS}/HisMobile")
+                                    put(MediaStore.Downloads.IS_PENDING, 1)
+                                }
+                                val collection = MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+                                val uri = contentResolver.insert(collection, contentValues)
+                                if (uri == null) {
+                                    result.error("MEDIASTORE_FAILED", "Insert returned null", null)
+                                    return@setMethodCallHandler
+                                }
+                                contentResolver.openOutputStream(uri)?.use { outputStream ->
+                                    srcFile.inputStream().use { input ->
+                                        input.copyTo(outputStream)
+                                    }
+                                }
+                                contentValues.clear()
+                                contentValues.put(MediaStore.Downloads.IS_PENDING, 0)
+                                contentResolver.update(uri, contentValues, null, null)
+                                uri
+                            } else {
+                                // Android 9- (API <29) - direct file write
+                                @Suppress("DEPRECATION")
+                                val destDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                                val hisDir = File(destDir, "HisMobile")
+                                if (!hisDir.exists()) hisDir.mkdirs()
+                                val destFile = File(hisDir, displayName)
+                                srcFile.copyTo(destFile, overwrite = true)
+                                Uri.fromFile(destFile)
+                            }
+                            val sizeBytes = srcFile.length()
+                            // Trả về: đường dẫn user-friendly để hiển thị
+                            val displayPath = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                "Download/HisMobile/$displayName"
+                            } else {
+                                "Download/HisMobile/$displayName"
+                            }
+                            result.success(mapOf(
+                                "uri" to publicUri.toString(),
+                                "path" to displayPath,
+                                "size" to sizeBytes
+                            ))
+                        } catch (e: Exception) {
+                            result.error("SAVE_FAILED", e.message, e.stackTrace.toString())
                         }
                     }
                     else -> result.notImplemented()
