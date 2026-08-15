@@ -59,6 +59,24 @@ jobs:
       - name: 📦 Get dependencies
         run: flutter pub get
 
+      # v3.0.119: Decode release keystore tu secrets (neu co) - de build APK
+      # sign voi release key (cung SHA voi local build) -> user cài de len ban cu duoc
+      - name: 🔐 Decode release keystore
+        id: keystore
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        run: |
+          $keystoreBytes = [System.Convert]::FromBase64String('${{ secrets.ANDROID_KEYSTORE_BASE64 }}')
+          [System.IO.File]::WriteAllBytes("$env:RUNNER_TEMP\his-mobile-release.jks", $keystoreBytes)
+          echo "keystore_path=$env:RUNNER_TEMP\his-mobile-release.jks" >> $env:GITHUB_OUTPUT
+      - name: 📝 Generate key.properties
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        run: |
+          cat > android/key.properties <<EOF
+          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          storeFile=${{ steps.keystore.outputs.keystore_path }}
+          EOF
       - name: 🏗️ Build APK (arm64 only)
         # Output: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
         run: flutter build apk --release --target-platform android-arm64 --split-per-abi
@@ -312,12 +330,24 @@ jobs:
           cat version.json
 
       - name: 📤 Commit version.json
-        # Pull --rebase trước để tránh conflict nếu có commit khác trên main
-        # (vd: BS tự sửa CHANGELOG.md giữa workflow runs)
+        # v3.0.119: Switch sang main branch trước (workflow checkout ở detached HEAD từ tag)
+        # Sau đó reset về origin/main để tránh conflict, rồi mới commit + push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git pull --rebase origin main || true
+          git checkout main
+          git fetch origin main
+          git reset --hard origin/main
+          # Restore version.json từ bước trước (đã ghi vào file)
+          # (đã bị reset --hard xoá, cần ghi lại)
+          # Lấy version từ TAG_NAME env
+          cat > version.json <<EOF
+          {
+            "version": "${TAG_NAME#v}",
+            "apk_url": "https://github.com/${REPO}/releases/download/${TAG_NAME}/his_mobile_v${TAG_NAME#v}_arm64.apk",
+            "message": "Cập nhật phiên bản ${TAG_NAME#v}"
+          }
+          EOF
           git add version.json
           if git diff --staged --quiet; then
             echo "No version.json changes to commit"
