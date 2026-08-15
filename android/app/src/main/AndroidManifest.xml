@@ -71,6 +71,11 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- v3.0.123: BroadcastReceiver nhận kết quả install từ PackageInstaller API -->
+        <receiver
+            android:name=".InstallResultReceiver"
+            android:exported="false" />
     </application>
 
     <queries>

@@ -1,7 +1,9 @@
 package com.drnem.ccdk.his_mobile
 
+import android.app.PendingIntent
 import android.content.ContentValues
 import android.content.Intent
+import android.content.pm.PackageInstaller
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
@@ -21,7 +23,8 @@ import java.io.IOException
 /// v3.0.99: Thêm MethodChannel 'his_mobile/installer' cho auto-update
 /// v3.0.111: Thêm method 'openInstallPermissionSettings' + 'canRequestPackageInstalls'
 /// v3.0.122: Thêm method 'saveApkToDownloads' - copy APK vào thư mục Download public
-///            (Android 10+ dùng MediaStore.Downloads, Android < 10 direct write)
+/// v3.0.123: Refactor 'installApk' - dùng PackageInstaller.Session API (officially supported
+///            for in-app updates, KHÔNG cần kill process, hệ thống tự handle lifecycle)
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.drnem.ccdk.his_mobile/vnpt_smartca"
     private val INSTALL_CHANNEL = "his_mobile/installer"
@@ -73,40 +76,42 @@ class MainActivity : FlutterActivity() {
                                 result.error("FILE_NOT_FOUND", "APK file not found: $path", null)
                                 return@setMethodCallHandler
                             }
-                            val apkUri: Uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                                // Android 7+ (API 24+): phải dùng FileProvider
-                                FileProvider.getUriForFile(
-                                    this,
-                                    "$packageName.fileprovider",
-                                    file
-                                )
+                            // v3.0.123: Dùng PackageInstaller.Session API thay vì Intent.ACTION_VIEW
+                            // Đây là cách chính thống của Android cho in-app update.
+                            // Ưu điểm:
+                            // - Hệ thống tự xử lý self-update (không cần kill process)
+                            // - Hoạt động đúng trên mọi thiết bị (Samsung, Pixel, Xiaomi...)
+                            // - User thấy system install dialog chuẩn
+                            // - Callback về BroadcastReceiver để xử lý success/failure
+                            val packageInstaller = packageManager.packageInstaller
+                            val sessionParams = PackageInstaller.SessionParams(
+                                PackageInstaller.SessionParams.MODE_FULL_INSTALL
+                            )
+                            val sessionId = packageInstaller.createSession(sessionParams)
+                            val session = packageInstaller.openSession(sessionId)
+                            val totalSize = file.length()
+                            session.openWrite("package", 0, totalSize).use { outputStream ->
+                                file.inputStream().use { inputStream ->
+                                    val buffer = ByteArray(65536)
+                                    var read: Int
+                                    while (inputStream.read(buffer).also { read = it } > 0) {
+                                        outputStream.write(buffer, 0, read)
+                                    }
+                                }
+                            }
+                            // PendingIntent flags: cần FLAG_MUTABLE trên Android 12+ (API 31+)
+                            val piFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
                             } else {
-                                // Android < 7: file:// URI vẫn OK
-                                Uri.fromFile(file)
+                                PendingIntent.FLAG_UPDATE_CURRENT
                             }
-                            val intent = Intent(Intent.ACTION_VIEW).apply {
-                                setDataAndType(apkUri, "application/vnd.android.package-archive")
-                                // v3.0.121: Thêm FLAG_ACTIVITY_CLEAR_TASK để install dialog
-                                // chạy trong task riêng, không bị conflict với app cũ
-                                flags = Intent.FLAG_ACTIVITY_NEW_TASK or
-                                        Intent.FLAG_GRANT_READ_URI_PERMISSION or
-                                        Intent.FLAG_ACTIVITY_CLEAR_TASK
-                            }
-                            // v3.0.121: Fix lỗi "App not installed" khi tự cập nhật
-                            // Android PackageInstaller yêu cầu app cũ phải TẮT HẲN (process killed)
-                            // trước khi cho cài đè. Nếu app cũ vẫn còn foreground/background process,
-                            // OS sẽ báo "App not installed" dù signature khớp.
-                            //
-                            // Flow:
-                            // 1. finishAndRemoveTask() - đóng activity, xóa khỏi recents
-                            // 2. startActivity(install intent) - mở install permission dialog
-                            // 3. postDelayed kill process 800ms - đợi install dialog start xong rồi kill
-                            //    → user grant permission + tap Cập nhật → process cũ đã chết → install OK
-                            finishAndRemoveTask()
-                            startActivity(intent)
-                            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                                android.os.Process.killProcess(android.os.Process.myPid())
-                            }, 800)
+                            val resultIntent = Intent(this, InstallResultReceiver::class.java)
+                            val pendingIntent = PendingIntent.getBroadcast(
+                                this, sessionId, resultIntent, piFlags
+                            )
+                            // Commit session - hệ thống sẽ show install dialog
+                            session.commit(pendingIntent.intentSender)
+                            session.close()
                             result.success(true)
                         } catch (e: Exception) {
                             result.error("INSTALL_FAILED", e.message, e.stackTrace.toString())
