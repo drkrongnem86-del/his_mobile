@@ -150,9 +150,10 @@ class AppConstants {
     {'id': 502, 'code': 'DTTN', 'name': 'Khu Điều Trị Trong Ngày', 'icon': '🏥'},
     // v2.47.0: thêm các khoa phát hiện từ data thật (500 BN từ EMR-Checker)
     {'id': 522, 'code': 'KSKCB', 'name': 'Khoa Khám sức khỏe cán bộ', 'icon': '🩺'},
-    // v3.0.116: Phòng thử thuật HSCC (port từ v3.1.13) - id=9999 tránh conflict với HIS dept id 22-71
-    // Khi chọn → HomeScreen render ProcedureRoomScreen thay DepartmentPatientPage
-    {'id': 9999, 'code': 'PTTHSCC', 'name': 'Phòng thử thuật HSCC', 'icon': '⚡', 'isProcedureRoom': true, 'executeRoomId': 39, 'executeDepartmentId': 22},
+    // v3.0.117: Phòng thử thuật HSCC - id=9999 tránh conflict với HIS dept id 22-71
+    // executeRoomId: 36 (PKCC - HIS Desktop filter thật: 78 BN, status 1,2,3)
+    // v3.0.116 dùng 39 (PTTT_KCC) → user test thấy 0 BN → đổi về 36
+    {'id': 9999, 'code': 'PTTHSCC', 'name': 'Phòng thử thuật HSCC', 'icon': '⚡', 'isProcedureRoom': true, 'executeRoomId': 36, 'executeDepartmentId': 22},
   ];
 
   /// Danh sách PHÒNG (buồng) đầy đủ 53 buồng - từ ảnh chụp danh sách BV (2026-07-07)

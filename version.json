@@ -1,5 +1,5 @@
-﻿{
-  "version": "3.0.115",
-  "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.115/his_mobile_v3.0.115_arm64.apk",
-  "message": "Them Phong thu thuat HSCC vao Drawer + Tien ich + doi label trong Chon khoa"
+{
+  "version": "3.0.117",
+  "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.117/his_mobile_v3.0.117_arm64.apk",
+  "message": "Phong thu thuat HSCC: doi executeRoomId 39 -> 36 (PKCC - HIS Desktop filter that tra 78 BN)"
 }
