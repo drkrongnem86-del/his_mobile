@@ -35,7 +35,9 @@ import 'package:his_mobile/presentation/screens/qr_scanner_screen.dart';
 import 'package:his_mobile/presentation/screens/department_patients_screen.dart';
 import 'package:his_mobile/presentation/screens/tien_ich_screen.dart';
 import 'package:his_mobile/presentation/screens/y_te_so_home_screen.dart';
-import 'package:his_mobile/presentation/screens/phong_thu_thuat_hscc_screen.dart';
+// v3.0.116: Phòng thủ thuật HSCC - port từ v3.1.13 (replaced phong_thu_thuat_hscc_screen.dart)
+import 'package:his_mobile/presentation/screens/procedure_room_screen.dart';
+import 'package:his_mobile/presentation/widgets/procedure_room_actions_sheet.dart';
 import 'package:his_mobile/presentation/widgets/marquee_banner.dart';
 
 /// Nguồn dữ liệu BN hiển thị - "Thật" (từ Data/HIS Pro API) vs "Từ app code" (PatientSeed).
@@ -147,6 +149,14 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentDeptIndex = 0;  // v2.94.0: Sẽ load từ SharedPreferences trong initState
   final GlobalKey<_DepartmentPatientPageState> _departmentKey =
       GlobalKey<_DepartmentPatientPageState>();
+
+  /// v3.0.116: Check khoa hiện tại có phải "Phòng thủ thuật HSCC" không
+  /// (port từ v3.1.13) - khi chọn → render ProcedureRoomScreen embedded
+  bool get _isCurrentDeptProcedureRoom {
+    if (_currentDeptIndex < 0 || _currentDeptIndex >= _departments.length) return false;
+    final d = _departments[_currentDeptIndex];
+    return d['isProcedureRoom'] == true;
+  }
 
   // v3.0.36: API push EMR đang chọn
   EmrPushApiSource _emrApiSource = EmrPushApiSource.public;
@@ -598,9 +608,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       context.safePop();
                       Future.delayed(const Duration(milliseconds: 100), () {
                         if (mounted) {
+                          // v3.0.116: Mở ProcedureRoomScreen thay vì PhongThuThuatHsccScreen (đã port)
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (_) => const PhongThuThuatHsccScreen()),
+                            MaterialPageRoute(builder: (_) => const ProcedureRoomScreen()),
                           );
                         }
                       });
@@ -1006,12 +1017,20 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _pickDept(int i) {
-    // v3.0.109: Special index 99001 = Phòng thủ thuật HSCC (từ card nổi bật ở dialog)
-    if (i == 99001) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => const PhongThuThuatHsccScreen()),
-      );
+    // v3.0.116: Special index 9999 = Phòng thủ thuật HSCC (port từ v3.1.13)
+    // v3.0.109: Old 99001 (backward compat)
+    if (i == 9999 || i == 99001) {
+      // Render embedded - set _currentDeptIndex đến entry 9999
+      final procIdx = AppConstants.departments.indexWhere((d) => d['isProcedureRoom'] == true);
+      if (procIdx >= 0) {
+        _onDeptChanged(procIdx);
+      } else {
+        // Fallback: mở standalone
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ProcedureRoomScreen()),
+        );
+      }
       return;
     }
     if (i == _currentDeptIndex) return;
@@ -1019,11 +1038,16 @@ class _HomeScreenState extends State<HomeScreen> {
     // Tránh index lệch khi DepartmentService load từ API (số entry khác 53)
     if (i >= 0 && i < AppConstants.departments.length) {
       final d = AppConstants.departments[i];
-      if (d['isPhong'] == true) {
-        Navigator.push(
-          context,
-          MaterialPageRoute(builder: (_) => const PhongThuThuatHsccScreen()),
-        );
+      if (d['isPhong'] == true || d['isProcedureRoom'] == true) {
+        final procIdx = AppConstants.departments.indexWhere((d) => d['isProcedureRoom'] == true);
+        if (procIdx >= 0) {
+          _onDeptChanged(procIdx);
+        } else {
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const ProcedureRoomScreen()),
+          );
+        }
         return;
       }
     }
@@ -1334,31 +1358,63 @@ class _HomeScreenState extends State<HomeScreen> {
 
           // v2.96.0: API selector TRÊN, search bar DƯỚI
           // v2.92.0: SegmentedButton chọn API - to, nổi bật, dễ thấy
-          _buildApiSelector(),
+          // v3.0.116: ẨN top pill khi ở Phòng thủ thuật HSCC (procedure room có info bar gọn riêng)
+          if (!_isCurrentDeptProcedureRoom) _buildApiSelector(),
 
           // v2.81.0: Search bar thật - filter trực tiếp tên BN
           _buildSearchBar(),
 
           Expanded(
-            child: DepartmentPatientPage(
-              key: _departmentKey,
-              department: _departments[_currentDeptIndex],
-              searchQuery: _searchQuery,
-              // v2.81.0: Bỏ roomFilter
-              roomFilter: null,
-              // v3.0.42: Filter TREATMENT_TYPE_NAME
-              treatmentTypeFilter: _treatmentTypeFilter,
-              // v3.0.75: Date range từ TrDateFilter (HIS Pro style)
-              dateFrom: _dateFrom,
-              dateTo: _dateTo,
-              selectedPatientId: _selectedPatient?['ID'] as int?,
-              onPatientTap: _openActions,
-              onPatientSelect: (p) => setState(() => _selectedPatient = p),
-            ),
+            child: _isCurrentDeptProcedureRoom
+                // v3.0.116: Phòng thủ thuật HSCC - render trực tiếp với thao tác BN riêng
+                ? ProcedureRoomScreen(
+                    executeRoomId: _departments[_currentDeptIndex]['executeRoomId'] as int?,
+                    executeDepartmentId: _departments[_currentDeptIndex]['executeDepartmentId'] as int?,
+                    embedded: true,  // ẩn AppBar riêng vì đã có của HomeScreen
+                    onPatientTap: _openProcedureRoomActions,
+                  )
+                // Khoa thường → DepartmentPatientPage
+                : DepartmentPatientPage(
+                    key: _departmentKey,
+                    department: _departments[_currentDeptIndex],
+                    searchQuery: _searchQuery,
+                    // v2.81.0: Bỏ roomFilter
+                    roomFilter: null,
+                    // v3.0.42: Filter TREATMENT_TYPE_NAME
+                    treatmentTypeFilter: _treatmentTypeFilter,
+                    // v3.0.75: Date range từ TrDateFilter (HIS Pro style)
+                    dateFrom: _dateFrom,
+                    dateTo: _dateTo,
+                    selectedPatientId: _selectedPatient?['ID'] as int?,
+                    onPatientTap: _openActions,
+                    onPatientSelect: (p) => setState(() => _selectedPatient = p),
+                  ),
           ),
         ],
       ),
       floatingActionButton: null,
+    );
+  }
+
+  /// v3.0.116: Mở sheet thao tác RIÊNG cho phòng thủ thuật (chỉ có Thực hiện ECG)
+  /// Khác với _openActions (dùng PatientActionsSheet chung với 4 mục)
+  void _openProcedureRoomActions(Map<String, dynamic> patient, Map<String, dynamic> serviceReq) {
+    setState(() => _selectedPatient = null);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      isScrollControlled: true,
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.70,
+      ),
+      builder: (_) => ProcedureRoomActionsSheet(
+        patient: patient,
+        serviceReq: serviceReq,
+        onECGSaved: () {
+          // Khi lưu ECG xong → refresh danh sách procedure room
+          setState(() {});
+        },
+      ),
     );
   }
 

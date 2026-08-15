@@ -80,22 +80,23 @@ class _DeptPickerDialogState extends State<DeptPickerDialog> {
           ),
         ),
 
-        // v3.0.103: Card nổi bật "Phòng TT Khoa Cấp Cứu" ở trên cùng - không thể bỏ sót
+        // v3.0.103: Card nổi bật "Phòng thử thuật HSCC" ở trên cùng - không thể bỏ sót
+        // v3.0.116: Port từ v3.1.13 - return index 9999
         InkWell(
           onTap: () {
-            // Return special index 99001 (Phòng TT KCC id)
-            Navigator.pop(context, 99001);
+            // Return special index 9999 (Phòng thử thuật HSCC id)
+            Navigator.pop(context, 9999);
           },
           child: Container(
             margin: const EdgeInsets.fromLTRB(8, 8, 8, 4),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFFB71C1C), Color(0xFFD32F2F)],
+                colors: [Color(0xFF6A1B9A), Color(0xFF4A148C)],
               ),
               borderRadius: BorderRadius.circular(10),
               boxShadow: [
-                BoxShadow(color: Colors.red.shade200, blurRadius: 6, offset: const Offset(0, 2)),
+                BoxShadow(color: Colors.purple.shade200, blurRadius: 6, offset: const Offset(0, 2)),
               ],
             ),
             child: Row(
@@ -103,17 +104,17 @@ class _DeptPickerDialogState extends State<DeptPickerDialog> {
                 Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(color: Colors.white24, shape: BoxShape.circle),
-                  child: const Icon(Icons.medical_services, color: Colors.white, size: 24),
+                  child: const Icon(Icons.flash_on, color: Colors.white, size: 24),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('PHÒNG THỦ THUẬT HSCC',
+                      const Text('PHÒNG THỬ THUẬT HSCC',
                           style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 2),
-                      Text('📋 Danh sách BN + điện tim (ECG) - 3 nguồn API',
+                      Text('📋 Danh sách BN + ECG - 3 nguồn API + Thực hiện',
                           style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 11)),
                     ],
                   ),

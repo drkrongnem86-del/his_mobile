@@ -172,6 +172,7 @@ class DataService {
   String? get accessToken => _accessToken;
   DataUser? get user => _user;
   bool get isAuthenticated => _accessToken != null && _user != null;
+  String? get email => _user?.email;
   String? get loginName => _user?.loginName;
   String? get userName => _user?.userName;
   String? get userId => _user?.id;
@@ -726,6 +727,38 @@ class DataService {
     } catch (e) {
       debugPrint('downloadDocument error: $e');
       return null;
+    }
+  }
+
+  /// v3.0.116: Tra cứu nhanh BN theo mã điều trị (15 số)
+  /// Dùng khi cả 3 API (HIS Pro/Data/Public) đều chết
+  /// - Gọi Data 3000 `/v1/medical-record/document-types?treatmentCode=...` (works qua internet)
+  /// - User nhập mã điều trị (15 số) từ HIS Desktop → xem BN + danh sách phiếu EMR
+  /// - Trả về {patient: {...}, documents: [...], treatmentCode: ...}
+  Future<Map<String, dynamic>?> quickLookupByTreatmentCode(String treatmentCode) async {
+    try {
+      if (!isAuthenticated) {
+        return {'error': 'Chưa đăng nhập Data API'};
+      }
+      final dio = _makeDio();
+      final r = await dio.get(
+        '/v1/medical-record/document-types',
+        queryParameters: {'treatmentCode': treatmentCode},
+        options: Options(receiveTimeout: const Duration(seconds: 30)),
+      );
+      if (r.statusCode != 200) {
+        return {'error': 'HTTP ${r.statusCode}'};
+      }
+      final data = r.data is Map ? r.data as Map : {};
+      // Response structure: {patient: {...}, documents: [{name, type, isSigned, hisCode, serviceReqCode, ...}], treatmentCode}
+      return {
+        'patient': data['patient'] as Map<String, dynamic>?,
+        'documents': (data['documents'] as List?) ?? [],
+        'treatmentCode': treatmentCode,
+      };
+    } catch (e) {
+      debugPrint('quickLookupByTreatmentCode error: $e');
+      return {'error': e.toString()};
     }
   }
 }
