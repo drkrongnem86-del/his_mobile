@@ -113,11 +113,14 @@ jobs:
   # ============================================================
   # iOS - IPA (cho TestFlight / App Store / Ad-hoc)
   # v3.0.112: Thêm job build IPA song song với Android
+  # v3.0.113: continue-on-error: true - IPA fail không block Create Release
+  #            (iOS thiếu Apple certs, build sẽ fail cho đến khi add certs vào secrets)
   # ============================================================
   build-ipa:
-    name: 🍎 Build IPA (iOS - macOS runner)
+    name: 🍎 Build IPA (iOS - macOS runner) - optional
     runs-on: macos-latest
     timeout-minutes: 60
+    continue-on-error: true  # KHÔNG block Create Release khi iOS thiếu certs
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
@@ -185,7 +188,9 @@ jobs:
   # ============================================================
   create-release:
     name: 🚀 Create GitHub Release
-    needs: [build-apk, build-aab, build-ipa]
+    # v3.0.113: Bỏ build-ipa khỏi needs - IPA fail không block Create Release
+    #            (iOS chưa có certs, IPA sẽ optional)
+    needs: [build-apk, build-aab]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:

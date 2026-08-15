@@ -1,5 +1,5 @@
 ﻿{
-  "version": "3.0.112",
-  "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.112/his_mobile_v3.0.112_arm64.apk",
-  "message": "Them job build-ipa cho iOS trong GitHub Actions workflow"
+  "version": "3.0.113",
+  "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.113/his_mobile_v3.0.113_arm64.apk",
+  "message": "Fix auto-update: workflow iOS job thanh optional, khong block Create Release"
 }
