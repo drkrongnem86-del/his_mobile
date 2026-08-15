@@ -185,13 +185,16 @@ class UpdateService {
 
     // Bước 1: Tải APK
     try {
-      // v3.0.99: dùng getApplicationDocumentsDirectory() - app's own storage
-      // Đường dẫn: /data/data/<pkg>/app_flutter/ (always writable, no permission)
-      final docsDir = await getApplicationDocumentsDirectory();
-      if (!await docsDir.exists()) {
-        await docsDir.create(recursive: true);
+      // v3.0.114: dùng getApplicationSupportDirectory() thay vì getApplicationDocumentsDirectory()
+      // - getApplicationDocumentsDirectory() trả về /data/data/<pkg>/app_flutter/ (Flutter 3.x+)
+      //   path này KHÔNG được FileProvider cover (chỉ cover /data/data/<pkg>/files/ + cache)
+      // - getApplicationSupportDirectory() trả về /data/data/<pkg>/files/ (covered by <files-path>)
+      // → FileProvider.getUriForFile() sẽ work
+      final supportDir = await getApplicationSupportDirectory();
+      if (!await supportDir.exists()) {
+        await supportDir.create(recursive: true);
       }
-      apkPath = '${docsDir.path}/HIS_MOBILE_v${info.newVersion}.apk';
+      apkPath = '${supportDir.path}/HIS_MOBILE_v${info.newVersion}.apk';
 
       // Xóa file cũ nếu có
       final oldFile = File(apkPath);

@@ -1,5 +1,5 @@
 ﻿{
-  "version": "3.0.113",
-  "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.113/his_mobile_v3.0.113_arm64.apk",
-  "message": "Fix auto-update: workflow iOS job thanh optional, khong block Create Release"
+  "version": "3.0.114",
+  "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.114/his_mobile_v3.0.114_arm64.apk",
+  "message": "Fix FileProvider: luu APK vao getApplicationSupportDirectory (covered by <files-path>)"
 }
