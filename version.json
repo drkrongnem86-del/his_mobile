@@ -1,5 +1,5 @@
 {
-  "version": "3.0.119",
-  "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.119/his_mobile_v3.0.119_arm64.apk",
-  "message": "Fix Update version.json workflow + revert room 22->36 + setup release keystore cho auto-update"
+  "version": "3.0.120",
+  "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.120/his_mobile_v3.0.120_arm64.apk",
+  "message": "Fix Update version.json workflow - bỏ if: secrets.X (GitHub cấm) → dùng continue-on-error + runtime check; PTTT HSCC room 36 (HIS Desktop 78 BN / Data 70 BN)"
 }

@@ -123,3 +123,7 @@ lib/presentation/screens/_*.dart
 lib/presentation/screens/_*.bak
 lib/**/_*.dart
 lib/**/_*.bak
+# v3.0.118: Android release keystore (KHONG commit - bao mat)
+android/app/*.jks
+android/app/*.keystore
+
