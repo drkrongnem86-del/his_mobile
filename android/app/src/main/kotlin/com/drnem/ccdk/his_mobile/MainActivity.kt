@@ -80,10 +80,27 @@ class MainActivity : FlutterActivity() {
                             }
                             val intent = Intent(Intent.ACTION_VIEW).apply {
                                 setDataAndType(apkUri, "application/vnd.android.package-archive")
+                                // v3.0.121: Thêm FLAG_ACTIVITY_CLEAR_TASK để install dialog
+                                // chạy trong task riêng, không bị conflict với app cũ
                                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or
-                                        Intent.FLAG_GRANT_READ_URI_PERMISSION
+                                        Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                                        Intent.FLAG_ACTIVITY_CLEAR_TASK
                             }
+                            // v3.0.121: Fix lỗi "App not installed" khi tự cập nhật
+                            // Android PackageInstaller yêu cầu app cũ phải TẮT HẲN (process killed)
+                            // trước khi cho cài đè. Nếu app cũ vẫn còn foreground/background process,
+                            // OS sẽ báo "App not installed" dù signature khớp.
+                            //
+                            // Flow:
+                            // 1. finishAndRemoveTask() - đóng activity, xóa khỏi recents
+                            // 2. startActivity(install intent) - mở install permission dialog
+                            // 3. postDelayed kill process 800ms - đợi install dialog start xong rồi kill
+                            //    → user grant permission + tap Cập nhật → process cũ đã chết → install OK
+                            finishAndRemoveTask()
                             startActivity(intent)
+                            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                                android.os.Process.killProcess(android.os.Process.myPid())
+                            }, 800)
                             result.success(true)
                         } catch (e: Exception) {
                             result.error("INSTALL_FAILED", e.message, e.stackTrace.toString())
