@@ -1,5 +1,5 @@
 {
-  "version": "3.0.117",
-  "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.117/his_mobile_v3.0.117_arm64.apk",
-  "message": "Phong thu thuat HSCC: doi executeRoomId 39 -> 36 (PKCC - HIS Desktop filter that tra 78 BN)"
+  "version": "3.0.118",
+  "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.118/his_mobile_v3.0.118_arm64.apk",
+  "message": "Fix ten BN that (field mapping HOTENBN) + stable release keystore (cai de len ban cu) + room id 22"
 }

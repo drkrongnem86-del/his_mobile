@@ -1046,30 +1046,34 @@ class HisApiService {
       final list = <Map<String, dynamic>>[];
       for (final raw in items) {
         if (raw is Map) {
+          // v3.0.118: Fix tên BN thật từ Data 3000 (trước dùng 'patient_name' sai - thực tế là 'HOTENBN' / 'VIR_PATIENT_NAME' / 'tdl_patient_name')
+          final patientName = (raw['HOTENBN'] ?? raw['hotenbn'] ?? raw['VIR_PATIENT_NAME'] ?? raw['vir_patient_name']
+              ?? raw['TDL_PATIENT_NAME'] ?? raw['tdl_patient_name'] ?? raw['TEN_BENH_NHAN'] ?? raw['ten_benh_nhan'] ?? '').toString();
+          final patientNameUnsigned = (raw['HOTENBN'] ?? raw['hotenbn'] ?? raw['TDL_PATIENT_UNSIGNED_NAME'] ?? raw['TEN_BENH_NHAN'] ?? '').toString();
           list.add({
             'ID': raw['treatment_code'] ?? raw['TREATMENT_CODE'] ?? raw['id'],
-            'TDL_TREATMENT_CODE': raw['treatment_code'] ?? raw['TREATMENT_CODE'],
-            'TDL_PATIENT_CODE': raw['patient_code'] ?? raw['PATIENT_CODE'] ?? raw['tdl_patient_code'],
-            'TDL_PATIENT_UNSIGNED_NAME': raw['patient_name_unsigned'] ?? raw['PATIENT_NAME_UNSIGNED'] ?? '',
-            'TDL_PATIENT_NAME': raw['patient_name'] ?? raw['PATIENT_NAME'] ?? raw['tdl_patient_name'],
-            'TDL_PATIENT_DOB': raw['dob'] ?? raw['DOB'] ?? raw['tdl_patient_dob'],
-            'TDL_PATIENT_ADDRESS': raw['address'] ?? raw['ADDRESS'] ?? raw['tdl_patient_address'],
+            'TDL_TREATMENT_CODE': raw['treatment_code'] ?? raw['TREATMENT_CODE'] ?? raw['MADT'],
+            'TDL_PATIENT_CODE': raw['patient_code'] ?? raw['PATIENT_CODE'] ?? raw['tdl_patient_code'] ?? raw['MABN'],
+            'TDL_PATIENT_UNSIGNED_NAME': patientNameUnsigned,
+            'TDL_PATIENT_NAME': patientName,
+            'TDL_PATIENT_DOB': raw['dob'] ?? raw['DOB'] ?? raw['tdl_patient_dob'] ?? raw['NGAYSINH'],
+            'TDL_PATIENT_ADDRESS': raw['address'] ?? raw['ADDRESS'] ?? raw['tdl_patient_address'] ?? raw['DIACHI'],
             'TDL_PATIENT_PHONE': raw['phone'] ?? raw['PHONE'] ?? raw['tdl_patient_phone'],
-            'TDL_HEIN_CARD_NUMBER': raw['hein_card_number'] ?? raw['HEIN_CARD_NUMBER'],
+            'TDL_HEIN_CARD_NUMBER': raw['hein_card_number'] ?? raw['HEIN_CARD_NUMBER'] ?? raw['BHYT'],
             'TREATMENT_TYPE_NAME': raw['treatment_type_name'] ?? raw['TREATMENT_TYPE_NAME'],
             'PATIENT_TYPE_NAME': raw['patient_type_name'] ?? raw['PATIENT_TYPE_NAME'],
-            'IN_TIME': raw['in_time'] ?? raw['IN_TIME'],
+            'IN_TIME': raw['in_time'] ?? raw['IN_TIME'] ?? raw['ADD_TIME'],
             'OUT_TIME': raw['out_time'] ?? raw['OUT_TIME'],
-            'DEPARTMENT_NAME': raw['department_name'] ?? raw['DEPARTMENT_NAME'] ?? raw['last_department'],
+            'DEPARTMENT_NAME': raw['department_name'] ?? raw['DEPARTMENT_NAME'] ?? raw['last_department'] ?? raw['MAKHOA'],
             'IS_BHYT': (raw['patient_type_name'] ?? raw['PATIENT_TYPE_NAME'] ?? '').toString().contains('BHYT'),
-            'BED_NAME': raw['bed_name'] ?? raw['BED_NAME'],
+            'BED_NAME': raw['bed_name'] ?? raw['BED_NAME'] ?? raw['TENBUONGBENH'],
             'SERVICE_REQ_CODE': raw['service_req_code'] ?? raw['SERVICE_REQ_CODE'],
             'SERVICE_NAME': raw['service_name'] ?? raw['SERVICE_NAME'],
             'SERVICE_REQ_STT_ID': raw['service_req_stt_id'] ?? raw['SERVICE_REQ_STT_ID'] ?? 1,
             'SERVICE_REQ_STT_NAME': raw['service_req_stt_name'] ?? raw['SERVICE_REQ_STT_NAME'] ?? '',
             'PRIORITY': raw['priority'] ?? raw['PRIORITY'] ?? 0,
             'ICD_CODE': raw['icd_code'] ?? raw['ICD_CODE'],
-            'ICD_NAME': raw['icd_name'] ?? raw['ICD_NAME'],
+            'ICD_NAME': raw['icd_name'] ?? raw['ICD_NAME'] ?? raw['ICD_TEXT'],
             'INTRUCTION_TIME': raw['intruction_time'] ?? raw['INTRUCTION_TIME'],
             '_DATA_SOURCE': 'DATA_3000_BED_$roomId',
           });
