@@ -1,0 +1,11 @@
+v3.0.111
+
+Tinh nang chinh:
+- Auto-check version.json khi mo app (sau 5s) -> dialog thong bao
+- Them PTTT_HSCC screen (3 nguon API: Public 8080, HIS Pro 1408, Y Te So 3000)
+- HIS Pro filter EXECUTE_ROOM_ID=36 + status [1,2,3] (match HIS Desktop)
+- Native: canRequestPackageInstalls + openInstallPermissionSettings (Android 8+)
+
+Bug fix:
+- Revert ROOM_ID 39 -> 36 (HIS Pro thuc te dung 36)
+- Fix YTeSoService singleton

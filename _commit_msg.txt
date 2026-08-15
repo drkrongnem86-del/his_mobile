@@ -1,0 +1,13 @@
+v3.0.112: Them job build-ipa cho iOS trong GitHub Actions workflow
+
+- Them job build-ipa (runs-on: macos-latest)
+- Build iOS IPA khong can code signing (no-codesign)
+- Tao IPA tu Runner.app bang zip
+- Upload artifact his-mobile-ipa
+- create-release job dinh kem IPA vao GitHub Release
+- iOS artifact optional (continue-on-error) neu khong co Apple certs
+
+De build iOS that su:
+- Can Apple Developer Program
+- Them secrets: APPLE_CERTIFICATE_BASE64, APPLE_CERTIFICATE_PASSWORD, APPLE_PROVISIONING_PROFILE_BASE64
+- Sua step 'Build IPA' de dung --export-method thich hop

@@ -111,12 +111,81 @@ jobs:
           retention-days: 90
 
   # ============================================================
+  # iOS - IPA (cho TestFlight / App Store / Ad-hoc)
+  # v3.0.112: Thêm job build IPA song song với Android
+  # ============================================================
+  build-ipa:
+    name: 🍎 Build IPA (iOS - macOS runner)
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🔧 Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: 🐦 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: 📦 Get dependencies
+        run: flutter pub get
+
+      # v3.0.112: Chọn iOS deployment target trong Podfile nếu cần
+      - name: 🍎 Set iOS deployment target
+        run: |
+          cd ios
+          # iOS 13+ (mặc định Flutter 3.x)
+          if [ -f "Podfile" ]; then
+            sed -i '' 's/# platform :ios, .*/platform :ios, "13.0"/' Podfile || true
+            echo "✅ Podfile updated"
+          fi
+
+      - name: 📦 Install CocoaPods
+        run: |
+          cd ios
+          pod install --repo-update
+        env:
+          # Tăng timeout cho pod install
+          LC_ALL: en_US.UTF-8
+
+      - name: 🏗️ Build IPA (no-codesign)
+        # v3.0.112: Build KHÔNG cần code signing để workflow chạy được
+        # Để cài được lên iPhone, cần thêm Apple Developer certs vào secrets
+        # xem: https://docs.fastlane.tools/codesigning/guides/
+        run: |
+          flutter build ios --release --no-codesign --export-method=development
+          # Tạo IPA từ Runner.app
+          cd build/ios/iphoneos
+          mkdir -p Payload
+          cp -r Runner.app Payload/
+          zip -r "Runner.ipa" Payload
+          ls -la Runner.ipa
+
+      - name: 📤 Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: his-mobile-ipa
+          path: build/ios/iphoneos/Runner.ipa
+          if-no-files-found: warn  # Không fail nếu IPA build lỗi (iOS chưa có certs)
+          retention-days: 90
+
+  # ============================================================
   # GITHUB RELEASE - tạo release tự động khi push tag
-  # Bao gồm: APK arm64 (rename) + AAB
+  # Bao gồm: APK arm64 (rename) + AAB + IPA
   # ============================================================
   create-release:
     name: 🚀 Create GitHub Release
-    needs: [build-apk, build-aab]
+    needs: [build-apk, build-aab, build-ipa]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
@@ -126,9 +195,18 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+          continue-on-error: true  # iOS artifact có thể không có (no certs)
 
       - name: 📋 List artifacts
-        run: ls -la artifacts/*/
+        run: |
+          echo "=== Artifacts downloaded ==="
+          ls -la artifacts/ 2>/dev/null || echo "No artifacts dir"
+          for d in artifacts/*/; do
+            if [ -d "$d" ]; then
+              echo "--- $d ---"
+              ls -la "$d"
+            fi
+          done
 
       - name: 🏷️ Rename APK theo version
         # Đổi tên app-arm64-v8a-release.apk → his_mobile_v{version}_arm64.apk
@@ -136,10 +214,29 @@ jobs:
         env:
           TAG_NAME: ${{ github.ref_name }}
         run: |
-          cd artifacts/his-mobile-apk-arm64/
+          cd artifacts/his-mobile-apk-arm64/ 2>/dev/null || {
+            echo "❌ APK artifact not found - skipping rename"
+            exit 0
+          }
           VERSION="${TAG_NAME#v}"
-          mv -v app-arm64-v8a-release.apk "his_mobile_v${VERSION}_arm64.apk"
-          ls -la
+          mv -v app-arm64-v8a-release.apk "his_mobile_v${VERSION}_arm64.apk" 2>/dev/null || true
+          ls -la 2>/dev/null || true
+
+      - name: 🏷️ Rename IPA theo version
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          cd artifacts/his-mobile-ipa/ 2>/dev/null || {
+            echo "❌ IPA artifact not found (iOS build có thể đã skip) - skipping"
+            exit 0
+          }
+          VERSION="${TAG_NAME#v}"
+          if [ -f "Runner.ipa" ]; then
+            mv -v Runner.ipa "his_mobile_v${VERSION}.ipa" 2>/dev/null || true
+            ls -la 2>/dev/null
+          else
+            echo "❌ Runner.ipa not found"
+          fi
 
       - name: 🚀 Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -151,6 +248,7 @@ jobs:
           files: |
             artifacts/his-mobile-apk-arm64/his_mobile_${{ github.ref_name }}_arm64.apk
             artifacts/his-mobile-aab/app-release.aab
+            artifacts/his-mobile-ipa/his_mobile_${{ github.ref_name }}.ipa
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
