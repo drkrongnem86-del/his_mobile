@@ -14,6 +14,7 @@ import 'package:his_mobile/presentation/screens/eric_calculators.dart';
 import 'package:his_mobile/presentation/screens/catalog_browser_screen.dart';
 import 'package:his_mobile/presentation/widgets/local_patient_search_field.dart';
 import 'package:his_mobile/presentation/widgets/user_header.dart';
+import 'package:his_mobile/presentation/screens/phong_thu_thuat_hscc_screen.dart';
 
 class TienIchScreen extends StatelessWidget {
   const TienIchScreen({super.key});
@@ -79,6 +80,10 @@ class TienIchScreen extends StatelessWidget {
 
   Widget _buildGrid(BuildContext context) {
     final items = <_TI>[
+      // v3.0.115: Phòng thủ thuật HSCC - nổi bật ở đầu tiện ích
+      _TI('P. TT HSCC', Icons.medical_services, const Color(0xFFB71C1C), () {
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const PhongThuThuatHsccScreen()));
+      }),
       _TI('QR BN', Icons.qr_code_scanner, const Color(0xFF00838F), () {
         Navigator.push(context, MaterialPageRoute(builder: (_) => const QrScannerScreen()));
       }),

@@ -588,6 +588,27 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   const Divider(height: 16),
 
+                  // v3.0.115: Phòng thủ thuật HSCC (mở từ Drawer - shortcut)
+                  _drawerItem(
+                    icon: Icons.medical_services,
+                    color: const Color(0xFFB71C1C),
+                    title: 'Phòng thủ thuật HSCC',
+                    subtitle: 'Danh sách BN + ECG (3 nguồn API)',
+                    onTap: () {
+                      context.safePop();
+                      Future.delayed(const Duration(milliseconds: 100), () {
+                        if (mounted) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (_) => const PhongThuThuatHsccScreen()),
+                          );
+                        }
+                      });
+                    },
+                  ),
+
+                  const Divider(height: 16),
+
                   // v2.81.0: Bỏ mục 'Bệnh nhân' trong Drawer (giống bottom nav)
                   _drawerItem(
                     icon: Icons.bar_chart,

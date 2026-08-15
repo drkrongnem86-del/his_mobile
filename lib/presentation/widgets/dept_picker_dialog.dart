@@ -110,10 +110,10 @@ class _DeptPickerDialogState extends State<DeptPickerDialog> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('PHÒNG TT KHOA CẤP CỨU',
+                      const Text('PHÒNG THỦ THUẬT HSCC',
                           style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 2),
-                      Text('📋 Danh sách BN + điện tim (ECG)',
+                      Text('📋 Danh sách BN + điện tim (ECG) - 3 nguồn API',
                           style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 11)),
                     ],
                   ),
