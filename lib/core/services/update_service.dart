@@ -80,6 +80,7 @@ class UpdateService {
   }
 
   /// Hiện dialog thông báo có bản mới
+  /// v3.0.122: 3 nút - HỦY / TẢI VỀ (lưu vào Download public, user tự cài) / ĐỒNG Ý (auto install)
   static void showUpdateDialog(BuildContext context, UpdateInfo info) {
     showDialog(
       context: context,
@@ -119,15 +120,25 @@ class UpdateService {
             ),
             const SizedBox(height: 4),
             const Text(
-              '📥 APK tải về bộ nhớ trong của app. Sau khi tải xong, hệ thống sẽ tự mở installer - bấm "Cài đặt" để hoàn tất.',
+              '📲 ĐỒNG Ý: app tự cài đè. TẢI VỀ: lưu APK vào Download/HisMobile, mở File Manager cài thủ công.',
               style: TextStyle(fontSize: 11, color: Colors.black54, height: 1.4),
             ),
           ],
         ),
         actions: [
+          // v3.0.122: Layout responsive - nếu hẹp dùng Wrap, rộng dùng OverflowBar
+          // Thêm TẢI VỀ ở giữa (màu cam) - lưu vào Download public
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('HỦY'),
+          ),
+          TextButton.icon(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _downloadToPublicDownloads(context, info);
+            },
+            icon: const Icon(Icons.file_download, size: 16, color: Color(0xFFE65100)),
+            label: const Text('TẢI VỀ', style: TextStyle(color: Color(0xFFE65100))),
           ),
           FilledButton.icon(
             onPressed: () {
@@ -140,6 +151,125 @@ class UpdateService {
         ],
       ),
     );
+  }
+
+  /// v3.0.122: Tải APK về thư mục Download public (Download/HisMobile/) để user tự cài
+  /// - Android 10+: dùng MediaStore.Downloads (qua MethodChannel 'saveApkToDownloads')
+  /// - User mở File Manager, tap file APK để cài
+  /// - Ưu điểm: app KHÔNG cần chạy khi user cài → tránh "App not installed"
+  static Future<void> _downloadToPublicDownloads(BuildContext context, UpdateInfo info) async {
+    final messenger = ScaffoldMessenger.of(context);
+
+    String? internalPath;
+    bool downloadOk = false;
+    String? downloadError;
+    double progress = 0;
+
+    // Hiện progress dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => StatefulBuilder(builder: (ctx, setSt) {
+        return AlertDialog(
+          title: Text('Đang tải v${info.newVersion} về Download…'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              LinearProgressIndicator(value: progress > 0 ? progress : null),
+              const SizedBox(height: 12),
+              Text(
+                progress > 0
+                    ? '${(progress * 100).toStringAsFixed(0)}% • v${info.newVersion}'
+                    : 'Đang kết nối GitHub...',
+                style: const TextStyle(fontSize: 13),
+              ),
+            ],
+          ),
+        );
+      }),
+    );
+
+    // Bước 1: Download APK về internal storage (giống _downloadAndInstall)
+    try {
+      final supportDir = await getApplicationSupportDirectory();
+      if (!await supportDir.exists()) {
+        await supportDir.create(recursive: true);
+      }
+      internalPath = '${supportDir.path}/HIS_MOBILE_v${info.newVersion}.apk';
+
+      final oldFile = File(internalPath);
+      if (await oldFile.exists()) {
+        try { await oldFile.delete(); } catch (_) {}
+      }
+
+      await Dio().download(
+        info.apkUrl,
+        internalPath,
+        onReceiveProgress: (received, total) {
+          if (total > 0) progress = received / total;
+        },
+      );
+      downloadOk = true;
+    } catch (e) {
+      downloadError = e.toString();
+    }
+
+    // Đóng progress dialog
+    final nav = Navigator.of(context);
+    if (nav.canPop()) {
+      try { nav.pop(); } catch (_) {}
+    }
+
+    if (!downloadOk) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('❌ Tải APK lỗi: ${downloadError ?? "unknown"}'),
+          backgroundColor: const Color(0xFFC62828),
+          duration: const Duration(seconds: 6),
+        ),
+      );
+      return;
+    }
+
+    // Bước 2: Gọi native copy file từ internal → public Downloads
+    try {
+      const platform = MethodChannel(_installerChannel);
+      final displayName = 'HIS_MOBILE_v${info.newVersion}.apk';
+      final res = await platform.invokeMethod('saveApkToDownloads', {
+        'path': internalPath,
+        'displayName': displayName,
+      });
+      debugPrint('saveApkToDownloads result: $res');
+      final path = (res is Map) ? (res['path'] as String? ?? 'Download/HisMobile/') : 'Download/HisMobile/';
+      final sizeBytes = (res is Map) ? (res['size'] as int? ?? 0) : 0;
+      final sizeStr = sizeBytes > 0 ? '${(sizeBytes / 1024 / 1024).toStringAsFixed(1)} MB' : '';
+      messenger.showSnackBar(
+        SnackBar(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('✅ Đã lưu APK vào thư mục Download', style: TextStyle(fontWeight: FontWeight.bold)),
+              Text('📁 $path', style: const TextStyle(fontSize: 11)),
+              if (sizeStr.isNotEmpty) Text('📦 $sizeStr', style: const TextStyle(fontSize: 11)),
+              const SizedBox(height: 4),
+              const Text('Mở File Manager → Download/HisMobile → tap file để cài', style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic)),
+            ],
+          ),
+          backgroundColor: const Color(0xFFE65100),
+          duration: const Duration(seconds: 8),
+        ),
+      );
+    } catch (e) {
+      debugPrint('saveApkToDownloads error: $e');
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('❌ Lưu vào Download lỗi: $e'),
+          backgroundColor: const Color(0xFFC62828),
+          duration: const Duration(seconds: 6),
+        ),
+      );
+    }
   }
 
   /// Tải APK về app's documents directory rồi gọi native install
