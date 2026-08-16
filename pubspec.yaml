@@ -1,7 +1,7 @@
 ﻿name: his_mobile
 description: "HIS Pro Mobile - Khoa Cap Cuu"
 publish_to: 'none'
-version: 3.0.135+279
+version: 3.0.136+280
 environment:
   sdk: ^3.11.5
 

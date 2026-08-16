@@ -525,18 +525,22 @@ class _PhieuTuChoiScreenState extends State<PhieuTuChoiScreen> {
 
   Future<void> _showDatePicker() async {
     final now = DateTime.now();
+    final initialDate = DateTime(
+      _selectedYear ?? now.year,
+      _selectedMonth ?? now.month,
+      _selectedDay ?? now.day,
+    );
+    // Capture mounted state BEFORE await
+    final isMounted = mounted;
+
     final picked = await showDatePicker(
       context: context,
-      initialDate: DateTime(
-        _selectedYear ?? now.year,
-        _selectedMonth ?? now.month,
-        _selectedDay ?? now.day,
-      ),
+      initialDate: initialDate,
       firstDate: DateTime(2020),
       lastDate: DateTime(2100),
       locale: const Locale('vi', 'VN'),
     );
-    if (picked != null && mounted) {
+    if (picked != null && isMounted) {
       setState(() {
         _selectedDay = picked.day;
         _selectedMonth = picked.month;
@@ -599,12 +603,12 @@ class _PhieuTuChoiScreenState extends State<PhieuTuChoiScreen> {
   Future<void> _ensurePdfFonts() async {
     if (_pdfFont != null) return;
     try {
-      final fontData = await rootBundle.load('assets/fonts/arial.ttf');
-      final boldData = await rootBundle.load('assets/fonts/arialbd.ttf');
+      final fontData = await rootBundle.load('assets/fonts/times.ttf');
+      final boldData = await rootBundle.load('assets/fonts/timesbd.ttf');
       _pdfFont = pw.Font.ttf(fontData.buffer.asByteData()!);
       _pdfFontBold = pw.Font.ttf(boldData.buffer.asByteData()!);
     } catch (e) {
-      debugPrint('Failed to load Arial font: $e');
+      debugPrint('Failed to load Times New Roman font: $e');
       _pdfFont = pw.Font.helvetica();
       _pdfFontBold = pw.Font.helveticaBold();
     }

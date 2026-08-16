@@ -743,12 +743,12 @@ class _PhieuBanGiaoScreenState extends State<PhieuBanGiaoScreen> {
   Future<void> _ensurePdfFonts() async {
     if (_pdfFont != null) return;
     try {
-      final fontData = await rootBundle.load('assets/fonts/arial.ttf');
-      final boldData = await rootBundle.load('assets/fonts/arialbd.ttf');
+      final fontData = await rootBundle.load('assets/fonts/times.ttf');
+      final boldData = await rootBundle.load('assets/fonts/timesbd.ttf');
       _pdfFont = pw.Font.ttf(fontData.buffer.asByteData()!);
       _pdfFontBold = pw.Font.ttf(boldData.buffer.asByteData()!);
     } catch (e) {
-      debugPrint('Failed to load Arial font: $e');
+      debugPrint('Failed to load Times New Roman font: $e');
       _pdfFont = pw.Font.helvetica();
       _pdfFontBold = pw.Font.helveticaBold();
     }
