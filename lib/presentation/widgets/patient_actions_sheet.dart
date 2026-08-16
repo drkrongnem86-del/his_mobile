@@ -16,10 +16,15 @@
 // v3.0.79: Thêm tile "Đính kèm tài liệu" - mở AttachDocumentScreen
 //   - Gọi api/EmrDocument/CreateWithFile (port 1417) để upload ảnh/file lên EMR BN
 //   - Workflow giống HIS desktop "Chi tiết BA → Đính kèm" (theo note2.docx)
+// v3.0.131: Thêm tile "Phiếu phẫu thuật" - mở PhieuPhauThuatScreen
+//   - Form Word-style (mẫu MS: 01/BV2) cho giấy cam kết chấp thuận PT/TT/GMHS
+//   - Text fields đỏ editable + checkboxes ☐/☒ + signature
+//   - Lưu local PDF + sync EMR (placeholder endpoint, user tự thêm sau)
 import 'package:flutter/material.dart';
 import 'package:his_mobile/data/models/y_te_so_feature.dart';
 import 'package:his_mobile/data/models/y_te_so_router.dart';
 import 'package:his_mobile/presentation/screens/attach_document_screen.dart';
+import 'package:his_mobile/presentation/screens/phieu_phau_thuat_screen.dart';
 import 'package:his_mobile/presentation/screens/treatment_history_screen.dart';
 // v3.0.90: BỎ import y_te_screen.dart - menu Chức năng Y tế đã xóa
 import 'package:his_mobile/presentation/screens/y_te_so_screen.dart';
@@ -76,6 +81,13 @@ class PatientActionsSheet extends StatelessWidget {
     }
     Navigator.push(context, MaterialPageRoute(
       builder: (_) => AttachDocumentScreen(patient: patient),
+    ));
+  }
+
+  /// v3.0.131: Mở form Phiếu phẫu thuật (Cam kết chấp thuận PT/TT/GMHS)
+  void _openPhieuPhauThuat(BuildContext context) {
+    Navigator.push(context, MaterialPageRoute(
+      builder: (_) => PhieuPhauThuatScreen(patient: patient, department: department),
     ));
   }
 
@@ -233,6 +245,9 @@ class PatientActionsSheet extends StatelessWidget {
 
               // v3.0.79: TILE 1d: Đính kèm tài liệu (EMR upload)
               _dinhKemTaiLieuTile(context),
+
+              // v3.0.131: TILE 1e: Phiếu phẫu thuật (Cam kết chấp thuận PT/TT/GMHS)
+              _phieuPhauThuatTile(context),
 
               // === GRID TILE: Y TẾ SỐ (Bộ Y tế) - 15 chức năng ===
               _sectionHeader('Y TẾ SỐ (BỘ Y TẾ)', Icons.health_and_safety, const Color(0xFF00838F), '15 chức năng'),
@@ -494,6 +509,63 @@ class PatientActionsSheet extends StatelessWidget {
               ),
             ])),
             Icon(Icons.chevron_right, color: color1.withOpacity(0.5), size: 20),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  /// v3.0.131: Phiếu phẫu thuật (Cam kết chấp thuận PT/TT/GMHS)
+  /// Form Word-style với text fields đỏ editable + checkboxes ☐/☒ + signature
+  /// Lưu local PDF + sync EMR (placeholder endpoint)
+  Widget _phieuPhauThuatTile(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+      child: InkWell(
+        onTap: () => _openPhieuPhauThuat(context),
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFB71C1C), width: 1.5),
+          ),
+          padding: const EdgeInsets.all(10),
+          child: Row(children: [
+            Container(
+              width: 40, height: 40,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                    begin: Alignment.topLeft, end: Alignment.bottomRight,
+                    colors: [Color(0xFFB71C1C), Color(0xFF7F0000)]),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.medical_services, color: Colors.white, size: 22),
+            ),
+            const SizedBox(width: 10),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                const Expanded(
+                  child: Text('Phiếu phẫu thuật',
+                      style: TextStyle(
+                          color: Color(0xFFB71C1C), fontSize: 14, fontWeight: FontWeight.bold)),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                      color: const Color(0xFFB71C1C).withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(4)),
+                  child: const Text('MẪU 01/BV2',
+                      style: TextStyle(color: Color(0xFFB71C1C), fontSize: 9, fontWeight: FontWeight.bold)),
+                ),
+              ]),
+              const SizedBox(height: 2),
+              const Text(
+                'Giấy cam kết chấp thuận PT/TT/GMHS - Text đỏ editable, ☐/☒ checkboxes, ký tên → PDF',
+                style: TextStyle(color: Colors.black54, fontSize: 11, height: 1.3),
+              ),
+            ])),
+            const Icon(Icons.chevron_right, color: Color(0xFFB71C1C), size: 20),
           ]),
         ),
       ),
