@@ -1,5 +1,6 @@
-// PhieuPhauThuatScreen v3.0.132 - GIẤY CAM KẾT CHẤP THUẬN PHẪU THUẬT, THỦ THUẬT VÀ GÂY MÊ HỒI SỨC
-// Mẫu MS: 01/BV2 - Fix font tiếng Việt (Roboto TTF) + 3 chỗ ký + layout đúng mau.pdf
+// PhieuPhauThuatScreen v3.0.133 - GIẤY CAM KẾT CHẤP THUẬN PHẪU THUẬT, THỦ THUẬT VÀ GÂY MÊ HỒI SỨC
+// Mẫu MS: 01/BV2 - Fix font tiếng Việt (Roboto TTF) + 3 chỗ ký + EMR upload (giống Đính kèm tài liệu)
+// v3.0.133: 3 nút Hủy | Lưu | Lưu+Ký đúng pattern AttachDocumentScreen + EMR upload
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -9,15 +10,49 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:path/path.dart' as pathJoin;
 import 'package:signature/signature.dart';
 import 'package:printing/printing.dart';
+import 'package:his_mobile/data/api/attach_document_service.dart';
+import 'package:his_mobile/data/api/his_pro_api_service.dart';
+import 'package:his_mobile/data/local/scanned_forms_service.dart';
 
-/// v3.0.132: Form Phiếu phẫu thuật (Giấy cam kết chấp thuận PT/TT/GMHS)
+/// v3.0.133: Form Phiếu phẫu thuật (Giấy cam kết chấp thuận PT/TT/GMHS)
 /// Mẫu: MS 01/BV2 - SỞ Y TẾ TỈNH KHÁNH HÒA / BVĐK NINH THUẬN
-/// Changes v3.0.132:
+/// Changes v3.0.133:
 /// - Fix font Vietnamese (Roboto TTF from assets)
 /// - 3 chỗ ký (NB + Bác sỹ gây mê + Phẫu thuật viên)
-/// - Checkbox đồng ý/không đồng ý
-/// - Dòng ghi chú tay
-/// - Ngày tháng năm
+/// - Checkbox đồng ý/không đồng ý + dòng ghi chú tay + ngày tháng
+/// - 3 nút Hủy | Lưu | Lưu+Ký đúng pattern Đính kèm tài liệu
+/// - EMR upload qua AttachDocumentService (Lưu = unsigned, Lưu+Ký = signed)
+
+/// Document types cho EMR
+class EmrDocType {
+  final int id;
+  final String code;
+  final String name;
+  const EmrDocType({required this.id, required this.code, required this.name});
+
+  static const all = <EmrDocType>[
+    EmrDocType(id: 2, code: '02', name: 'Phiếu khám vào viện'),
+    EmrDocType(id: 3, code: '03', name: 'Đơn thuốc'),
+    EmrDocType(id: 4, code: '04', name: 'Chứng nhận PTTT'),
+    EmrDocType(id: 5, code: '05', name: 'Sơ kết 15 ngày điều trị'),
+    EmrDocType(id: 7, code: '07', name: 'Tờ điều trị'),
+    EmrDocType(id: 8, code: '08', name: 'Phiếu chăm sóc'),
+    EmrDocType(id: 9, code: '09', name: 'Phiếu truyền dịch'),
+    EmrDocType(id: 10, code: '10', name: 'Phiếu theo dõi'),
+    EmrDocType(id: 11, code: '11', name: 'Phiếu phản ứng thuốc'),
+    EmrDocType(id: 12, code: '12', name: 'Phiếu trích lục bệnh án'),
+    EmrDocType(id: 15, code: '15', name: 'Giấy xác nhận cấp cứu'),
+    EmrDocType(id: 16, code: '16', name: 'Biên bản khám'),
+    EmrDocType(id: 17, code: '17', name: 'Biên bản hội chẩn'),
+    EmrDocType(id: 20, code: '20', name: 'Phiếu khác'),
+    EmrDocType(id: 21, code: '21', name: 'Phiếu chỉ định'),
+    EmrDocType(id: 22, code: '22', name: 'Phiếu kết quả'),
+    EmrDocType(id: 25, code: '25', name: 'Giấy ra viện'),
+    EmrDocType(id: 26, code: '26', name: 'Giấy hẹn khám'),
+    EmrDocType(id: 27, code: '27', name: 'Giấy chuyển viện'),
+    EmrDocType(id: 30, code: '30', name: 'Vỏ bệnh án hội chẩn'),
+  ];
+}
 class PhieuPhauThuatScreen extends StatefulWidget {
   final Map<String, dynamic> patient;
   final Map<String, dynamic> department;
@@ -84,6 +119,30 @@ class _PhieuPhauThuatScreenState extends State<PhieuPhauThuatScreen> {
 
   bool _saving = false;
 
+  // v3.0.133: document type cho EMR
+  EmrDocType _docType = EmrDocType.all.firstWhere(
+    (e) => e.code == '04',
+    orElse: () => EmrDocType.all.first,
+  );
+
+  // v3.0.133: signature path đã capture (reuse khi bấm Lưu+Ký nhiều lần)
+  String? _signaturePath;
+
+  // v3.0.133: user signature controller cho Lưu+Ký (1 chữ ký chung)
+  final SignatureController _sigCtrlUser = SignatureController(
+    penStrokeWidth: 2.5, penColor: Colors.black, exportBackgroundColor: Colors.white,
+  );
+
+  String get _signerName {
+    final session = HisProApiService.instance.session;
+    return session?.userName ?? session?.loginName ?? 'Khoa Cấp Cứu';
+  }
+
+  String get _treatmentCode {
+    final p = widget.patient;
+    return (p['TDL_TREATMENT_CODE'] ?? p['tdl_treatment_code'] ?? '').toString();
+  }
+
   @override
   void initState() {
     super.initState();
@@ -126,6 +185,7 @@ class _PhieuPhauThuatScreenState extends State<PhieuPhauThuatScreen> {
     _sigCtrlNB.dispose();
     _sigCtrlGayMe.dispose();
     _sigCtrlPTTB.dispose();
+    _sigCtrlUser.dispose();
     super.dispose();
   }
 
@@ -154,7 +214,11 @@ class _PhieuPhauThuatScreenState extends State<PhieuPhauThuatScreen> {
               _buildFormNumber(),
               const SizedBox(height: 16),
               _buildTitle(),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
+
+              // ===== Loại văn bản (EMR) =====
+              _buildDocTypeSelector(),
+              const SizedBox(height: 8),
 
               // ===== MỨC =====
               _buildMuc(),
@@ -216,29 +280,40 @@ class _PhieuPhauThuatScreenState extends State<PhieuPhauThuatScreen> {
             children: [
               Expanded(
                 child: OutlinedButton.icon(
-                  icon: const Icon(Icons.close, color: Color(0xFFB71C1C)),
-                  label: const Text('Hủy', style: TextStyle(color: Color(0xFFB71C1C))),
-                  onPressed: _saving ? null : () => Navigator.of(context).pop(),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton.icon(
-                  icon: const Icon(Icons.save_outlined, color: Color(0xFFB71C1C)),
-                  label: const Text('Lưu', style: TextStyle(color: Color(0xFFB71C1C))),
-                  onPressed: _saving ? null : () => _save(uploadToEmr: false),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFB71C1C),
-                    foregroundColor: Colors.white,
+                  onPressed: _saving ? null : () => Navigator.of(context).pop(false),
+                  icon: const Icon(Icons.close, size: 18),
+                  label: const Text('Hủy'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
                   ),
-                  icon: const Icon(Icons.edit_document),
-                  label: const Text('Lưu+Ký'),
-                  onPressed: _saving ? null : () => _save(uploadToEmr: false, requireSignatures: true),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: _saving ? null : _saveEmr,
+                  icon: _saving
+                      ? const SizedBox(width: 14, height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Icon(Icons.cloud_upload, size: 18),
+                  label: Text(_saving ? 'Đang lưu...' : 'Lưu',
+                      style: const TextStyle(fontSize: 13)),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFB71C1C),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: _saving ? null : _saveEmrWithSignature,
+                  icon: const Icon(Icons.draw, size: 18),
+                  label: const Text('Lưu+Ký', style: TextStyle(fontSize: 13)),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFF2E7D32),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
                 ),
               ),
             ],
@@ -687,6 +762,34 @@ class _PhieuPhauThuatScreenState extends State<PhieuPhauThuatScreen> {
   // ===========================================================================
   // REUSABLE WIDGETS
   // ===========================================================================
+  Widget _buildDocTypeSelector() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Loại văn bản (EMR)',
+            style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+        const SizedBox(height: 4),
+        DropdownButtonFormField<EmrDocType>(
+          value: _docType,
+          isExpanded: true,
+          decoration: const InputDecoration(
+            border: OutlineInputBorder(),
+            isDense: true,
+            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          ),
+          items: EmrDocType.all.map((e) {
+            return DropdownMenuItem(
+              value: e,
+              child: Text('${e.code} - ${e.name}',
+                  style: const TextStyle(fontSize: 13)),
+            );
+          }).toList(),
+          onChanged: (v) => setState(() => _docType = v ?? _docType),
+        ),
+      ],
+    );
+  }
+
   Widget _buildSectionHeader(String text) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
@@ -743,43 +846,187 @@ class _PhieuPhauThuatScreenState extends State<PhieuPhauThuatScreen> {
   }
 
   // ===========================================================================
-  // SAVE / PDF / EMR
+  // EMR UPLOAD (giống Đính kèm tài liệu)
   // ===========================================================================
-  Future<void> _save({required bool uploadToEmr, bool requireSignatures = false}) async {
-    if (_tenBacSiCtrl.text.isEmpty) { _toast('Vui lòng nhập tên Bác sĩ'); return; }
-    if (_tenBenhNhanCtrl.text.isEmpty) { _toast('Vui lòng nhập tên Bệnh nhân'); return; }
-    if (requireSignatures && !_sigCtrlNB.isNotEmpty) {
-      _toast('Vui lòng ký tên người bệnh/thân nhân');
+  /// v3.0.133: Capture signature từ user cho "Lưu+Ký"
+  Future<String?> _captureSignature() async {
+    _sigCtrlUser.clear();
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return Dialog(
+          insetPadding: const EdgeInsets.all(12),
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(children: [
+                  const Icon(Icons.draw, color: Color(0xFF6A1B9A), size: 20),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Ký tên: $_signerName',
+                      style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ]),
+                const SizedBox(height: 8),
+                Container(
+                  decoration: BoxDecoration(
+                    border: Border.all(color: Colors.grey.shade400),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  height: 200,
+                  child: Signature(
+                    controller: _sigCtrlUser,
+                    backgroundColor: Colors.grey.shade50,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton.icon(
+                        onPressed: () => Navigator.pop(ctx, false),
+                        icon: const Icon(Icons.close, size: 18),
+                        label: const Text('Huỷ'),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () => _sigCtrlUser.clear(),
+                        icon: const Icon(Icons.refresh, size: 18),
+                        label: const Text('Xóa'),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: () {
+                          if (_sigCtrlUser.isNotEmpty) Navigator.pop(ctx, true);
+                        },
+                        icon: const Icon(Icons.check, size: 18),
+                        label: const Text('Xong'),
+                        style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFF2E7D32)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+
+    if (result != true || _sigCtrlUser.isEmpty) return null;
+    final bytes = await _sigCtrlUser.toPngBytes();
+    if (bytes == null) return null;
+    final dir = await ScannedFormsService.instance.getImageDir();
+    final sigPath = pathJoin.join(
+        dir, 'phieu_pt_sig_${DateTime.now().millisecondsSinceEpoch}.png');
+    await File(sigPath).writeAsBytes(bytes);
+    return sigPath;
+  }
+
+  /// v3.0.133: Lưu PDF + push lên EMR (unsigned)
+  Future<void> _saveEmr() async {
+    if (_treatmentCode.isEmpty) {
+      _toast('BN chưa có mã điều trị - không thể đính kèm EMR');
       return;
     }
+    if (_tenBacSiCtrl.text.isEmpty) { _toast('Vui lòng nhập tên Bác sĩ'); return; }
+    if (_tenBenhNhanCtrl.text.isEmpty) { _toast('Vui lòng nhập tên Bệnh nhân'); return; }
 
     setState(() => _saving = true);
     try {
       final pdfBytes = await _buildPdf();
-      final path = await _savePdfLocal(pdfBytes);
-      String? emrResult;
-      if (uploadToEmr) {
-        emrResult = await _syncEmr(pdfBytes);
-      }
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-              '✅ Đã lưu PDF${requireSignatures ? ' + chữ ký' : ''}\n$path'),
-          duration: const Duration(seconds: 8),
-          action: SnackBarAction(label: 'MỞ', onPressed: () => _openPdf(path)),
-        ),
+      final localPath = await _savePdfLocal(pdfBytes);
+
+      // Push lên EMR (unsigned)
+      final r = await AttachDocumentService.instance.attachFile(
+        treatmentCode: _treatmentCode,
+        documentTypeId: _docType.id,
+        documentName: 'GIẤY CAM KẾT CHẤP THUẬN PHẪU THUẬT',
+        filePath: localPath,
+        signerName: _signerName,
       );
+
+      if (!mounted) return;
+      setState(() => _saving = false);
+
+      if (r.success) {
+        _toast('✅ Đã lưu EMR (unsigned)\n${_docType.name}\n$localPath');
+        Navigator.of(context).pop(true); // về lại màn trước, refresh
+      } else {
+        _toast('⚠️ Đã lưu local nhưng EMR lỗi:\n${r.error ?? "lỗi không rõ"}\n$localPath');
+      }
     } catch (e) {
       if (!mounted) return;
-      _toast('Lỗi lưu: $e');
-    } finally {
-      if (mounted) setState(() => _saving = false);
+      setState(() => _saving = false);
+      _toast('Lỗi: $e');
+    }
+  }
+
+  /// v3.0.133: Lưu PDF + ký + push lên EMR (signed)
+  Future<void> _saveEmrWithSignature() async {
+    if (_treatmentCode.isEmpty) {
+      _toast('BN chưa có mã điều trị - không thể đính kèm EMR');
+      return;
+    }
+    if (_tenBacSiCtrl.text.isEmpty) { _toast('Vui lòng nhập tên Bác sĩ'); return; }
+    if (_tenBenhNhanCtrl.text.isEmpty) { _toast('Vui lòng nhập tên Bệnh nhân'); return; }
+
+    // Capture signature hoặc reuse đã có
+    String? sigPath = _signaturePath;
+    if (sigPath == null || !await File(sigPath).exists()) {
+      sigPath = await _captureSignature();
+      if (sigPath == null) return; // user huỷ
+      if (mounted) setState(() => _signaturePath = sigPath);
+    }
+
+    if (!mounted) return;
+    setState(() => _saving = true);
+    try {
+      final pdfBytes = await _buildPdf();
+      final localPath = await _savePdfLocal(pdfBytes);
+
+      // Push lên EMR (signed)
+      final r = await AttachDocumentService.instance.attachFile(
+        treatmentCode: _treatmentCode,
+        documentTypeId: _docType.id,
+        documentName: 'GIẤY CAM KẾT CHẤP THUẬN PHẪU THUẬT',
+        filePath: localPath,
+        signaturePath: sigPath,
+        signerName: _signerName,
+      );
+
+      if (!mounted) return;
+      setState(() => _saving = false);
+
+      if (r.success) {
+        _toast('✅ Đã ký + lưu EMR\n${_docType.name}\n$localPath');
+        Navigator.of(context).pop(true);
+      } else {
+        _toast('⚠️ Đã lưu local nhưng EMR lỗi:\n${r.error ?? "lỗi không rõ"}\n$localPath');
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _saving = false);
+      _toast('Lỗi: $e');
     }
   }
 
   void _toast(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg), duration: const Duration(seconds: 5)),
+    );
   }
 
   // ===========================================================================
@@ -1234,19 +1481,6 @@ class _PhieuPhauThuatScreenState extends State<PhieuPhauThuatScreen> {
     final file = File(pathJoin.join(hisDir.path, fileName));
     await file.writeAsBytes(pdfBytes);
     return file.path;
-  }
-
-  Future<String?> _syncEmr(Uint8List pdfBytes) async {
-    const String emrEndpoint = '';
-    if (emrEndpoint.isEmpty) {
-      debugPrint('EMR sync placeholder: ${pdfBytes.length} bytes');
-      return null;
-    }
-    try {
-      return null;
-    } catch (e) {
-      return e.toString();
-    }
   }
 
   Future<void> _openPdf(String path) async {
