@@ -2,6 +2,7 @@ package com.drnem.ccdk.his_mobile
 
 import android.app.PendingIntent
 import android.content.ContentValues
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageInstaller
 import android.net.Uri
@@ -141,6 +142,47 @@ class MainActivity : FlutterActivity() {
                             }
                         } catch (e: Exception) {
                             result.error("OPEN_SETTINGS_FAILED", e.message, e.stackTrace.toString())
+                        }
+                    }
+                    "disconnectVpn" -> {
+                        // v3.0.124: Stop OpenVPN service trước khi cài update
+                        // Lý do: OpenVPN chạy foreground service → hệ thống coi app "in use"
+                        //         → PackageInstaller từ chối cài đè với "App not installed"
+                        //
+                        // Thử 3 cách (best effort, không fail nếu cách nào không work):
+                        // 1. Gọi openvpn_flutter method channel "disconnect" (Flutter side stops service)
+                        // 2. am.killBackgroundProcesses(packageName) - kill background processes
+                        // 3. sendBroadcast(de.blinkt.openvpn.DISCONNECT) - fallback broadcast
+                        try {
+                            // Cách 1: Gọi openvpn_flutter method channel
+                            val openVpnChannel = MethodChannel(
+                                flutterEngine.dartExecutor.binaryMessenger,
+                                "id.laskarmedia.openvpn_flutter"
+                            )
+                            try {
+                                openVpnChannel.invokeMethod("disconnect", null)
+                            } catch (e: Exception) {
+                                android.util.Log.w("HISMobile", "openvpn method channel disconnect failed: $e")
+                            }
+                            // Cách 2: Kill background processes
+                            try {
+                                val am = getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+                                am.killBackgroundProcesses(packageName)
+                            } catch (e: Exception) {
+                                android.util.Log.w("HISMobile", "killBackgroundProcesses failed: $e")
+                            }
+                            // Cách 3: Broadcast intent tới OpenVPN service
+                            try {
+                                sendBroadcast(Intent("de.blinkt.openvpn.DISCONNECT"))
+                            } catch (e: Exception) {
+                                android.util.Log.w("HISMobile", "broadcast disconnect failed: $e")
+                            }
+                            // Wait 2s cho service thực sự stop
+                            try { Thread.sleep(2000) } catch (_: Exception) {}
+                            result.success(true)
+                        } catch (e: Exception) {
+                            android.util.Log.e("HISMobile", "disconnectVpn fatal error: $e")
+                            result.success(false)  // Best effort - không fail update
                         }
                     }
                     "saveApkToDownloads" -> {
