@@ -11,15 +11,18 @@
 #      - Update version.json với version mới + link tới release
 #      - Commit version.json mới về repo
 #
-# ⚠️ CẦN add 4 GitHub Secrets để build với release keystore (tránh debug-signed APK):
+# ⚠️ OPTIONAL - CÓ THỂ add 4 GitHub Secrets để build với release keystore (SHA dc3abb):
 #   - ANDROID_KEYSTORE_BASE64    (paste từ D:\his-mobile-release.jks.base64)
 #   - ANDROID_KEYSTORE_PASSWORD  = hismobile123
 #   - ANDROID_KEY_PASSWORD       = hismobile123
 #   - ANDROID_KEY_ALIAS          = his-mobile
-# Nếu thiếu → workflow fail-fast với message rõ ràng (xem Build APK step).
+# Nếu KHÔNG add → APK sẽ được sign bằng Android Debug keystore (mặc định Flutter).
+# Để cài lên thiết bị đã cài release keystore, cần:
+#   - Hoặc add 4 secrets ở trên
+#   - Hoặc build local + upload APK local lên release
 #
-# v3.0.128: Restore build jobs (sau khi v3.0.127 simplified) - giờ user vừa có thể
-#           build local (LOCAL-FIRST) vừa build trên GitHub (khi add secrets).
+# v3.0.129: Bỏ fail-fast guard (revert về behavior #27 v3.0.124 - luôn succeed)
+#           nếu thiếu secrets, APK sẽ là debug-signed (chấp nhận được cho fresh install)
 #
 # Trigger: push tag v*.*.* HOẶC manual workflow_dispatch
 
@@ -109,9 +112,11 @@ jobs:
           Set-Content -Path android/key.properties -Value $content -Encoding UTF8
           Write-Host "::notice::android/key.properties generated"
       - name: 🏗️ Build APK (arm64 only)
-        # v3.0.125: Fail-fast nếu release keystore chưa setup (tránh build với debug.keystore
-        # silently - gây lỗi "INSTALL_FAILED_UPDATE_INCOMPATIBLE" khi user cài đè)
-        # Check: key.properties tồn tại + chứa storeFile trỏ tới file .jks (không phải debug.keystore)
+        # v3.0.129: Bỏ fail-fast guard (revert về behavior #27 v3.0.124 cũ)
+        # Nếu có 4 secrets (ANDROID_KEYSTORE_*) → sign bằng release keystore (SHA dc3abb)
+        # Nếu KHÔNG có secrets → sign bằng Android Debug keystore (mặc định Flutter, SHA 87b77725)
+        #   → CẢNH BÁO: APK debug-signed sẽ KHÔNG cài đè được lên bản release-signed cũ
+        #   → Workaround: build local + upload APK lên release, hoặc gỡ app cũ rồi cài mới
         run: |
           $keyProps = "android\key.properties"
           $storeFile = $null
@@ -120,13 +125,13 @@ jobs:
               if ($_ -match '^storeFile=(.+)$') { $storeFile = $Matches[1].Trim() }
             }
           }
-          if (-not $storeFile -or $storeFile -like '*debug*' -or $storeFile -like '*keystore') {
-            Write-Host "::error::❌ Release keystore chưa được setup! File key.properties thiếu hoặc storeFile trỏ tới debug keystore."
-            Write-Host "::error::  → Add 4 secrets vào GitHub: ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_PASSWORD, ANDROID_KEY_ALIAS"
-            Write-Host "::error::  → Hoặc build local: flutter build apk --release --target-platform android-arm64 --split-per-abi"
-            exit 1
+          if ($storeFile) {
+            Write-Host "::notice::✅ Release keystore detected: $storeFile → APK sẽ sign bằng release keystore"
+          } else {
+            Write-Host "::warning::⚠️ ANDROID_KEYSTORE_* secrets chưa add → APK sẽ sign bằng Android Debug keystore (mặc định)"
+            Write-Host "::warning::   Để fix vĩnh viễn: add 4 secrets vào repo Settings → Secrets → Actions"
+            Write-Host "::warning::   Hoặc build local rồi upload APK: flutter build apk --release --target-platform android-arm64 --split-per-abi"
           }
-          Write-Host "::notice::✅ Release keystore detected: $storeFile"
           flutter build apk --release --target-platform android-arm64 --split-per-abi
 
       - name: 📤 Upload APK artifact

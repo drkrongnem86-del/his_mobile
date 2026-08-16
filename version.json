@@ -1,5 +1,5 @@
 ﻿{
-    "message":  "Restore build jobs (APK + AAB + IPA) trên GitHub Actions. Build local vẫn work như trước. Khi user add 4 GitHub secrets (ANDROID_KEYSTORE_*) thì GitHub build sẽ sign đúng release keystore.",
-    "version":  "3.0.128",
-    "apk_url":  "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.128/his_mobile_v3.0.128_arm64.apk"
+    "message":  "Bỏ fail-fast guard - revert về behavior #27 v3.0.124 (luôn succeed). Nếu thiếu GitHub secrets thì APK sẽ là debug-signed nhưng build pass như cũ. Cài fresh OK, cài đè lên bản release-signed thì cần gỡ cũ.",
+    "version":  "3.0.129",
+    "apk_url":  "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.129/his_mobile_v3.0.129_arm64.apk"
 }
