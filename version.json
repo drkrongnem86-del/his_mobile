@@ -1,5 +1,5 @@
 {
-    "message": "Fix font Arial (full Vietnamese), 3 chu ky hang ngang, Luu+Ky embed signature PNG vao PDF, editable date picker",
-    "version": "3.0.134",
-    "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.134/his_mobile_v3.0.134_arm64.apk"
+    "message": "Phiếu bàn giao chuyển khoa (MS: 43/BV2), InstallResultReceiver fix, 4s delay trước khi app đóng để system installer khởi động",
+    "version": "3.0.135",
+    "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.135/his_mobile_v3.0.135_arm64.apk"
 }

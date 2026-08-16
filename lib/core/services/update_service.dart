@@ -391,32 +391,85 @@ class UpdateService {
       const platform = MethodChannel(_installerChannel);
       final res = await platform.invokeMethod<bool>('installApk', {'path': apkPath});
       debugPrint('Install invoke result: $res');
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('📲 Đang mở installer - bấm "Cài đặt" khi Android hỏi'),
-          backgroundColor: Color(0xFF2E7D32),
-          duration: Duration(seconds: 4),
-        ),
-      );
-    } catch (e) {
-      debugPrint('Native install error: $e');
-      // Fallback: dùng ACTION_VIEW với file:// URI (cũ)
-      try {
-        final uri = Uri.file(apkPath!);
-        // Không dùng url_launcher nữa vì không có
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text('⚠️ Không mở được installer: $e\nPath: $apkPath'),
-            backgroundColor: const Color(0xFFE65100),
-            duration: const Duration(seconds: 8),
-            action: SnackBarAction(
-              label: 'Copy',
-              onPressed: () => Clipboard.setData(ClipboardData(text: apkPath!)),
+
+      // v3.0.135: Show persistent dialog thay vì snackbar
+      // User cần thấy hướng dẫn ĐỢI INSTALLER MỞ RA + nhấn "Cài đặt"
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx2) => AlertDialog(
+            icon: const Icon(Icons.system_update, color: Color(0xFF2E7D32), size: 48),
+            title: const Text('Đang chuẩn bị cài đặt…'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: const [
+                LinearProgressIndicator(),
+                SizedBox(height: 16),
+                Text(
+                  '1️⃣ Đợi SYSTEM INSTALLER mở ra (~4 giây)\n'
+                  '2️⃣ Nhấn "Cài đặt" (Install)\n'
+                  '3️⃣ App cũ sẽ được thay thế tự động\n\n'
+                  '⚠️ Nếu installer không mở sau 4s:\n'
+                  'Vào Download/HisMobile → tap file APK để cài thủ công.',
+                  style: TextStyle(fontSize: 13, height: 1.6),
+                ),
+              ],
             ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx2),
+                child: const Text('Đã hiểu'),
+              ),
+            ],
           ),
         );
-      } catch (e2) {
-        debugPrint('Final fallback error: $e2');
+      }
+    } catch (e) {
+      debugPrint('Native install error: $e');
+      // v3.0.135: Fallback - show dialog with file path for manual install
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx2) => AlertDialog(
+            icon: const Icon(Icons.warning_amber, color: Color(0xFFE65100), size: 48),
+            title: const Text('Cài đặt thủ công'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Installer không mở tự động. Hãy cài thủ công:',
+                  style: TextStyle(fontSize: 13),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF3E0),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: const Color(0xFFE65100)),
+                  ),
+                  child: Text(
+                    '📁 Download/HisMobile/HIS_MOBILE_v${info.newVersion}.apk',
+                    style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Mở File Manager → Download/HisMobile → tap file APK → Install',
+                  style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx2),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
       }
     }
   }

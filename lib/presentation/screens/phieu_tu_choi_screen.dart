@@ -288,8 +288,6 @@ class _PhieuTuChoiScreenState extends State<PhieuTuChoiScreen> {
             const Text('Nữ', style: TextStyle(fontSize: 13)),
           ],
         ),
-          ],
-        ),
         const SizedBox(height: 6),
         Row(
           children: [

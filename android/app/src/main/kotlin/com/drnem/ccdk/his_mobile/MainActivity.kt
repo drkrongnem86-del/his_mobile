@@ -8,6 +8,8 @@ import android.content.pm.PackageInstaller
 import android.net.Uri
 import android.os.Build
 import android.os.Environment
+import android.os.Handler
+import android.os.Looper
 import android.provider.MediaStore
 import android.provider.Settings
 import androidx.core.content.FileProvider
@@ -113,17 +115,17 @@ class MainActivity : FlutterActivity() {
                             // Commit session - hệ thống sẽ show install dialog
                             session.commit(pendingIntent.intentSender)
                             session.close()
-                            // v3.0.130: Kill Flutter process sau khi start install
-                            // Lý do: Flutter engine keep-alive → system coi app "in use"
-                            //         → PackageInstaller từ chối cài đè ("App not installed")
-                            // Schedule 1.5s để:
-                            // 1. result.success(true) về Flutter
-                            // 2. System install dialog có thời gian start
-                            // 3. Sau đó kill process → install chạy với clean state
-                            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                                android.util.Log.i("HISMobile", "Auto-closing app after install started (v3.0.130)")
-                                android.os.Process.killProcess(android.os.Process.myPid())
-                            }, 1500)
+                            // v3.0.135: Đợi 4 giây rồi đóng app để system installer khởi động
+                            // PackageInstaller.Session commit() chạy async - hệ thống schedule
+                            // install dialog. App cần alive trong ~4s để system xử lý dialog.
+                            // Sau 4s → finishAndRemoveTask() để app không block install.
+                            Handler(Looper.getMainLooper()).postDelayed({
+                                try {
+                                    finishAndRemoveTask()
+                                } catch (e: Exception) {
+                                    android.util.Log.w("HISMobile", "finishAndRemoveTask failed: $e")
+                                }
+                            }, 4000)
                             result.success(true)
                         } catch (e: Exception) {
                             result.error("INSTALL_FAILED", e.message, e.stackTrace.toString())
