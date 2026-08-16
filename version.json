@@ -1,5 +1,5 @@
 {
-    "message": "Thêm form Phiếu phẫu thuật (Cam kết chấp thuận PT/TT/GMHS, mẫu 01/BV2): text fields đỏ editable, checkboxes ☐/☒, signature → Lưu PDF local + placeholder EMR sync.",
-    "version": "3.0.131",
-    "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.131/his_mobile_v3.0.131_arm64.apk"
+  "version": "3.0.131",
+  "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.131/his_mobile_v3.0.131_arm64.apk",
+  "message": "Cập nhật phiên bản 3.0.131"
 }
