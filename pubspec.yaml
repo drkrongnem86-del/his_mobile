@@ -1,7 +1,7 @@
-name: his_mobile
+﻿name: his_mobile
 description: "HIS Pro Mobile - Khoa Cap Cuu"
 publish_to: 'none'
-version: 3.0.126+270
+version: 3.0.127+271
 environment:
   sdk: ^3.11.5
 
@@ -9,7 +9,7 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8
-  # v2.87.0: Google Fonts - hỗ trợ tiếng Việt đầy đủ (Roboto)
+  # v2.87.0: Google Fonts - há»— trá»£ tiáº¿ng Viá»‡t Ä‘áº§y Ä‘á»§ (Roboto)
   google_fonts: ^6.2.1
 
   # State Management
@@ -40,7 +40,7 @@ dependencies:
   # v2.37.0: OpenVPN/WiFi Settings
   url_launcher: ^6.3.0
 
-  # v3.0.76: Native OpenVPN client (ics-openvpn) - tích hợp trong app
+  # v3.0.76: Native OpenVPN client (ics-openvpn) - tÃ­ch há»£p trong app
   openvpn_flutter: ^1.3.4
 
   # v2.36.2: QR Scanner
@@ -54,7 +54,7 @@ dependencies:
   # v3.0.24: SHA-256 hash cho VNPT SmartCA workflow
   crypto: ^3.0.3
 
-  # v2.66.0: Lấy version app động (hiển thị ở Settings)
+  # v2.66.0: Láº¥y version app Ä‘á»™ng (hiá»ƒn thá»‹ á»Ÿ Settings)
   package_info_plus: ^8.0.2
   # v3.0.34: Audit trail - device info
   device_info_plus: ^12.0.0
