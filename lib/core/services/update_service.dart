@@ -126,8 +126,8 @@ class UpdateService {
           ],
         ),
         actions: [
-          // v3.0.122: Layout responsive - nếu hẹp dùng Wrap, rộng dùng OverflowBar
-          // Thêm TẢI VỀ ở giữa (màu cam) - lưu vào Download public
+          // v3.0.124: Đổi thứ tự nút - TẮT VPN & CÀI đầu tiên (giải quyết "App not installed"
+          // trên Samsung do OpenVPN service còn chạy foreground)
           TextButton(
             onPressed: () => Navigator.pop(ctx),
             child: const Text('HỦY'),
@@ -140,7 +140,26 @@ class UpdateService {
             icon: const Icon(Icons.file_download, size: 16, color: Color(0xFFE65100)),
             label: const Text('TẢI VỀ', style: TextStyle(color: Color(0xFFE65100))),
           ),
+          TextButton.icon(
+            // v3.0.124: NÚT CHÍNH cho Samsung - tắt VPN trước khi cài
+            onPressed: () async {
+              Navigator.pop(ctx);
+              // Tắt OpenVPN service trước (giải quyết "App not installed" trên Samsung)
+              try {
+                const vpnPlatform = MethodChannel(_installerChannel);
+                await vpnPlatform.invokeMethod('disconnectVpn');
+                debugPrint('✅ OpenVPN service disconnected');
+              } catch (e) {
+                debugPrint('⚠️ disconnectVpn error: $e');
+              }
+              // Sau đó mới install
+              await _downloadAndInstall(context, info);
+            },
+            icon: const Icon(Icons.power_settings_new, size: 16, color: Color(0xFFD32F2F)),
+            label: const Text('TẮT VPN & CÀI', style: TextStyle(color: Color(0xFFD32F2F))),
+          ),
           FilledButton.icon(
+            // v3.0.124: "ĐỒNG Ý" chỉ work nếu VPN đã tắt sẵn
             onPressed: () {
               Navigator.pop(ctx);
               _downloadAndInstall(context, info);

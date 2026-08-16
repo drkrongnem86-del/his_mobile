@@ -1,5 +1,5 @@
 {
-  "version": "3.0.123",
-  "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.123/his_mobile_v3.0.123_arm64.apk",
-  "message": "Cập nhật phiên bản 3.0.123"
+  "version": "3.0.124",
+  "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.124/his_mobile_v3.0.124_arm64.apk",
+  "message": "Thêm nút TẮT VPN & CÀI - disconnect OpenVPN service trước khi cài (giải quyết 'App not installed' trên Samsung do service còn chạy foreground)"
 }

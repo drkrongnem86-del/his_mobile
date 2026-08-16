@@ -26,7 +26,8 @@
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true"
-        android:extractNativeLibs="true">
+        android:extractNativeLibs="true"
+        android:installLocation="auto">
         <activity
             android:name=".MainActivity"
             android:exported="true"
