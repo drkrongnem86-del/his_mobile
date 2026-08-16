@@ -1,0 +1,20 @@
+﻿v3.0.130: Auto-close app khi nhấn Cập nhật - kill Flutter process
+
+User feedback: app tự đóng lại khi nhấn Cập nhật trong dialog update.
+
+Fix:
+- Trong MainActivity.kt installApk: sau khi session.commit() (start install),
+  schedule kill process sau 1.5s
+- 1.5s để result.success(true) về Flutter + system install dialog có thời gian start
+- Sau đó kill Flutter engine process → install chạy với clean state
+
+Lý do: Flutter engine keep-alive → system coi app 'in use' → PackageInstaller
+       từ chối cài đè với 'App not installed'
+
+LƯU Ý QUAN TRỌNG: Fix này KHÔNG giải quyết lỗi 'INSTALL_FAILED_UPDATE_INCOMPATIBLE'
+(v3.0.129 GitHub = debug keystore, app hiện tại = release keystore - khác signing key).
+Để cài đè được, cần:
+- Dùng LOCAL APK (sign release keystore dc3abb) - KHẢ THI
+- Hoặc add 4 GitHub secrets ANDROID_KEYSTORE_* - cần user setup
+
+Bump: 3.0.129+273 → 3.0.130+274

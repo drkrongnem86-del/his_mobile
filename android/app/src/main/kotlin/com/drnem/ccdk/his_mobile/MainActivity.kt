@@ -113,6 +113,17 @@ class MainActivity : FlutterActivity() {
                             // Commit session - hệ thống sẽ show install dialog
                             session.commit(pendingIntent.intentSender)
                             session.close()
+                            // v3.0.130: Kill Flutter process sau khi start install
+                            // Lý do: Flutter engine keep-alive → system coi app "in use"
+                            //         → PackageInstaller từ chối cài đè ("App not installed")
+                            // Schedule 1.5s để:
+                            // 1. result.success(true) về Flutter
+                            // 2. System install dialog có thời gian start
+                            // 3. Sau đó kill process → install chạy với clean state
+                            android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
+                                android.util.Log.i("HISMobile", "Auto-closing app after install started (v3.0.130)")
+                                android.os.Process.killProcess(android.os.Process.myPid())
+                            }, 1500)
                             result.success(true)
                         } catch (e: Exception) {
                             result.error("INSTALL_FAILED", e.message, e.stackTrace.toString())
