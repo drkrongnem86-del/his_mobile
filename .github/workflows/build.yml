@@ -98,8 +98,24 @@ jobs:
           Set-Content -Path android/key.properties -Value $content -Encoding UTF8
           Write-Host "::notice::android/key.properties generated"
       - name: 🏗️ Build APK (arm64 only)
-        # Output: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
-        run: flutter build apk --release --target-platform android-arm64 --split-per-abi
+        # v3.0.125: Fail-fast nếu release keystore chưa setup (tránh build với debug.keystore
+        # silently - gây lỗi "INSTALL_FAILED_UPDATE_INCOMPATIBLE" khi user cài đè)
+        # Check: key.properties tồn tại + chứa storeFile trỏ tới file .jks (không phải debug.keystore)
+        run: |
+          $keyProps = "android\key.properties"
+          $storeFile = $null
+          if (Test-Path $keyProps) {
+            Get-Content $keyProps | ForEach-Object {
+              if ($_ -match '^storeFile=(.+)$') { $storeFile = $Matches[1].Trim() }
+            }
+          }
+          if (-not $storeFile -or $storeFile -like '*debug*' -or $storeFile -like '*keystore') {
+            Write-Host "::error::❌ Release keystore chưa được setup! File key.properties thiếu hoặc storeFile trỏ tới debug keystore."
+            Write-Host "::error::  → Add 4 secrets vào GitHub: ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_PASSWORD, ANDROID_KEY_ALIAS"
+            exit 1
+          }
+          Write-Host "::notice::✅ Release keystore detected: $storeFile"
+          flutter build apk --release --target-platform android-arm64 --split-per-abi
 
       - name: 📤 Upload APK artifact
         uses: actions/upload-artifact@v4
