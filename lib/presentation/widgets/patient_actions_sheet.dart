@@ -20,11 +20,14 @@
 //   - Form Word-style (mẫu MS: 01/BV2) cho giấy cam kết chấp thuận PT/TT/GMHS
 //   - Text fields đỏ editable + checkboxes ☐/☒ + signature
 //   - Lưu local PDF + sync EMR (placeholder endpoint, user tự thêm sau)
+// v3.0.134: Thêm tile "Giấy từ chối DV" + "Giấy ra viện không BS"
 import 'package:flutter/material.dart';
 import 'package:his_mobile/data/models/y_te_so_feature.dart';
 import 'package:his_mobile/data/models/y_te_so_router.dart';
 import 'package:his_mobile/presentation/screens/attach_document_screen.dart';
 import 'package:his_mobile/presentation/screens/phieu_phau_thuat_screen.dart';
+import 'package:his_mobile/presentation/screens/phieu_tu_choi_screen.dart';
+import 'package:his_mobile/presentation/screens/phieu_ra_vien_screen.dart';
 import 'package:his_mobile/presentation/screens/treatment_history_screen.dart';
 // v3.0.90: BỎ import y_te_screen.dart - menu Chức năng Y tế đã xóa
 import 'package:his_mobile/presentation/screens/y_te_so_screen.dart';
@@ -88,6 +91,20 @@ class PatientActionsSheet extends StatelessWidget {
   void _openPhieuPhauThuat(BuildContext context) {
     Navigator.push(context, MaterialPageRoute(
       builder: (_) => PhieuPhauThuatScreen(patient: patient, department: department),
+    ));
+  }
+
+  /// v3.0.134: Mở form Giấy từ chối sử dụng dịch vụ (MS: 41/BV2)
+  void _openPhieuTuChoi(BuildContext context) {
+    Navigator.push(context, MaterialPageRoute(
+      builder: (_) => PhieuTuChoiScreen(patient: patient, department: department),
+    ));
+  }
+
+  /// v3.0.134: Mở form Giấy ra viện không theo chỉ định BS (MS: 46/BV2)
+  void _openPhieuRaVien(BuildContext context) {
+    Navigator.push(context, MaterialPageRoute(
+      builder: (_) => PhieuRaVienScreen(patient: patient, department: department),
     ));
   }
 
@@ -248,6 +265,12 @@ class PatientActionsSheet extends StatelessWidget {
 
               // v3.0.131: TILE 1e: Phiếu phẫu thuật (Cam kết chấp thuận PT/TT/GMHS)
               _phieuPhauThuatTile(context),
+
+              // v3.0.134: TILE 1f: Giấy từ chối sử dụng dịch vụ (MS: 41/BV2)
+              _phieuTuChoiTile(context),
+
+              // v3.0.134: TILE 1g: Giấy ra viện không theo chỉ định BS (MS: 46/BV2)
+              _phieuRaVienTile(context),
 
               // === GRID TILE: Y TẾ SỐ (Bộ Y tế) - 15 chức năng ===
               _sectionHeader('Y TẾ SỐ (BỘ Y TẾ)', Icons.health_and_safety, const Color(0xFF00838F), '15 chức năng'),
@@ -566,6 +589,116 @@ class PatientActionsSheet extends StatelessWidget {
               ),
             ])),
             const Icon(Icons.chevron_right, color: Color(0xFFB71C1C), size: 20),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  /// v3.0.134: Giấy từ chối sử dụng dịch vụ (MS: 41/BV2)
+  Widget _phieuTuChoiTile(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+      child: InkWell(
+        onTap: () => _openPhieuTuChoi(context),
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFE65100), width: 1.5),
+          ),
+          padding: const EdgeInsets.all(10),
+          child: Row(children: [
+            Container(
+              width: 40, height: 40,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                    begin: Alignment.topLeft, end: Alignment.bottomRight,
+                    colors: [Color(0xFFE65100), Color(0xFFBF360C)]),
+                borderRadius: BorderRadius.all(Radius.circular(8)),
+              ),
+              child: const Icon(Icons.block, color: Colors.white, size: 22),
+            ),
+            const SizedBox(width: 10),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                const Expanded(
+                  child: Text('Giấy từ chối DV',
+                      style: TextStyle(
+                          color: Color(0xFFE65100), fontSize: 14, fontWeight: FontWeight.bold)),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                      color: const Color(0xFFE65100).withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(4)),
+                  child: const Text('MẪU 41/BV2',
+                      style: TextStyle(color: Color(0xFFE65100), fontSize: 9, fontWeight: FontWeight.bold)),
+                ),
+              ]),
+              const SizedBox(height: 2),
+              const Text(
+                'Giấy cam kết từ chối sử dụng dịch vụ khám bệnh, chữa bệnh → PDF',
+                style: TextStyle(color: Colors.black54, fontSize: 11, height: 1.3),
+              ),
+            ])),
+            const Icon(Icons.chevron_right, color: Color(0xFFE65100), size: 20),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  /// v3.0.134: Giấy ra viện không theo chỉ định BS (MS: 46/BV2)
+  Widget _phieuRaVienTile(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+      child: InkWell(
+        onTap: () => _openPhieuRaVien(context),
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFF1565C0), width: 1.5),
+          ),
+          padding: const EdgeInsets.all(10),
+          child: Row(children: [
+            Container(
+              width: 40, height: 40,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                    begin: Alignment.topLeft, end: Alignment.bottomRight,
+                    colors: [Color(0xFF1565C0), Color(0xFF0D47A1)]),
+                borderRadius: BorderRadius.all(Radius.circular(8)),
+              ),
+              child: const Icon(Icons.exit_to_app, color: Colors.white, size: 22),
+            ),
+            const SizedBox(width: 10),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                const Expanded(
+                  child: Text('Giấy ra viện không BS',
+                      style: TextStyle(
+                          color: Color(0xFF1565C0), fontSize: 14, fontWeight: FontWeight.bold)),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                      color: const Color(0xFF1565C0).withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(4)),
+                  child: const Text('MẪU 46/BV2',
+                      style: TextStyle(color: Color(0xFF1565C0), fontSize: 9, fontWeight: FontWeight.bold)),
+                ),
+              ]),
+              const SizedBox(height: 2),
+              const Text(
+                'Giấy cam kết ra viện không theo chỉ định của bác sĩ (khi chưa kết thúc điều trị) → PDF',
+                style: TextStyle(color: Colors.black54, fontSize: 11, height: 1.3),
+              ),
+            ])),
+            const Icon(Icons.chevron_right, color: Color(0xFF1565C0), size: 20),
           ]),
         ),
       ),

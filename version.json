@@ -1,5 +1,5 @@
 {
-  "version": "3.0.133",
-  "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.133/his_mobile_v3.0.133_arm64.apk",
-  "message": "Cập nhật phiên bản 3.0.133"
+    "message": "Fix font Arial (full Vietnamese), 3 chu ky hang ngang, Luu+Ky embed signature PNG vao PDF, editable date picker",
+    "version": "3.0.134",
+    "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.134/his_mobile_v3.0.134_arm64.apk"
 }

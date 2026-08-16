@@ -1,6 +1,10 @@
-// PhieuPhauThuatScreen v3.0.133 - GIẤY CAM KẾT CHẤP THUẬN PHẪU THUẬT, THỦ THUẬT VÀ GÂY MÊ HỒI SỨC
-// Mẫu MS: 01/BV2 - Fix font tiếng Việt (Roboto TTF) + 3 chỗ ký + EMR upload (giống Đính kèm tài liệu)
-// v3.0.133: 3 nút Hủy | Lưu | Lưu+Ký đúng pattern AttachDocumentScreen + EMR upload
+// PhieuPhauThuatScreen v3.0.134 - GIẤY CAM KẾT CHẤP THUẬN PHẪU THUẬT, THỦ THUẬT VÀ GÂY MÊ HỒI SỨC
+// Mẫu MS: 01/BV2 - Arial font (full Vietnamese) + 3 chỗ ký HÀNG NGANG + Lưu+Ký embed signature PNG vào PDF
+// v3.0.134 fixes:
+// - Arial TTF thay Roboto (font tiếng Việt 100%)
+// - 3 chữ ký dàn HÀNG NGANG (NB | Bác sỹ GM | PTV) đúng mau.pdf
+// - Lưu+Ký: embed signature PNG vào PDF bytes → pass unsigned cho attachFile
+// - Date picker: 3 trường Ngày/Tháng/Năm có thể chỉnh sửa
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -14,14 +18,14 @@ import 'package:his_mobile/data/api/attach_document_service.dart';
 import 'package:his_mobile/data/api/his_pro_api_service.dart';
 import 'package:his_mobile/data/local/scanned_forms_service.dart';
 
-/// v3.0.133: Form Phiếu phẫu thuật (Giấy cam kết chấp thuận PT/TT/GMHS)
+/// v3.0.134: Form Phiếu phẫu thuật (Giấy cam kết chấp thuận PT/TT/GMHS)
 /// Mẫu: MS 01/BV2 - SỞ Y TẾ TỈNH KHÁNH HÒA / BVĐK NINH THUẬN
-/// Changes v3.0.133:
-/// - Fix font Vietnamese (Roboto TTF from assets)
-/// - 3 chỗ ký (NB + Bác sỹ gây mê + Phẫu thuật viên)
-/// - Checkbox đồng ý/không đồng ý + dòng ghi chú tay + ngày tháng
+/// Changes v3.0.134:
+/// - Arial TTF (full Vietnamese) thay Roboto (garbled accent marks)
+/// - 3 chữ ký dàn HÀNG NGANG (pw.Row 3 cột) đúng mau.pdf
+/// - Lưu+Ký: embed signature PNG vào PDF → pass unsigned cho attachFile (fix lỗi PDF chưa support)
+/// - Date picker: 3 trường Ngày/Tháng/Năm editable với date picker dialog
 /// - 3 nút Hủy | Lưu | Lưu+Ký đúng pattern Đính kèm tài liệu
-/// - EMR upload qua AttachDocumentService (Lưu = unsigned, Lưu+Ký = signed)
 
 /// Document types cho EMR
 class EmrDocType {
@@ -102,6 +106,11 @@ class _PhieuPhauThuatScreenState extends State<PhieuPhauThuatScreen> {
   // ===== Đồng ý =====
   bool? _dongY; // null=chưa chọn, true=đồng ý, false=không
 
+  // ===== Ngày/Tháng/Năm editable (v3.0.134) =====
+  int? _selectedDay;
+  int? _selectedMonth;
+  int? _selectedYear;
+
   // ===== 3 Signature controllers =====
   final SignatureController _sigCtrlNB = SignatureController(
     penStrokeWidth: 2, penColor: Colors.black, exportBackgroundColor: Colors.white,
@@ -146,6 +155,10 @@ class _PhieuPhauThuatScreenState extends State<PhieuPhauThuatScreen> {
   @override
   void initState() {
     super.initState();
+    final now = DateTime.now();
+    _selectedDay = now.day;
+    _selectedMonth = now.month;
+    _selectedYear = now.year;
     _prefillFromPatient();
   }
 
@@ -262,9 +275,14 @@ class _PhieuPhauThuatScreenState extends State<PhieuPhauThuatScreen> {
               // ===== CAM KẾT NB + ĐỒNG Ý =====
               _buildCamKetNB(),
 
+              const SizedBox(height: 12),
+
+              // ===== NGÀY THÁNG NĂM (v3.0.134: editable) =====
+              _buildDateSection(),
+
               const SizedBox(height: 16),
 
-              // ===== 3 CHỮ KÝ =====
+              // ===== 3 CHỮ KÝ HÀNG NGANG (v3.0.134) =====
               _buildSignatureSection(),
 
               const SizedBox(height: 80),
@@ -673,86 +691,214 @@ class _PhieuPhauThuatScreenState extends State<PhieuPhauThuatScreen> {
     );
   }
 
+  // v3.0.134: Date picker section
+  Widget _buildDateSection() {
+    return Row(
+      children: [
+        const Text('Ngày: ', style: TextStyle(fontSize: 13)),
+        GestureDetector(
+          onTap: _showDatePicker,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.red.shade700),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Row(
+              children: [
+                Text(
+                  '${(_selectedDay ?? 0).toString().padLeft(2, '0')}',
+                  style: const TextStyle(fontSize: 13, color: Color(0xFFB71C1C)),
+                ),
+                const SizedBox(width: 4),
+                const Icon(Icons.calendar_today, size: 16, color: Color(0xFFB71C1C)),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        const Text('Tháng: ', style: TextStyle(fontSize: 13)),
+        GestureDetector(
+          onTap: _showDatePicker,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.red.shade700),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Row(
+              children: [
+                Text(
+                  '${(_selectedMonth ?? 0).toString().padLeft(2, '0')}',
+                  style: const TextStyle(fontSize: 13, color: Color(0xFFB71C1C)),
+                ),
+                const SizedBox(width: 4),
+                const Icon(Icons.calendar_today, size: 16, color: Color(0xFFB71C1C)),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        const Text('Năm: ', style: TextStyle(fontSize: 13)),
+        GestureDetector(
+          onTap: _showDatePicker,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.red.shade700),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Row(
+              children: [
+                Text(
+                  '${_selectedYear ?? ''}',
+                  style: const TextStyle(fontSize: 13, color: Color(0xFFB71C1C)),
+                ),
+                const SizedBox(width: 4),
+                const Icon(Icons.calendar_today, size: 16, color: Color(0xFFB71C1C)),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        TextButton.icon(
+          onPressed: _showDatePicker,
+          icon: const Icon(Icons.edit_calendar, size: 16),
+          label: const Text('Đổi'),
+          style: TextButton.styleFrom(
+            foregroundColor: const Color(0xFFB71C1C),
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _showDatePicker() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime(
+        _selectedYear ?? now.year,
+        _selectedMonth ?? now.month,
+        _selectedDay ?? now.day,
+      ),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+      locale: const Locale('vi', 'VN'),
+    );
+    if (picked != null && mounted) {
+      setState(() {
+        _selectedDay = picked.day;
+        _selectedMonth = picked.month;
+        _selectedYear = picked.year;
+      });
+    }
+  }
+
+  // v3.0.134: 3 chữ ký dàn HÀNG NGANG
   Widget _buildSignatureSection() {
-    return Column(
+    return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('NGƯỜI BỆNH/THÂN NHÂN:',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-        const SizedBox(height: 8),
-        Container(
-          height: 160,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: Colors.black54),
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Signature(controller: _sigCtrlNB, backgroundColor: Colors.white),
-        ),
-        Align(
-          alignment: Alignment.centerRight,
-          child: TextButton.icon(
-            onPressed: () => setState(() => _sigCtrlNB.clear()),
-            icon: const Icon(Icons.clear, size: 16),
-            label: const Text('Xóa'),
-          ),
-        ),
-
-        const SizedBox(height: 12),
-        const Text('BÁC SỸ GÂY MÊ:',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-        const SizedBox(height: 4),
-        Row(
-          children: [
-            const Text('Tên: ', style: TextStyle(fontSize: 13)),
-            Expanded(child: _redField(_tenBacSiGayMeCtrl, hint: 'Tên Bác sĩ gây mê')),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Container(
-          height: 120,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: Colors.black54),
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Signature(controller: _sigCtrlGayMe, backgroundColor: Colors.white),
-        ),
-        Align(
-          alignment: Alignment.centerRight,
-          child: TextButton.icon(
-            onPressed: () => setState(() => _sigCtrlGayMe.clear()),
-            icon: const Icon(Icons.clear, size: 16),
-            label: const Text('Xóa'),
+        // NGƯỜI BỆNH/THÂN NHÂN
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('NGƯỜI BỆNH/THÂN NHÂN:',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+              const SizedBox(height: 6),
+              Container(
+                height: 140,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: Colors.black54),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Signature(controller: _sigCtrlNB, backgroundColor: Colors.white),
+              ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: () => setState(() => _sigCtrlNB.clear()),
+                  icon: const Icon(Icons.clear, size: 14),
+                  label: const Text('Xóa', style: TextStyle(fontSize: 12)),
+                ),
+              ),
+            ],
           ),
         ),
-
-        const SizedBox(height: 12),
-        const Text('PHẪU THUẬT VIÊN/BÁC SỸ THỰC HIỆN THỦ THUẬT:',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-        const SizedBox(height: 4),
-        Row(
-          children: [
-            const Text('Tên: ', style: TextStyle(fontSize: 13)),
-            Expanded(child: _redField(_tenPhauThuatVienCtrl, hint: 'Tên Phẫu thuật viên')),
-          ],
-        ),
-        const SizedBox(height: 8),
-        Container(
-          height: 120,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border.all(color: Colors.black54),
-            borderRadius: BorderRadius.circular(4),
+        const SizedBox(width: 8),
+        // BÁC SỸ GÂY MÊ
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('BÁC SỸ GÂY MÊ:',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  const Text('Tên: ', style: TextStyle(fontSize: 12)),
+                  Expanded(child: _redField(_tenBacSiGayMeCtrl, hint: 'Tên BS gây mê')),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Container(
+                height: 100,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: Colors.black54),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Signature(controller: _sigCtrlGayMe, backgroundColor: Colors.white),
+              ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: () => setState(() => _sigCtrlGayMe.clear()),
+                  icon: const Icon(Icons.clear, size: 14),
+                  label: const Text('Xóa', style: TextStyle(fontSize: 12)),
+                ),
+              ),
+            ],
           ),
-          child: Signature(controller: _sigCtrlPTTB, backgroundColor: Colors.white),
         ),
-        Align(
-          alignment: Alignment.centerRight,
-          child: TextButton.icon(
-            onPressed: () => setState(() => _sigCtrlPTTB.clear()),
-            icon: const Icon(Icons.clear, size: 16),
-            label: const Text('Xóa'),
+        const SizedBox(width: 8),
+        // PHẪU THUẬT VIÊN
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('PHẪU THUẬT VIÊN/TT:',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  const Text('Tên: ', style: TextStyle(fontSize: 12)),
+                  Expanded(child: _redField(_tenPhauThuatVienCtrl, hint: 'Tên PTV')),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Container(
+                height: 100,
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  border: Border.all(color: Colors.black54),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                child: Signature(controller: _sigCtrlPTTB, backgroundColor: Colors.white),
+              ),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: () => setState(() => _sigCtrlPTTB.clear()),
+                  icon: const Icon(Icons.clear, size: 14),
+                  label: const Text('Xóa', style: TextStyle(fontSize: 12)),
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -961,10 +1107,10 @@ class _PhieuPhauThuatScreenState extends State<PhieuPhauThuatScreen> {
       setState(() => _saving = false);
 
       if (r.success) {
-        _toast('✅ Đã lưu EMR (unsigned)\n${_docType.name}\n$localPath');
-        Navigator.of(context).pop(true); // về lại màn trước, refresh
+        _toast('✅ Đã lưu EMR (unsigned)\n${_docType.name}');
+        Navigator.of(context).pop(true);
       } else {
-        _toast('⚠️ Đã lưu local nhưng EMR lỗi:\n${r.error ?? "lỗi không rõ"}\n$localPath');
+        _toast('⚠️ Đã lưu local nhưng EMR lỗi: ${r.error ?? "lỗi không rõ"}');
       }
     } catch (e) {
       if (!mounted) return;
@@ -973,7 +1119,8 @@ class _PhieuPhauThuatScreenState extends State<PhieuPhauThuatScreen> {
     }
   }
 
-  /// v3.0.133: Lưu PDF + ký + push lên EMR (signed)
+  /// v3.0.134: Lưu PDF + ký + push lên EMR
+  /// Fix: signature PNG được embed vào PDF bytes, pass unsigned cho attachFile
   Future<void> _saveEmrWithSignature() async {
     if (_treatmentCode.isEmpty) {
       _toast('BN chưa có mã điều trị - không thể đính kèm EMR');
@@ -982,7 +1129,7 @@ class _PhieuPhauThuatScreenState extends State<PhieuPhauThuatScreen> {
     if (_tenBacSiCtrl.text.isEmpty) { _toast('Vui lòng nhập tên Bác sĩ'); return; }
     if (_tenBenhNhanCtrl.text.isEmpty) { _toast('Vui lòng nhập tên Bệnh nhân'); return; }
 
-    // Capture signature hoặc reuse đã có
+    // Capture signature
     String? sigPath = _signaturePath;
     if (sigPath == null || !await File(sigPath).exists()) {
       sigPath = await _captureSignature();
@@ -993,16 +1140,17 @@ class _PhieuPhauThuatScreenState extends State<PhieuPhauThuatScreen> {
     if (!mounted) return;
     setState(() => _saving = true);
     try {
-      final pdfBytes = await _buildPdf();
+      // v3.0.134: build PDF (đã embed 3 sig từ pad) + embed user signature vào
+      final pdfBytes = await _buildPdfWithSignature(sigPath);
       final localPath = await _savePdfLocal(pdfBytes);
 
-      // Push lên EMR (signed)
+      // v3.0.134: PDF đã có chữ ký embed → pass unsigned cho attachFile
       final r = await AttachDocumentService.instance.attachFile(
         treatmentCode: _treatmentCode,
         documentTypeId: _docType.id,
         documentName: 'GIẤY CAM KẾT CHẤP THUẬN PHẪU THUẬT',
         filePath: localPath,
-        signaturePath: sigPath,
+        // KHÔNG pass signaturePath vì sig đã embed trong PDF
         signerName: _signerName,
       );
 
@@ -1010,10 +1158,10 @@ class _PhieuPhauThuatScreenState extends State<PhieuPhauThuatScreen> {
       setState(() => _saving = false);
 
       if (r.success) {
-        _toast('✅ Đã ký + lưu EMR\n${_docType.name}\n$localPath');
+        _toast('✅ Đã ký + lưu EMR\n${_docType.name}');
         Navigator.of(context).pop(true);
       } else {
-        _toast('⚠️ Đã lưu local nhưng EMR lỗi:\n${r.error ?? "lỗi không rõ"}\n$localPath');
+        _toast('⚠️ Đã lưu local nhưng EMR lỗi: ${r.error ?? "lỗi không rõ"}');
       }
     } catch (e) {
       if (!mounted) return;
@@ -1039,12 +1187,13 @@ class _PhieuPhauThuatScreenState extends State<PhieuPhauThuatScreen> {
   Future<void> _ensurePdfFonts() async {
     if (_pdfFont != null) return;
     try {
-      final fontData = await rootBundle.load('assets/fonts/Roboto-Regular.ttf');
-      final boldData = await rootBundle.load('assets/fonts/Roboto-Bold.ttf');
+      // v3.0.134: Arial TTF - full Vietnamese diacritics support
+      final fontData = await rootBundle.load('assets/fonts/arial.ttf');
+      final boldData = await rootBundle.load('assets/fonts/arialbd.ttf');
       _pdfFont = pw.Font.ttf(fontData.buffer.asByteData()!);
       _pdfFontBold = pw.Font.ttf(boldData.buffer.asByteData()!);
     } catch (e) {
-      debugPrint('Failed to load Roboto font, using fallback: $e');
+      debugPrint('Failed to load Arial font, using fallback: $e');
       _pdfFont = pw.Font.helvetica();
       _pdfFontBold = pw.Font.helveticaBold();
     }
@@ -1060,11 +1209,17 @@ class _PhieuPhauThuatScreenState extends State<PhieuPhauThuatScreen> {
     );
   }
 
-  /// Render PDF đúng mẫu MS: 01/BV2 với font Roboto + 3 chỗ ký
+  /// Render PDF đúng mẫu MS: 01/BV2 với font Arial + 3 chỗ ký HÀNG NGANG
   Future<Uint8List> _buildPdf() async {
     await _ensurePdfFonts();
 
     final now = DateTime.now();
+    // v3.0.134: dùng ngày user chọn thay vì auto DateTime.now()
+    final pdfDate = DateTime(
+      _selectedYear ?? now.year,
+      _selectedMonth ?? now.month,
+      _selectedDay ?? now.day,
+    );
     final hasSigNB = _sigCtrlNB.isNotEmpty;
     final hasSigGM = _sigCtrlGayMe.isNotEmpty;
     final hasSigPTTB = _sigCtrlPTTB.isNotEmpty;
@@ -1095,12 +1250,83 @@ class _PhieuPhauThuatScreenState extends State<PhieuPhauThuatScreen> {
           _pdfCamKetNB(),
           // Dòng ghi chú
           _pdfNoteLine(),
-          // 3 chữ ký
-          _pdfSignatureNB(sigNbBytes),
-          _pdfSignatureGayMe(sigGmBytes),
-          _pdfSignaturePTTB(sigPttbBytes),
-          // Ngày tháng năm
-          _pdfDateFooter(now),
+          // v3.0.134: 3 chữ ký dàn HÀNG NGANG
+          _pdfSignatureRow(sigNbBytes, sigGmBytes, sigPttbBytes),
+          // Ngày tháng năm (dùng date user chọn)
+          _pdfDateFooter(pdfDate),
+        ],
+      ),
+    );
+    return pdf.save();
+  }
+
+  /// v3.0.134: Build PDF + embed user signature PNG vào cuối trang
+  /// Fix lỗi "PDF có sẵn chưa hỗ trợ ký tay" bằng cách overlay sig lên PDF
+  Future<Uint8List> _buildPdfWithSignature(String userSigPath) async {
+    await _ensurePdfFonts();
+
+    final now = DateTime.now();
+    final pdfDate = DateTime(
+      _selectedYear ?? now.year,
+      _selectedMonth ?? now.month,
+      _selectedDay ?? now.day,
+    );
+
+    final hasSigNB = _sigCtrlNB.isNotEmpty;
+    final hasSigGM = _sigCtrlGayMe.isNotEmpty;
+    final hasSigPTTB = _sigCtrlPTTB.isNotEmpty;
+    final sigNbBytes = hasSigNB ? await _sigCtrlNB.toPngBytes() : null;
+    final sigGmBytes = hasSigGM ? await _sigCtrlGayMe.toPngBytes() : null;
+    final sigPttbBytes = hasSigPTTB ? await _sigCtrlPTTB.toPngBytes() : null;
+
+    // Load user signature PNG
+    final sigFile = File(userSigPath);
+    final sigBytes = await sigFile.readAsBytes();
+
+    final pdf = pw.Document();
+    pdf.addPage(
+      pw.MultiPage(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(20),
+        build: (ctx) => [
+          _pdfHeader(),
+          _pdfFormNumber(),
+          _pdfTitle(),
+          _pdfMuc(),
+          _pdfBacSi(),
+          _pdfTuVan(),
+          _pdfPhuongPhapPT(),
+          _pdfPhuongPhapGayMe(),
+          _pdfDieuTriKhac(),
+          _pdfNguyCo(),
+          _pdfCamKetBS(),
+          _pdfNguoiBenh(),
+          _pdfCamKetNB(),
+          _pdfNoteLine(),
+          _pdfSignatureRow(sigNbBytes, sigGmBytes, sigPttbBytes),
+          _pdfDateFooter(pdfDate),
+          // v3.0.134: embed user sig overlay
+          pw.Padding(
+            padding: const pw.EdgeInsets.only(top: 8),
+            child: pw.Row(
+              children: [
+                pw.Spacer(),
+                pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.end,
+                  children: [
+                    pw.Text('Đã ký điện tử bởi: $_signerName', style: _s(9, style: pw.FontStyle.italic)),
+                    pw.SizedBox(height: 4),
+                    pw.Container(
+                      height: 60,
+                      width: 150,
+                      child: pw.Image(pw.MemoryImage(sigBytes), height: 60, fit: pw.BoxFit.contain),
+                    ),
+                    pw.Text('(Chữ ký điện tử)', style: _s(8, style: pw.FontStyle.italic)),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -1357,79 +1583,57 @@ class _PhieuPhauThuatScreenState extends State<PhieuPhauThuatScreen> {
         ),
       );
 
-  /// Chữ ký người bệnh/thân nhân
-  pw.Widget _pdfSignatureNB(Uint8List? bytes) {
-    return pw.Padding(
-      padding: const pw.EdgeInsets.only(bottom: 8),
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.Text('NGƯỜI BỆNH/THÂN NHÂN:', style: _s(11, bold: true)),
-          pw.SizedBox(height: 2),
-          pw.Text('(Ký, ghi rõ họ tên)', style: _s(10, style: pw.FontStyle.italic)),
-          pw.SizedBox(height: 4),
-          if (bytes != null)
-            pw.Container(
-              height: 80,
-              alignment: pw.Alignment.centerLeft,
-              child: pw.Image(pw.MemoryImage(bytes), height: 80, fit: pw.BoxFit.contain),
-            )
-          else
-            pw.Container(height: 80, decoration: const pw.BoxDecoration(border: pw.Border(bottom: pw.BorderSide()))),
-          pw.SizedBox(height: 2),
-          pw.Text('(Họ và tên)', style: _s(10)),
-        ],
-      ),
-    );
-  }
+  /// v3.0.134: 3 chữ ký dàn HÀNG NGANG (NB | Bác sỹ GM | PTV)
+  pw.Widget _pdfSignatureRow(Uint8List? sigNb, Uint8List? sigGm, Uint8List? sigPttb) {
+    pw.Widget _sigBox(String title, String subTitle, Uint8List? bytes) {
+      return pw.Expanded(
+        child: pw.Padding(
+          padding: const pw.EdgeInsets.symmetric(horizontal: 4),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text(title, style: _s(10, bold: true)),
+              pw.SizedBox(height: 1),
+              pw.Text(subTitle, style: _s(9, style: pw.FontStyle.italic)),
+              pw.SizedBox(height: 3),
+              if (bytes != null)
+                pw.Container(
+                  height: 70,
+                  alignment: pw.Alignment.centerLeft,
+                  child: pw.Image(pw.MemoryImage(bytes), height: 70, fit: pw.BoxFit.contain),
+                )
+              else
+                pw.Container(height: 70, decoration: const pw.BoxDecoration(border: pw.Border(bottom: pw.BorderSide()))),
+              pw.SizedBox(height: 2),
+              pw.Text('(Họ và tên)', style: _s(9)),
+              pw.SizedBox(height: 2),
+              pw.Text('Ngày......tháng......năm......', style: _s(9)),
+            ],
+          ),
+        ),
+      );
+    }
 
-  /// Chữ ký bác sỹ gây mê
-  pw.Widget _pdfSignatureGayMe(Uint8List? bytes) {
     return pw.Padding(
-      padding: const pw.EdgeInsets.only(bottom: 8),
-      child: pw.Column(
+      padding: const pw.EdgeInsets.only(top: 10, bottom: 8),
+      child: pw.Row(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          pw.Text('BÁC SỸ GÂY MÊ:', style: _s(11, bold: true)),
-          pw.SizedBox(height: 2),
-          pw.Text('(Ký, ghi rõ họ tên) ${_tenBacSiGayMeCtrl.text.isNotEmpty ? _tenBacSiGayMeCtrl.text : ""}', style: _s(10, style: pw.FontStyle.italic)),
-          pw.SizedBox(height: 4),
-          if (bytes != null)
-            pw.Container(
-              height: 80,
-              alignment: pw.Alignment.centerLeft,
-              child: pw.Image(pw.MemoryImage(bytes), height: 80, fit: pw.BoxFit.contain),
-            )
-          else
-            pw.Container(height: 80, decoration: const pw.BoxDecoration(border: pw.Border(bottom: pw.BorderSide()))),
-          pw.SizedBox(height: 2),
-          pw.Text('(Họ và tên)', style: _s(10)),
-        ],
-      ),
-    );
-  }
-
-  /// Chữ ký phẫu thuật viên
-  pw.Widget _pdfSignaturePTTB(Uint8List? bytes) {
-    return pw.Padding(
-      padding: const pw.EdgeInsets.only(bottom: 8),
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [
-          pw.Text('PHẪU THUẬT VIÊN/BÁC SỸ THỰC HIỆN THỦ THUẬT:', style: _s(11, bold: true)),
-          pw.SizedBox(height: 2),
-          pw.Text('(Ký, ghi rõ họ tên) ${_tenPhauThuatVienCtrl.text.isNotEmpty ? _tenPhauThuatVienCtrl.text : ""}', style: _s(10, style: pw.FontStyle.italic)),
-          pw.SizedBox(height: 4),
-          if (bytes != null)
-            pw.Container(
-              height: 80,
-              alignment: pw.Alignment.centerLeft,
-              child: pw.Image(pw.MemoryImage(bytes), height: 80, fit: pw.BoxFit.contain),
-            )
-          else
-            pw.Container(height: 80, decoration: const pw.BoxDecoration(border: pw.Border(bottom: pw.BorderSide()))),
-          pw.SizedBox(height: 2),
-          pw.Text('(Họ và tên)', style: _s(10)),
+          _sigBox(
+            'NGƯỜI BỆNH/THÂN NHÂN:',
+            '(Ký, ghi rõ họ tên)',
+            sigNb,
+          ),
+          _sigBox(
+            'BÁC SỸ GÂY MÊ:',
+            '(Ký, ghi rõ họ tên)${_tenBacSiGayMeCtrl.text.isNotEmpty ? " ${_tenBacSiGayMeCtrl.text}" : ""}',
+            sigGm,
+          ),
+          _sigBox(
+            'PHẪU THUẬT VIÊN/TT:',
+            '(Ký, ghi rõ họ tên)${_tenPhauThuatVienCtrl.text.isNotEmpty ? " ${_tenPhauThuatVienCtrl.text}" : ""}',
+            sigPttb,
+          ),
         ],
       ),
     );
