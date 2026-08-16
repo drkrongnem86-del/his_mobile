@@ -1,25 +1,29 @@
-# GitHub Actions: Create GitHub Release + Auto-update version.json
+# GitHub Actions: Build APK (arm64) + AAB + Auto-release + Auto-update version.json
 #
-# Workflow mới (v3.0.127): KHÔNG build APK trên CI nữa vì user không add secrets
-# (release keystore thiếu → APK build ra bị sign với Android Debug → user cài đè
-#  lên bản local cũ release-signed bị "INSTALL_FAILED_UPDATE_INCOMPATIBLE").
+# Workflow:
+#   1. git tag v3.0.95
+#   2. git push origin v3.0.95
+#   3. Action tự động:
+#      - Build APK arm64 (Samsung A17 dùng cái này)
+#      - Build AAB (Google Play Store)
+#      - Build IPA iOS (cần Apple certs - optional, sẽ skip nếu thiếu)
+#      - Tạo GitHub Release với APK + AAB + IPA đính kèm
+#      - Update version.json với version mới + link tới release
+#      - Commit version.json mới về repo
 #
-# Workflow mới (LOCAL-FIRST):
-#   1. Build APK trên máy local với release keystore
-#      $ flutter build apk --release --target-platform android-arm64 --split-per-abi
-#   2. Commit code + push
-#   3. Tag version + push tag
-#      $ git tag v3.0.127
-#      $ git push origin v3.0.127
-#   4. Action này chạy:
-#      - Tạo GitHub Release (rỗng) cho tag
-#      - Update version.json với link tới APK
-#   5. User upload local APK vào release page qua web UI
-#      (5 clicks: Edit release → drag APK vào Assets → Publish)
+# ⚠️ CẦN add 4 GitHub Secrets để build với release keystore (tránh debug-signed APK):
+#   - ANDROID_KEYSTORE_BASE64    (paste từ D:\his-mobile-release.jks.base64)
+#   - ANDROID_KEYSTORE_PASSWORD  = hismobile123
+#   - ANDROID_KEY_PASSWORD       = hismobile123
+#   - ANDROID_KEY_ALIAS          = his-mobile
+# Nếu thiếu → workflow fail-fast với message rõ ràng (xem Build APK step).
+#
+# v3.0.128: Restore build jobs (sau khi v3.0.127 simplified) - giờ user vừa có thể
+#           build local (LOCAL-FIRST) vừa build trên GitHub (khi add secrets).
 #
 # Trigger: push tag v*.*.* HOẶC manual workflow_dispatch
 
-name: Create Release
+name: Build Release
 
 on:
   push:
@@ -28,22 +32,283 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version (vd: 3.0.127) - phải khớp pubspec.yaml'
+        description: 'Version (vd: 3.0.95) - phải khớp pubspec.yaml'
         required: true
-        default: '3.0.127'
+        default: '3.0.95'
+
+env:
+  FLUTTER_VERSION: '3.41.7'
+  JAVA_VERSION: '17'
 
 jobs:
   # ============================================================
-  # GITHUB RELEASE - tạo release rỗng cho tag
-  # User sẽ upload local APK (signed bằng release keystore) qua web UI
+  # ANDROID - APK arm64 (cho Samsung A17 - direct install)
+  # ============================================================
+  build-apk:
+    name: 📦 Build APK (arm64 - Samsung A17)
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🔧 Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: 🐦 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: 📦 Get dependencies
+        run: flutter pub get
+
+      # v3.0.120: Decode release keystore tu secrets (neu co) - de build APK
+      # sign voi release key (cung SHA voi local build) -> user cài de len ban cu duoc
+      #
+      # v3.0.119 BUG: dung "if: ${{ secrets.X != '' }}" → GitHub Actions REJECT
+      # file (security: secrets khong duoc phep trong if: condition).
+      # Fix: bo if:, dung "continue-on-error: true" + check runtime trong script.
+      # Output keystore_path se duoc set neu decode thanh cong.
+      - name: 🔐 Decode release keystore
+        id: keystore
+        continue-on-error: true
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if ([string]::IsNullOrEmpty($env:KEYSTORE_B64)) {
+            Write-Host "::notice::ANDROID_KEYSTORE_BASE64 secret not set - skipping release keystore decode (build se dung debug keystore)"
+            exit 0
+          }
+          try {
+            $keystoreBytes = [System.Convert]::FromBase64String($env:KEYSTORE_B64)
+            [System.IO.File]::WriteAllBytes("$env:RUNNER_TEMP\his-mobile-release.jks", $keystoreBytes)
+            "keystore_path=$env:RUNNER_TEMP\his-mobile-release.jks" | Out-File -Append -Encoding utf8 $env:GITHUB_OUTPUT
+            Write-Host "::notice::Release keystore decoded to $env:RUNNER_TEMP\his-mobile-release.jks"
+          } catch {
+            Write-Host "::warning::Failed to decode keystore: $_"
+            exit 0
+          }
+      - name: 📝 Generate key.properties
+        # v3.0.120: Chi chay neu keystore duoc decode thanh cong
+        # (truthy check: null/empty string deu skip step)
+        if: ${{ steps.keystore.outputs.keystore_path }}
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          $content = "storePassword=$env:KEYSTORE_PASSWORD`nkeyPassword=$env:KEY_PASSWORD`nkeyAlias=$env:KEY_ALIAS`nstoreFile=${{ steps.keystore.outputs.keystore_path }}"
+          Set-Content -Path android/key.properties -Value $content -Encoding UTF8
+          Write-Host "::notice::android/key.properties generated"
+      - name: 🏗️ Build APK (arm64 only)
+        # v3.0.125: Fail-fast nếu release keystore chưa setup (tránh build với debug.keystore
+        # silently - gây lỗi "INSTALL_FAILED_UPDATE_INCOMPATIBLE" khi user cài đè)
+        # Check: key.properties tồn tại + chứa storeFile trỏ tới file .jks (không phải debug.keystore)
+        run: |
+          $keyProps = "android\key.properties"
+          $storeFile = $null
+          if (Test-Path $keyProps) {
+            Get-Content $keyProps | ForEach-Object {
+              if ($_ -match '^storeFile=(.+)$') { $storeFile = $Matches[1].Trim() }
+            }
+          }
+          if (-not $storeFile -or $storeFile -like '*debug*' -or $storeFile -like '*keystore') {
+            Write-Host "::error::❌ Release keystore chưa được setup! File key.properties thiếu hoặc storeFile trỏ tới debug keystore."
+            Write-Host "::error::  → Add 4 secrets vào GitHub: ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_PASSWORD, ANDROID_KEY_ALIAS"
+            Write-Host "::error::  → Hoặc build local: flutter build apk --release --target-platform android-arm64 --split-per-abi"
+            exit 1
+          }
+          Write-Host "::notice::✅ Release keystore detected: $storeFile"
+          flutter build apk --release --target-platform android-arm64 --split-per-abi
+
+      - name: 📤 Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: his-mobile-apk-arm64
+          path: build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+          if-no-files-found: error
+          retention-days: 90
+
+  # ============================================================
+  # ANDROID - AAB (Google Play Store format)
+  # ============================================================
+  build-aab:
+    name: 📦 Build AAB (Google Play)
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🔧 Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: 🐦 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: 📦 Get dependencies
+        run: flutter pub get
+
+      - name: 🏗️ Build AAB (universal)
+        # Output: build/app/outputs/bundle/release/app-release.aab
+        run: flutter build appbundle --release
+
+      - name: 📤 Upload AAB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: his-mobile-aab
+          path: build/app/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+          retention-days: 90
+
+  # ============================================================
+  # iOS - IPA (cho TestFlight / App Store / Ad-hoc)
+  # v3.0.112: Thêm job build IPA song song với Android
+  # v3.0.113: continue-on-error: true - IPA fail không block Create Release
+  #            (iOS thiếu Apple certs, build sẽ fail cho đến khi add certs vào secrets)
+  # ============================================================
+  build-ipa:
+    name: 🍎 Build IPA (iOS - macOS runner) - optional
+    runs-on: macos-latest
+    timeout-minutes: 60
+    continue-on-error: true  # KHÔNG block Create Release khi iOS thiếu certs
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🔧 Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: 🐦 Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: 📦 Get dependencies
+        run: flutter pub get
+
+      # v3.0.112: Chọn iOS deployment target trong Podfile nếu cần
+      - name: 🍎 Set iOS deployment target
+        run: |
+          cd ios
+          # iOS 13+ (mặc định Flutter 3.x)
+          if [ -f "Podfile" ]; then
+            sed -i '' 's/# platform :ios, .*/platform :ios, "13.0"/' Podfile || true
+            echo "✅ Podfile updated"
+          fi
+
+      - name: 📦 Install CocoaPods
+        run: |
+          cd ios
+          pod install --repo-update
+        env:
+          # Tăng timeout cho pod install
+          LC_ALL: en_US.UTF-8
+
+      - name: 🏗️ Build IPA (no-codesign)
+        # v3.0.112: Build KHÔNG cần code signing để workflow chạy được
+        # Để cài được lên iPhone, cần thêm Apple Developer certs vào secrets
+        # xem: https://docs.fastlane.tools/codesigning/guides/
+        run: |
+          flutter build ios --release --no-codesign --export-method=development
+          # Tạo IPA từ Runner.app
+          cd build/ios/iphoneos
+          mkdir -p Payload
+          cp -r Runner.app Payload/
+          zip -r "Runner.ipa" Payload
+          ls -la Runner.ipa
+
+      - name: 📤 Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: his-mobile-ipa
+          path: build/ios/iphoneos/Runner.ipa
+          if-no-files-found: warn  # Không fail nếu IPA build lỗi (iOS chưa có certs)
+          retention-days: 90
+
+  # ============================================================
+  # GITHUB RELEASE - tạo release tự động khi push tag
+  # Bao gồm: APK arm64 (rename) + AAB + IPA
   # ============================================================
   create-release:
-    name: 🚀 Create GitHub Release (empty - user uploads local APK)
+    name: 🚀 Create GitHub Release
+    # v3.0.113: Bỏ build-ipa khỏi needs - IPA fail không block Create Release
+    #            (iOS chưa có certs, IPA sẽ optional)
+    needs: [build-apk, build-aab]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
     steps:
+      - name: 📥 Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          continue-on-error: true  # iOS artifact có thể không có (no certs)
+
+      - name: 📋 List artifacts
+        run: |
+          echo "=== Artifacts downloaded ==="
+          ls -la artifacts/ 2>/dev/null || echo "No artifacts dir"
+          for d in artifacts/*/; do
+            if [ -d "$d" ]; then
+              echo "--- $d ---"
+              ls -la "$d"
+            fi
+          done
+
+      - name: 🏷️ Rename APK theo version
+        # Đổi tên app-arm64-v8a-release.apk → his_mobile_v{version}_arm64.apk
+        # để URL trong version.json dễ đọc + stable
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          cd artifacts/his-mobile-apk-arm64/ 2>/dev/null || {
+            echo "❌ APK artifact not found - skipping rename"
+            exit 0
+          }
+          VERSION="${TAG_NAME#v}"
+          mv -v app-arm64-v8a-release.apk "his_mobile_v${VERSION}_arm64.apk" 2>/dev/null || true
+          ls -la 2>/dev/null || true
+
+      - name: 🏷️ Rename IPA theo version
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+        run: |
+          cd artifacts/his-mobile-ipa/ 2>/dev/null || {
+            echo "❌ IPA artifact not found (iOS build có thể đã skip) - skipping"
+            exit 0
+          }
+          VERSION="${TAG_NAME#v}"
+          if [ -f "Runner.ipa" ]; then
+            mv -v Runner.ipa "his_mobile_v${VERSION}.ipa" 2>/dev/null || true
+            ls -la 2>/dev/null
+          else
+            echo "❌ Runner.ipa not found"
+          fi
+
       - name: 🚀 Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -51,23 +316,21 @@ jobs:
           draft: false
           prerelease: false
           generate_release_notes: true
-          # KHÔNG có files - user upload local APK manual
-          body: |
-            ## 📦 Cài đặt
-
-            1. Tải file `his_mobile_v${{ github.ref_name }}_arm64.apk` ở mục **Assets** bên dưới
-            2. Mở file APK trên điện thoại Android (Samsung A17)
-            3. Cho phép cài từ nguồn không xác định (nếu được hỏi)
-            4. Cài đè lên bản cũ (cùng signing key, không bị lỗi)
-
-            > ⚠️ **Quan trọng**: APK này phải được sign bằng **release keystore** (`dc3abb...`),
-            > không phải debug keystore. Nếu install bị lỗi "App not installed" → báo admin.
+          files: |
+            artifacts/his-mobile-apk-arm64/his_mobile_${{ github.ref_name }}_arm64.apk
+            artifacts/his-mobile-aab/app-release.aab
+            artifacts/his-mobile-ipa/his_mobile_${{ github.ref_name }}.ipa
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   # ============================================================
-  # AUTO-UPDATE version.json - commit file mới lên main branch
-  # File này được app đọc để check update in-app
+  # AUTO-UPDATE version.json - tự động update sau khi Release tạo xong
+  # File version.json được app đọc để check update
+  #
+  # v3.0.120: Checkout "ref: main" luôn (clean hơn detached HEAD + reset --hard)
+  # Workflow trigger = push tag, nên github.ref = refs/tags/vX.Y.Z
+  # Checkout main để commit + push version.json thẳng lên main branch
+  # (commit hash vX.Y.Z tag vẫn trỏ về đúng commit v3.0.120 trên main)
   # ============================================================
   update-version-json:
     name: 📝 Update version.json
@@ -89,7 +352,7 @@ jobs:
           TAG_NAME: ${{ github.ref_name }}
           REPO: ${{ github.repository }}
         run: |
-          # TAG_NAME = "v3.0.127" → version = "3.0.127"
+          # TAG_NAME = "v3.0.120" → version = "3.0.120"
           VERSION="${TAG_NAME#v}"
           echo "New version: $VERSION"
           APK_URL="https://github.com/${REPO}/releases/download/${TAG_NAME}/his_mobile_v${VERSION}_arm64.apk"

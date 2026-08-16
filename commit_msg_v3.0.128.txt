@@ -1,0 +1,16 @@
+﻿v3.0.128: Restore build.yml với build-apk/AAB/IPA jobs - vừa local vừa GitHub build
+
+Yêu cầu mới của user: vừa build local (LOCAL-FIRST) vừa build trên GitHub như trước.
+
+Fix:
+- Restore build jobs: build-apk (arm64 cho Samsung A17), build-aab (Google Play), build-ipa (iOS optional)
+- Giữ fail-fast guard ở Build APK step: nếu key.properties thiếu/storeFile trỏ debug keystore
+  → fail-fast với message hướng dẫn add 4 secrets
+- User workflow mới:
+  1. Add 4 GitHub secrets (ANDROID_KEYSTORE_BASE64/PASSWORD/KEY_PASSWORD/KEY_ALIAS)
+  2. git tag v3.0.128 && git push origin v3.0.128
+  3. Workflow tự build APK (sign release keystore dc3abb) + AAB + IPA + tạo release + update version.json
+- HOẶC build local không cần secrets:
+  flutter build apk --release --target-platform android-arm64 --split-per-abi
+
+Bump: 3.0.127+271 → 3.0.128+272
