@@ -1,5 +1,5 @@
 {
-    "message": "Fix font tiếng Việt (Roboto TTF) + 3 chỗ ký (NB + Bác sỹ gây mê + Phẫu thuật viên) + checkbox đồng ý/không + layout đúng mau.pdf",
-    "version": "3.0.132",
-    "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.132/his_mobile_v3.0.132_arm64.apk"
+  "version": "3.0.132",
+  "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.132/his_mobile_v3.0.132_arm64.apk",
+  "message": "Cập nhật phiên bản 3.0.132"
 }
