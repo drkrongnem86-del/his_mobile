@@ -72,3 +72,4 @@ flutter:
   assets:
     - assets/vpn/his_vpn.ovpn
     - assets/vpn/nemk_vpn.ovpn
+    - assets/fonts/
