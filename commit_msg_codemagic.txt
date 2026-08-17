@@ -1,0 +1,14 @@
+Thêm codemagic.yaml - config cho iOS IPA build + Android release
+
+File codemagic.yaml define 2 workflows:
+- ios-release: Build IPA (flutter build ipa --release --no-codesign)
+  → artifact: build/ios/ipa/*.ipa (đúng extension .ipa)
+  → cũ vẫn là Runner.app.zip vì build command cũ flutter build ios --debug --no-codesign
+- android-release: Build APK arm64 + AAB
+
+Trên Codemagic UI (nếu không dùng codemagic.yaml):
+Vào Workflows → chỉnh workflow hiện tại → Build commands:
+  OLD: flutter build ios --debug --no-codesign
+  NEW: flutter build ipa --release --no-codesign
+
+Bump version 3.0.125+269 -> 3.0.126+270

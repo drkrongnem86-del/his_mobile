@@ -1,0 +1,13 @@
+v3.0.120: Fix build.yml workflow - bỏ if: secrets.X (GitHub cấm)
+
+- build.yml: keystore decode step
+  - v3.0.119 BUG: 'if: secrets.X != ""' → GitHub Actions REJECT file
+    (security: secrets không được phép trong if: condition)
+  - Fix: bỏ if:, dùng continue-on-error + runtime check trong PowerShell
+  - Key.properties chỉ generate khi keystore decode thành công
+- build.yml: update-version-json
+  - Đổi checkout thành ref: main (clean hơn detached HEAD + reset --hard)
+  - Bỏ Setup Python step (không cần Python nữa)
+- app_constants: PTTT HSCC executeRoomId = 36 (v3.0.117 fix đã đúng)
+
+Bump 3.0.119+263 -> 3.0.120+264

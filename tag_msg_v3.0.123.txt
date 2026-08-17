@@ -1,0 +1,7 @@
+v3.0.123: Fix lỗi 'App not installed' - dùng PackageInstaller.Session API
+
+Thay vì Intent.ACTION_VIEW (cần kill process), dùng
+PackageInstaller.Session API chính thống để hệ thống tự
+xử lý self-update lifecycle.
+
+Bump 3.0.122+266 -> 3.0.123+267

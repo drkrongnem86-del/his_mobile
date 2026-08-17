@@ -1,0 +1,7 @@
+v3.0.121: Fix lỗi 'App not installed' khi tự cập nhật qua in-app update
+
+MainActivity.kt: finishAndRemoveTask + kill process sau 800ms
+trước khi mở install intent. Android PackageInstaller yêu cầu
+app cũ phải tắt hẳn trước khi cài đè.
+
+Bump 3.0.120+264 -> 3.0.121+265

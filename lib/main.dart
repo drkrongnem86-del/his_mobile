@@ -9,6 +9,7 @@ import 'package:his_mobile/core/theme/app_theme.dart';
 import 'package:his_mobile/core/theme/theme_manager.dart';
 import 'package:his_mobile/data/api/his_api_service.dart';
 import 'package:his_mobile/data/api/his_catalog_service.dart';
+import 'package:his_mobile/data/api/his_pro_api_service.dart' as his_pro_api;  // v3.0.139: class CHÍNH (EMR push)
 import 'package:his_mobile/data/api/his_service_req_service.dart';
 import 'package:his_mobile/data/api/his_tracking_service.dart';
 import 'package:his_mobile/data/api/thongke_auth_service.dart';
@@ -52,9 +53,13 @@ void main() async {
   //   → App dùng token cũ → EMR push fail
   // - Fix: hardcode là source of truth, LUÔN ghi đè SharedPreferences
   // - Nếu cần test token khác, dùng Settings → "Token HIS Pro (override)"
+  // v3.0.142: CRITICAL - Có 2 class HisProApiService khác nhau!
+  //   1. lib/data/api/his_pro_api_service.dart (class CHÍNH) - dùng cho EMR push
+  //   2. lib/data/services/his_pro_api_service.dart (class PHỤ) - dùng cho service khác
+  // → Fix: set token ở CẢ 2 class + update hardcode HisProHardcoded.tokenCode
   try {
     const String latestToken = '1ee41ae967caa75e7c2891a3d9612259d70b4645c67852ab0e5f07546c2f3dfb';
-    const String latestIp = '171.15.0.9';  // v3.0.59: IP mới (đổi từ 171.15.128.5)
+    const String latestIp = '172.16.200.109';  // v3.0.137: IP mới (đổi từ 171.15.0.9)
     // Check override từ Settings (nếu BS muốn dùng token khác)
     final String? overrideToken = prefs.getString('his_pro_token_override');
     final String? overrideIp = prefs.getString('his_pro_ip_override');
@@ -63,8 +68,19 @@ void main() async {
     // v3.0.49: LUÔN ghi đè SharedPreferences cache với hardcode mới nhất
     await prefs.setString('his_pro_token_code', emrToken);
     await prefs.setString('his_pro_client_ip', emrIp);
+    // v3.0.137: Set token cho HisApiService (procedure room dùng cái này)
+    HisApiService().setAuthToken(emrToken);
+    // v3.0.139: Set token cho class PHỤ (services/his_pro_api_service.dart)
     HisProApiService.instance.setTokenCode(token: emrToken, clientIp: emrIp);
-    print('🔑 [v3.0.59] Force EMR Token: ${emrToken.substring(0, 8)}… IP=$emrIp');
+    // v3.0.139: Set token cho class CHÍNH (api/his_pro_api_service.dart) - dùng cho EMR push
+    // Trước tiên xóa cache cũ (tránh token cũ paste trước đó còn trong SecureStorage)
+    try {
+      await his_pro_api.HisProApiService.instance.clearCustomBearer();
+    } catch (e) {
+      print('⚠️ clearCustomBearer: $e');
+    }
+    await his_pro_api.HisProApiService.instance.setCustomBearer(emrToken);
+    print('🔑 [v3.0.139] Force EMR Token: ${emrToken.substring(0, 8)}… IP=$emrIp (cả 2 class)');
   } catch (e) {
     print('⚠️ Bootstrap EMR Token failed: $e');
   }

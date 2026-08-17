@@ -1,0 +1,13 @@
+﻿v3.0.129: Bỏ fail-fast guard - GitHub build luôn succeed như #27 v3.0.124
+
+User yêu cầu GitHub build phải GREEN (pass) như các bản trước. Bỏ fail-fast guard:
+- Build APK step giờ chỉ warning nếu thiếu secrets (vẫn chạy flutter build)
+- Thiếu secrets → APK debug-signed (SHA 87b77725), build vẫn succeed
+- Có secrets → APK release-signed (SHA dc3abb), như cũ
+
+Workflow:
+- git push origin v3.0.129 → trigger full GitHub build
+- Build sẽ succeed, tạo release với APK + AAB
+- iOS build vẫn continue-on-error (no Apple certs)
+
+Bump: 3.0.128+272 → 3.0.129+273

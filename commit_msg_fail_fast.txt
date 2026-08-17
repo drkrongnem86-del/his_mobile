@@ -1,0 +1,14 @@
+build.yml: Fail-fast nếu release keystore chưa setup (v3.0.125)
+
+Root cause v3.0.124 build fail trên Samsung với "INSTALL_FAILED_UPDATE_INCOMPATIBLE":
+- User CHƯA add ANDROID_KEYSTORE_BASE64 secret vào GitHub Actions
+- Decode keystore step skip (continue-on-error) → key.properties không tạo
+- Build.gradle.kts rơi vào fallback dùng debug.keystore
+- APK release trên GitHub bị sign bằng Android Debug cert (CN=Android Debug)
+- User cài v3.0.124 đè lên v3.0.123 (release SHA dc3abb...) → mismatch → fail
+
+Fix: build.yml Build APK step thêm pre-check
+- Đọc android/key.properties
+- Nếu thiếu hoặc storeFile là debug keystore → fail-fast với ::error::
+- Hướng dẫn add 4 secrets: ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD, ANDROID_KEY_PASSWORD, ANDROID_KEY_ALIAS
+- Build KHÔNG BAO GIỜ dùng debug keystore silently nữa

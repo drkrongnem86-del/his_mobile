@@ -60,11 +60,12 @@ import 'package:his_mobile/data/services/secure_storage_service.dart';
 import 'package:his_mobile/data/services/upload_log_service.dart';
 
 /// v3.0.42: TokenCode từ memory dump HIS Pro desktop (MAYTINH-2FA6BJT)
-/// Expire: 2026-08-16T14:11:50 (30 ngày)
+/// v3.0.142: Bumped sang token MỚI 1ee41ae9... (active 17/08/2026 17:08)
 class HisProHardcoded {
-  /// TokenCode từ memory dump HIS Pro desktop (dump_his_token.ps1, 2026-07-17)
-  /// Dùng trong headers: TokenCode, ApplicationCode, ClientIpAddress
-  static const String tokenCode = 'cb356d3891b1e01ccbca37bafa5c61ef038e7c091de8cb09e019f061d20e77d3';
+  /// v3.0.142: TokenCode MỚI (active 17/08/2026 17:08, từ log HIS Desktop)
+  /// Token xoay mỗi session - lấy từ `dti:"...|TOKEN|..."` trong LogSystem.txt
+  /// Previous: cb356d3891b1e01ccbca37bafa5c61ef038e7c091de8cb09e019f061d20e77d3 (v3.0.65 - đã hết hạn)
+  static const String tokenCode = '1ee41ae967caa75e7c2891a3d9612259d70b4645c67852ab0e5f07546c2f3dfb';
 
   /// IP máy BV chạy HIS Pro (cố định, từ memory dump)
   static const String clientIpAddress = '172.16.200.109';

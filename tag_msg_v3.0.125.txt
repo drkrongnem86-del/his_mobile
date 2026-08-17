@@ -1,0 +1,9 @@
+v3.0.125: Re-tag với iOS build fix (AppDelegate.swift)
+
+Tag v3.0.124 cũ pin ở commit b1cc05f (trước iOS fix).
+Tag v3.0.125 này ở commit mới nhất với:
+- ios/Runner/AppDelegate.swift (file bị thiếu)
+- build.yml fail-fast guard cho release keystore
+- bump pubspec 3.0.124+268 -> 3.0.125+269
+
+Codemagic iOS build dùng tag này sẽ pass.
