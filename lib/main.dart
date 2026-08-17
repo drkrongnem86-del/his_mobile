@@ -53,7 +53,7 @@ void main() async {
   // - Fix: hardcode là source of truth, LUÔN ghi đè SharedPreferences
   // - Nếu cần test token khác, dùng Settings → "Token HIS Pro (override)"
   try {
-    const String latestToken = 'af89403b7f001cd27ca9defa6c987a4f9e7bbd564525b8bc6287a693bf674c4d';
+    const String latestToken = '1ee41ae967caa75e7c2891a3d9612259d70b4645c67852ab0e5f07546c2f3dfb';
     const String latestIp = '171.15.0.9';  // v3.0.59: IP mới (đổi từ 171.15.128.5)
     // Check override từ Settings (nếu BS muốn dùng token khác)
     final String? overrideToken = prefs.getString('his_pro_token_override');

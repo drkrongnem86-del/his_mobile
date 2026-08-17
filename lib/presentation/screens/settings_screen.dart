@@ -35,6 +35,9 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   String _apiUrl = '';
+  String _tokenCode = '';
+  String _tokenClientIp = '';
+  DateTime? _tokenUpdated;
 
   // v2.48.0: Bỏ UI nhập tay - chỉ theo dõi trạng thái tự động
   // (đã xóa _hisProLoginName, _hisProBearerToken, _hisProTokenVisible, ...)
@@ -50,9 +53,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _loadInfo() async {
     final data = DataService.instance;
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('his_pro_token_code') ?? '';
+    final clientIp = prefs.getString('his_pro_client_ip') ?? '';
+    final updatedMs = prefs.getInt('his_pro_token_updated');
     setState(() {
       _apiUrl = data.baseUrl;
+      _tokenCode = token;
+      _tokenClientIp = clientIp;
+      _tokenUpdated = updatedMs != null ? DateTime.fromMillisecondsSinceEpoch(updatedMs) : null;
     });
+  }
+
+  String get _tokenMasked {
+    if (_tokenCode.isEmpty) return '— chưa đặt —';
+    if (_tokenCode.length < 16) return _tokenCode;
+    return '${_tokenCode.substring(0, 8)}…${_tokenCode.substring(_tokenCode.length - 8)}';
+  }
+
+  String get _tokenStatusLabel {
+    if (_tokenCode.isEmpty) return '⚠️ Chưa có token';
+    return '✅ Token đã đặt';
   }
 
   // v2.66.0: Lấy version từ AppVersionService (đọc từ package_info_plus)
@@ -170,10 +191,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
     if (result != null && result.isNotEmpty) {
       await thongke.setHisProToken(result);
+      // v3.0.137: lưu thời gian update token
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt('his_pro_token_updated', DateTime.now().millisecondsSinceEpoch);
+      // Apply token immediately
+      await HisProApiService.instance.setCustomBearer(result);
       if (!mounted) return;
-      setState(() {});
+      setState(() {
+        _tokenCode = result;
+        _tokenUpdated = DateTime.now();
+      });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('✅ Đã lưu token - app sẽ tự dùng')),
+        const SnackBar(content: Text('✅ Đã lưu token - app sẽ tự dùng cho EMR')),
       );
     }
   }
@@ -326,6 +355,82 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     );
                   },
+                ),
+
+                // v3.0.137: Token EMR status
+                _section('TOKEN EMR'),
+                Card(
+                  color: Colors.white,
+                  margin: const EdgeInsets.only(bottom: 4),
+                  elevation: 0.5,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    side: const BorderSide(color: Color(0xFFE0E0E0), width: 1),
+                  ),
+                  child: InkWell(
+                    onTap: () async {
+                      await _showTokenDialog();
+                      await _loadInfo();
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                width: 40, height: 40,
+                                decoration: BoxDecoration(color: Colors.green.withOpacity(0.12), borderRadius: BorderRadius.circular(8)),
+                                child: const Icon(Icons.vpn_key, color: Colors.green, size: 22),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(_tokenStatusLabel, style: const TextStyle(color: Colors.black, fontSize: 14, fontWeight: FontWeight.w600)),
+                                    Text(_tokenMasked, style: const TextStyle(fontFamily: 'monospace', fontSize: 11, color: Colors.black54)),
+                                    if (_tokenClientIp.isNotEmpty)
+                                      Text('IP: $_tokenClientIp', style: const TextStyle(fontSize: 10, color: Colors.black38)),
+                                  ],
+                                ),
+                              ),
+                              const Icon(Icons.chevron_right, color: Colors.black45, size: 20),
+                            ],
+                          ),
+                          if (_tokenUpdated != null) ...[
+                            const SizedBox(height: 6),
+                            Text(
+                              'Cập nhật: ${_tokenUpdated!.day.toString().padLeft(2, '0')}/${_tokenUpdated!.month.toString().padLeft(2, '0')}/${_tokenUpdated!.year} lúc ${_tokenUpdated!.hour.toString().padLeft(2, '0')}:${_tokenUpdated!.minute.toString().padLeft(2, '0')}',
+                              style: const TextStyle(fontSize: 10, color: Colors.black38),
+                            ),
+                          ],
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: () async {
+                                    await _showTokenDialog();
+                                    await _loadInfo();
+                                  },
+                                  icon: const Icon(Icons.refresh, size: 14),
+                                  label: const Text('Cập nhật token', style: TextStyle(fontSize: 12)),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              OutlinedButton(
+                                onPressed: _showTokenHelp,
+                                child: const Icon(Icons.help_outline, size: 16),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
 
                 // === GIAO DIỆN ===

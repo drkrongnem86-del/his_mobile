@@ -1234,7 +1234,7 @@ class _PhieuPhauThuatScreenState extends State<PhieuPhauThuatScreen> {
     final sigGmBytes = hasSigGM ? await _sigCtrlGayMe.toPngBytes() : null;
     final sigPttbBytes = hasSigPTTB ? await _sigCtrlPTTB.toPngBytes() : null;
 
-    final pdf = pw.Document();
+    final pdf = pw.Document(theme: pw.ThemeData.withFont(base: _pdfFont));
 
     pdf.addPage(
       pw.MultiPage(
@@ -1289,7 +1289,7 @@ class _PhieuPhauThuatScreenState extends State<PhieuPhauThuatScreen> {
     final sigFile = File(userSigPath);
     final sigBytes = await sigFile.readAsBytes();
 
-    final pdf = pw.Document();
+    final pdf = pw.Document(theme: pw.ThemeData.withFont(base: _pdfFont));
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,

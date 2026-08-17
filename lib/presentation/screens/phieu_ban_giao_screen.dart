@@ -770,7 +770,7 @@ class _PhieuBanGiaoScreenState extends State<PhieuBanGiaoScreen> {
     final sigGiaoBytes = _sigCtrlGiao.isNotEmpty ? await _sigCtrlGiao.toPngBytes() : null;
     final sigNhanBytes = _sigCtrlNhan.isNotEmpty ? await _sigCtrlNhan.toPngBytes() : null;
 
-    final pdf = pw.Document();
+    final pdf = pw.Document(theme: pw.ThemeData.withFont(base: _pdfFont));
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,

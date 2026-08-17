@@ -675,7 +675,7 @@ class _PhieuRaVienScreenState extends State<PhieuRaVienScreen> {
     final sigNbBytes = _sigCtrlNB.isNotEmpty ? await _sigCtrlNB.toPngBytes() : null;
     final sigBsBytes = _sigCtrlBS.isNotEmpty ? await _sigCtrlBS.toPngBytes() : null;
 
-    final pdf = pw.Document();
+    final pdf = pw.Document(theme: pw.ThemeData.withFont(base: _pdfFont));
     pdf.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
