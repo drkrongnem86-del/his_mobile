@@ -662,7 +662,12 @@ class EmrPushService {
         // Trường hợp lạ: success=true nhưng Data không có DocumentCode
         return EmrPushResult(success: true, documentCode: null, fssUrl: fssUrl);
       }
-      // Fallback: response lạ (không phải Map, không phải String đã parse)
+      // v3.0.140: HIS Pro EMR 1417 trả text/plain thay vì JSON
+      if (r.data is String) {
+        final s = (r.data as String).trim();
+        debugPrint('EMR push: string response = $s');
+        return EmrPushResult(success: true, documentCode: null, fssUrl: fssUrl);
+      }
       return EmrPushResult(success: false, error: 'Response không hợp lệ: ${r.data?.runtimeType}', errorType: 'unknown', fssUrl: fssUrl);
     } catch (e) {
       debugPrint('EMR push error: $e');
@@ -840,6 +845,13 @@ class EmrPushService {
         // Trường hợp lạ: success=true nhưng Data không có DocumentCode
         return EmrPushResult(success: true, documentCode: null, fssUrl: fssUrl);
       }
+      // v3.0.140: response là String (HIS Pro EMR 1417 trả text/plain thay vì JSON)
+      if (r.data is String) {
+        final s = (r.data as String).trim();
+        debugPrint('EMR push (UNSIGNED): string response = $s');
+        // String = server đã nhận PDF thành công (hoặc trả "OK", "...", v.v.)
+        return EmrPushResult(success: true, documentCode: null, fssUrl: fssUrl);
+      }
       return EmrPushResult(success: false, error: 'Response không hợp lệ: ${r.data?.runtimeType}', errorType: 'unknown', fssUrl: fssUrl);
     } catch (e) {
       debugPrint('EMR push (UNSIGNED) error: $e');
@@ -978,6 +990,12 @@ class EmrPushService {
             documentId: data['DocumentId'] is int ? data['DocumentId'] as int : null,
           );
         }
+        return EmrPushResult(success: true, documentCode: null);
+      }
+      // v3.0.140: HIS Pro EMR 1417 trả text/plain thay vì JSON
+      if (r.data is String) {
+        final s = (r.data as String).trim();
+        debugPrint('EMR push SIGNED: string response = $s');
         return EmrPushResult(success: true, documentCode: null);
       }
       return EmrPushResult(success: false, error: 'Response không hợp lệ: ${r.data?.runtimeType}', errorType: 'unknown');
