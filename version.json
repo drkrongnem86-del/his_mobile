@@ -1,5 +1,5 @@
 {
-    "message": "Fix EMR push String response - HIS Pro 1417 tra text/plain, xu li thanh success khi chuoi tra ve",
-    "version": "3.0.138",
-    "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.138/his_mobile_v3.0.138_arm64.apk"
+  "version": "3.0.138",
+  "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.138/his_mobile_v3.0.138_arm64.apk",
+  "message": "Cập nhật phiên bản 3.0.138"
 }
