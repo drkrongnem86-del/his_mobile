@@ -1,5 +1,5 @@
 {
-    "message": "Fix font tieng Viet bi garbled trong PDF. Thay times.ttf bang TNKeyUni-Times.ttf tu HIS Pro (full Vietnamese glyphs). Ap dung 4 form: phau thuat, ban giao, tu choi, ra vien.",
-    "version": "3.0.140",
-    "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.140/his_mobile_v3.0.140_arm64.apk"
+  "version": "3.0.140",
+  "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.140/his_mobile_v3.0.140_arm64.apk",
+  "message": "Cập nhật phiên bản 3.0.140"
 }
