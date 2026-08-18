@@ -1193,13 +1193,13 @@ class _PhieuPhauThuatScreenState extends State<PhieuPhauThuatScreen> {
   Future<void> _ensurePdfFonts() async {
     if (_pdfFont != null) return;
     try {
-      // v3.0.136: Times New Roman TTF - standard Vietnamese hospital form font
-      final fontData = await rootBundle.load('assets/fonts/times.ttf');
-      final boldData = await rootBundle.load('assets/fonts/timesbd.ttf');
+      // v3.0.140: TNKeyUni Times New Roman - font chuẩn HIS Pro (full Vietnamese glyphs)
+      final fontData = await rootBundle.load('assets/fonts/TNKeyUni-Times.ttf');
+      final boldData = await rootBundle.load('assets/fonts/TNKeyUni-Timesbd.ttf');
       _pdfFont = pw.Font.ttf(fontData.buffer.asByteData()!);
       _pdfFontBold = pw.Font.ttf(boldData.buffer.asByteData()!);
     } catch (e) {
-      debugPrint('Failed to load Times New Roman font, using fallback: $e');
+      debugPrint('Failed to load TNKeyUni font, using fallback: $e');
       _pdfFont = pw.Font.helvetica();
       _pdfFontBold = pw.Font.helveticaBold();
     }
