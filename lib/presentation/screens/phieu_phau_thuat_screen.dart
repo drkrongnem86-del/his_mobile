@@ -14,7 +14,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:path/path.dart' as pathJoin;
 import 'package:signature/signature.dart';
 import 'package:printing/printing.dart';
-import 'package:his_mobile/data/api/attach_document_service.dart';
+import 'package:his_mobile/data/services/phieu_save_service.dart';
 import 'package:his_mobile/data/api/his_pro_api_service.dart';
 import 'package:his_mobile/data/local/scanned_forms_service.dart';
 
@@ -1086,7 +1086,7 @@ class _PhieuPhauThuatScreenState extends State<PhieuPhauThuatScreen> {
     return sigPath;
   }
 
-  /// v3.0.133: Lưu PDF + push lên EMR (unsigned)
+  /// v3.0.141: Lưu PDF (TNKeyUni font) + push EMR theo PhieuSaveService (SCAN PHIẾU pattern)
   Future<void> _saveEmr() async {
     if (_treatmentCode.isEmpty) {
       _toast('BN chưa có mã điều trị - không thể đính kèm EMR');
@@ -1098,25 +1098,34 @@ class _PhieuPhauThuatScreenState extends State<PhieuPhauThuatScreen> {
     setState(() => _saving = true);
     try {
       final pdfBytes = await _buildPdf();
-      final localPath = await _savePdfLocal(pdfBytes);
 
-      // Push lên EMR (unsigned)
-      final r = await AttachDocumentService.instance.attachFile(
-        treatmentCode: _treatmentCode,
-        documentTypeId: _docType.id,
-        documentName: 'GIẤY CAM KẾT CHẤP THUẬN PHẪU THUẬT',
-        filePath: localPath,
-        signerName: _signerName,
+      // v3.0.141: Dùng PhieuSaveService với prebuiltPdfBytes - font TNKeyUni đúng cho EMR
+      final result = await PhieuSaveService.instance.save(
+        mode: PhieuSaveMode.unsigned,
+        input: PhieuSaveInput(
+          patient: widget.patient,
+          formName: 'GIẤY CAM KẾT CHẤP THUẬN PHẪU THUẬT',
+          formData: const {},
+          documentTypeId: _docType.id,
+          prebuiltPdfBytes: pdfBytes,
+          workingDeptName: 'Khoa Cấp Cứu',
+          departmentCode: 'HSCC',
+          roomCode: 'PKCC',
+          roomTypeCode: 'XL',
+        ),
       );
 
       if (!mounted) return;
       setState(() => _saving = false);
 
-      if (r.success) {
-        _toast('✅ Đã lưu EMR (unsigned)\n${_docType.name}');
+      if (result.emrPushed) {
+        _toast('✅ Đã lưu EMR (unsigned)
+${_docType.name}');
         Navigator.of(context).pop(true);
+      } else if (result.success) {
+        _toast('⚠️ Đã lưu local. EMR: ${result.error}');
       } else {
-        _toast('⚠️ Đã lưu local nhưng EMR lỗi: ${r.error ?? "lỗi không rõ"}');
+        _toast('❌ Lỗi: ${result.error}');
       }
     } catch (e) {
       if (!mounted) return;
@@ -1125,8 +1134,8 @@ class _PhieuPhauThuatScreenState extends State<PhieuPhauThuatScreen> {
     }
   }
 
-  /// v3.0.134: Lưu PDF + ký + push lên EMR
-  /// Fix: signature PNG được embed vào PDF bytes, pass unsigned cho attachFile
+  /// v3.0.141: Lưu PDF (TNKeyUni) + ký + push EMR theo PhieuSaveService (SCAN PHIẾU pattern)
+  /// Fix: dùng PhieuSaveService với prebuiltPdfBytes - font TNKeyUni đúng cho EMR
   Future<void> _saveEmrWithSignature() async {
     if (_treatmentCode.isEmpty) {
       _toast('BN chưa có mã điều trị - không thể đính kèm EMR');
@@ -1139,7 +1148,7 @@ class _PhieuPhauThuatScreenState extends State<PhieuPhauThuatScreen> {
     String? sigPath = _signaturePath;
     if (sigPath == null || !await File(sigPath).exists()) {
       sigPath = await _captureSignature();
-      if (sigPath == null) return; // user huỷ
+      if (sigPath == null) return;
       if (mounted) setState(() => _signaturePath = sigPath);
     }
 
@@ -1148,26 +1157,35 @@ class _PhieuPhauThuatScreenState extends State<PhieuPhauThuatScreen> {
     try {
       // v3.0.134: build PDF (đã embed 3 sig từ pad) + embed user signature vào
       final pdfBytes = await _buildPdfWithSignature(sigPath);
-      final localPath = await _savePdfLocal(pdfBytes);
 
-      // v3.0.134: PDF đã có chữ ký embed → pass unsigned cho attachFile
-      final r = await AttachDocumentService.instance.attachFile(
-        treatmentCode: _treatmentCode,
-        documentTypeId: _docType.id,
-        documentName: 'GIẤY CAM KẾT CHẤP THUẬN PHẪU THUẬT',
-        filePath: localPath,
-        // KHÔNG pass signaturePath vì sig đã embed trong PDF
-        signerName: _signerName,
+      // v3.0.141: Dùng PhieuSaveService với prebuiltPdfBytes - font TNKeyUni đúng cho EMR
+      final result = await PhieuSaveService.instance.save(
+        mode: PhieuSaveMode.signed,
+        input: PhieuSaveInput(
+          patient: widget.patient,
+          formName: 'GIẤY CAM KẾT CHẤP THUẬN PHẪU THUẬT',
+          formData: const {},
+          documentTypeId: _docType.id,
+          prebuiltPdfBytes: pdfBytes,
+          signaturePath: sigPath,
+          workingDeptName: 'Khoa Cấp Cứu',
+          departmentCode: 'HSCC',
+          roomCode: 'PKCC',
+          roomTypeCode: 'XL',
+        ),
       );
 
       if (!mounted) return;
       setState(() => _saving = false);
 
-      if (r.success) {
-        _toast('✅ Đã ký + lưu EMR\n${_docType.name}');
+      if (result.emrPushed) {
+        _toast('✅ Đã ký + lưu EMR
+${_docType.name}');
         Navigator.of(context).pop(true);
+      } else if (result.success) {
+        _toast('⚠️ Đã lưu local. EMR: ${result.error}');
       } else {
-        _toast('⚠️ Đã lưu local nhưng EMR lỗi: ${r.error ?? "lỗi không rõ"}');
+        _toast('❌ Lỗi: ${result.error}');
       }
     } catch (e) {
       if (!mounted) return;
@@ -1176,14 +1194,6 @@ class _PhieuPhauThuatScreenState extends State<PhieuPhauThuatScreen> {
     }
   }
 
-  void _toast(String msg) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), duration: const Duration(seconds: 5)),
-    );
-  }
-
-  // ===========================================================================
   // PDF GENERATION
   // ===========================================================================
   /// Font tiếng Việt - load từ assets

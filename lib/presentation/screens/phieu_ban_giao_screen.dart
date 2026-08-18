@@ -12,7 +12,7 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:path/path.dart' as pathJoin;
 import 'package:signature/signature.dart';
 import 'package:printing/printing.dart';
-import 'package:his_mobile/data/api/attach_document_service.dart';
+import 'package:his_mobile/data/services/phieu_save_service.dart';
 import 'package:his_mobile/data/api/his_pro_api_service.dart';
 import 'package:his_mobile/data/local/scanned_forms_service.dart';
 
@@ -697,28 +697,38 @@ class _PhieuBanGiaoScreenState extends State<PhieuBanGiaoScreen> {
   // ===========================================================================
   // EMR SAVE
   // ===========================================================================
+  /// v3.0.141: Lưu PDF (TNKeyUni font) + push EMR theo PhieuSaveService (SCAN PHIẾU pattern)
   Future<void> _saveEmr() async {
     setState(() => _saving = true);
     try {
       final pdfBytes = await _buildPdf();
-      final localPath = await _savePdfLocal(pdfBytes);
 
-      final r = await AttachDocumentService.instance.attachFile(
-        treatmentCode: _treatmentCode,
-        documentTypeId: 20, // Phiếu khác
-        documentName: 'PHIẾU BÀN GIAO CHUYỂN KHOA',
-        filePath: localPath,
-        signerName: _signerName,
+      // v3.0.141: Dùng PhieuSaveService với prebuiltPdfBytes - font TNKeyUni đúng cho EMR
+      final result = await PhieuSaveService.instance.save(
+        mode: PhieuSaveMode.unsigned,
+        input: PhieuSaveInput(
+          patient: widget.patient,
+          formName: 'PHIẾU BÀN GIAO CHUYỂN KHOA',
+          formData: const {},
+          documentTypeId: 20,
+          prebuiltPdfBytes: pdfBytes,
+          workingDeptName: 'Khoa Cấp Cứu',
+          departmentCode: 'HSCC',
+          roomCode: 'PKCC',
+          roomTypeCode: 'XL',
+        ),
       );
 
       if (!mounted) return;
       setState(() => _saving = false);
 
-      if (r.success) {
-        _toast('Đã lưu EMR thành công');
+      if (result.emrPushed) {
+        _toast('✅ Đã lưu EMR thành công');
         Navigator.of(context).pop(true);
+      } else if (result.success) {
+        _toast('⚠️ Đã lưu local. EMR: ${result.error}');
       } else {
-        _toast('Đã lưu local. EMR lỗi: ${r.error ?? "không rõ"}');
+        _toast('❌ Lỗi: ${result.error}');
       }
     } catch (e) {
       if (!mounted) return;
