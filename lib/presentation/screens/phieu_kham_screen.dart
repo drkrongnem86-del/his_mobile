@@ -1758,8 +1758,8 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
   Future<void> _ensurePdfFonts() async {
     if (_pdfFont != null) return;
     try {
-      final fd = await rootBundle.load('assets/fonts/TNKeyUni-Times.ttf');
-      final bd = await rootBundle.load('assets/fonts/TNKeyUni-Timesbd.ttf');
+      final fd = await rootBundle.load('assets/fonts/times.ttf');
+      final bd = await rootBundle.load('assets/fonts/timesbd.ttf');
       _pdfFont = pw.Font.ttf(fd.buffer.asByteData()!);
       _pdfFontBold = pw.Font.ttf(bd.buffer.asByteData()!);
     } catch (e) {
