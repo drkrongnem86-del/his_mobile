@@ -189,6 +189,7 @@ import 'package:his_mobile/data/api/his_pro_api_service.dart';
 
 
 import 'package:his_mobile/data/services/phieu_save_service.dart';
+import 'package:his_mobile/data/services/pdf_to_image_service.dart';
 
 
 
@@ -2839,7 +2840,9 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
           // v3.0.143: Build PDF with TNKeyUni font
+          // v3.0.145: Render PDF -> PNG -> EMR (font trên server khong garble)
           final pdfBytes = await _buildPdf(signatureBytes: signatureBytes);
+          final pngBytes = await PdfToImageService.pdfToPngPdf(pdfBytes);
 
           final result = await PhieuSaveService.instance.save(
 
@@ -2873,7 +2876,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
               formData: const {},
-              prebuiltPdfBytes: pdfBytes,
+              prebuiltPngBytes: pngBytes ?? pdfBytes,
 
 
 

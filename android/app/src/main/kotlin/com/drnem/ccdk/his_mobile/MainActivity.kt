@@ -18,7 +18,6 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 import id.laskarmedia.openvpn_flutter.OpenVPNFlutterPlugin
 import java.io.File
-import java.io.IOException
 
 /// v3.0.28: Tích hợp VNPT SmartCA Deeplink SDK
 /// MethodChannel: com.drnem.ccdk.his_mobile/vnpt_smartca
@@ -28,11 +27,59 @@ import java.io.IOException
 /// v3.0.122: Thêm method 'saveApkToDownloads' - copy APK vào thư mục Download public
 /// v3.0.123: Refactor 'installApk' - dùng PackageInstaller.Session API (officially supported
 ///            for in-app updates, KHÔNG cần kill process, hệ thống tự handle lifecycle)
+/// v3.0.145: Thêm PdfRenderer channel - render PDF page to PNG using Android native PdfRenderer
 class MainActivity : FlutterActivity() {
     private val CHANNEL = "com.drnem.ccdk.his_mobile/vnpt_smartca"
     private val INSTALL_CHANNEL = "his_mobile/installer"
+    private val PDF_RENDERER_CHANNEL = "his_mobile/pdf_renderer"
     private var pendingResult: MethodChannel.Result? = null
     private var vnptPlugin: VnptSmartcaPlugin? = null
+
+    // v3.0.145: Render PDF bytes to PNG using Android native PdfRenderer
+    // PdfRenderer available from API 21. No external packages needed.
+    private fun renderPdfPageToPng(pdfBytes: ByteArray, dpi: Int, pageIndex: Int): ByteArray? {
+        return try {
+            // Write PDF bytes to a temp file (PdfRenderer requires a file path)
+            val tempFile = File(cacheDir, "temp_render_${System.currentTimeMillis()}.pdf")
+            tempFile.writeBytes(pdfBytes)
+
+            // Open file descriptor - use ParcelFileDescriptor for API <30 compatibility
+            val parcelFd = android.os.ParcelFileDescriptor.open(tempFile, android.os.ParcelFileDescriptor.MODE_READ_ONLY)
+            val renderer = android.graphics.pdf.PdfRenderer(parcelFd)
+
+            if (pageIndex >= renderer.pageCount) {
+                renderer.close()
+                parcelFd.close()
+                tempFile.delete()
+                return null
+            }
+
+            val page = renderer.openPage(pageIndex)
+            // Calculate pixel dimensions: PDF uses 72 DPI internally, scale to target DPI
+            val scale = dpi / 72.0f
+            val width = (page.width * scale).toInt()
+            val height = (page.height * scale).toInt()
+
+            val bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
+            bitmap.eraseColor(android.graphics.Color.WHITE)
+            page.render(bitmap, null, null, android.graphics.pdf.PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+
+            // Convert bitmap to PNG
+            val outputStream = java.io.ByteArrayOutputStream()
+            bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, outputStream)
+            val pngBytes = outputStream.toByteArray()
+
+            page.close()
+            renderer.close()
+            parcelFd.close()
+            tempFile.delete()
+
+            pngBytes
+        } catch (e: Exception) {
+            android.util.Log.e("PdfRenderer", "renderPdfPageToPng failed: $e")
+            null
+        }
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -269,6 +316,29 @@ class MainActivity : FlutterActivity() {
                             ))
                         } catch (e: Exception) {
                             result.error("SAVE_FAILED", e.message, e.stackTrace.toString())
+                        }
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+
+        // v3.0.145: PdfRenderer channel - render PDF bytes to PNG using Android native PdfRenderer
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, PDF_RENDERER_CHANNEL)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "renderPdfPageToPng" -> {
+                        val pdfBytes = call.argument<ByteArray>("pdfBytes")
+                        val dpi = call.argument<Int>("dpi") ?: 150
+                        val pageIndex = call.argument<Int>("pageIndex") ?: 0
+                        if (pdfBytes == null) {
+                            result.error("INVALID_ARGS", "pdfBytes is required", null)
+                            return@setMethodCallHandler
+                        }
+                        val pngBytes = renderPdfPageToPng(pdfBytes, dpi, pageIndex)
+                        if (pngBytes != null) {
+                            result.success(pngBytes)
+                        } else {
+                            result.error("RENDER_FAILED", "Failed to render PDF page", null)
                         }
                     }
                     else -> result.notImplemented()

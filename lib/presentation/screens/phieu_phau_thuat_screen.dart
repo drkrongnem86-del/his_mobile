@@ -17,6 +17,7 @@ import 'package:printing/printing.dart';
 import 'package:his_mobile/data/services/phieu_save_service.dart';
 import 'package:his_mobile/data/api/his_pro_api_service.dart';
 import 'package:his_mobile/data/local/scanned_forms_service.dart';
+import 'package:his_mobile/data/services/pdf_to_image_service.dart';
 
 /// v3.0.134: Form Phiếu phẫu thuật (Giấy cam kết chấp thuận PT/TT/GMHS)
 /// Mẫu: MS 01/BV2 - SỞ Y TẾ TỈNH KHÁNH HÒA / BVĐK NINH THUẬN
@@ -1105,6 +1106,8 @@ class _PhieuPhauThuatScreenState extends State<PhieuPhauThuatScreen> {
     setState(() => _saving = true);
     try {
       final pdfBytes = await _buildPdf();
+      // v3.0.145: Render PDF → PNG → EMR (font trên server không garble nữa)
+      final pngBytes = await PdfToImageService.pdfToPngPdf(pdfBytes);
 
       // v3.0.141: Dùng PhieuSaveService với prebuiltPdfBytes - font TNKeyUni đúng cho EMR
       final result = await PhieuSaveService.instance.save(
@@ -1114,7 +1117,7 @@ class _PhieuPhauThuatScreenState extends State<PhieuPhauThuatScreen> {
           formName: 'GIẤY CAM KẾT CHẤP THUẬN PHẪU THUẬT',
           formData: const {},
           documentTypeId: _docType.id,
-          prebuiltPdfBytes: pdfBytes,
+          prebuiltPngBytes: pngBytes ?? pdfBytes,
           workingDeptName: 'Khoa Cấp Cứu',
           departmentCode: 'HSCC',
           roomCode: 'PKCC',
@@ -1163,16 +1166,18 @@ class _PhieuPhauThuatScreenState extends State<PhieuPhauThuatScreen> {
     try {
       // v3.0.134: build PDF (đã embed 3 sig từ pad) + embed user signature vào
       final pdfBytes = await _buildPdfWithSignature(sigPath);
+      // v3.0.145: Render PDF -> PNG -> EMR (font trên server không garble)
+      final pngBytes = await PdfToImageService.pdfToPngPdf(pdfBytes);
 
       // v3.0.141: Dùng PhieuSaveService với prebuiltPdfBytes - font TNKeyUni đúng cho EMR
       final result = await PhieuSaveService.instance.save(
         mode: PhieuSaveMode.signed,
         input: PhieuSaveInput(
           patient: widget.patient,
-          formName: 'GIẤY CAM KẾT CHẤP THUẬN PHẪU THUẬT',
+          formName: 'GIẤY CAM KẾT CHẤP THUẬT PHẪU THUẬT',
           formData: const {},
           documentTypeId: _docType.id,
-          prebuiltPdfBytes: pdfBytes,
+          prebuiltPngBytes: pngBytes ?? pdfBytes,
           signaturePath: sigPath,
           workingDeptName: 'Khoa Cấp Cứu',
           departmentCode: 'HSCC',

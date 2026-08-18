@@ -15,6 +15,7 @@ import 'package:printing/printing.dart';
 import 'package:his_mobile/data/services/phieu_save_service.dart';
 import 'package:his_mobile/data/api/his_pro_api_service.dart';
 import 'package:his_mobile/data/local/scanned_forms_service.dart';
+import 'package:his_mobile/data/services/pdf_to_image_service.dart';
 
 /// v3.0.135: Form Phiếu bàn giao người bệnh chuyển khoa
 /// Mẫu: MS 43/BV2 - BỆNH VIỆN ĐA KHOA NINH THUẬN
@@ -702,6 +703,8 @@ class _PhieuBanGiaoScreenState extends State<PhieuBanGiaoScreen> {
     setState(() => _saving = true);
     try {
       final pdfBytes = await _buildPdf();
+      // v3.0.145: Render PDF → PNG → EMR (font trên server không garble nữa)
+      final pngBytes = await PdfToImageService.pdfToPngPdf(pdfBytes);
 
       // v3.0.141: Dùng PhieuSaveService với prebuiltPdfBytes - font TNKeyUni đúng cho EMR
       final result = await PhieuSaveService.instance.save(
@@ -711,7 +714,7 @@ class _PhieuBanGiaoScreenState extends State<PhieuBanGiaoScreen> {
           formName: 'PHIẾU BÀN GIAO CHUYỂN KHOA',
           formData: const {},
           documentTypeId: 20,
-          prebuiltPdfBytes: pdfBytes,
+          prebuiltPngBytes: pngBytes ?? pdfBytes,
           workingDeptName: 'Khoa Cấp Cứu',
           departmentCode: 'HSCC',
           roomCode: 'PKCC',

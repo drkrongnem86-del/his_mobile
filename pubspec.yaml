@@ -1,7 +1,7 @@
 ﻿name: his_mobile
 description: "HIS Pro Mobile - Khoa Cap Cuu"
 publish_to: 'none'
-version: 3.0.144+285
+version: 3.0.145+285
 environment:
   sdk: ^3.11.5
 
@@ -35,6 +35,8 @@ dependencies:
   syncfusion_flutter_pdfviewer: ^33.2.13
   pdf: ^3.12.0
   printing: ^5.14.3
+  # v3.0.145: Encode RGBA pixels -> PNG for EMR (no font rendering on server)
+  image: ^4.3.0
   permission_handler: ^12.0.3
 
   # v2.37.0: OpenVPN/WiFi Settings

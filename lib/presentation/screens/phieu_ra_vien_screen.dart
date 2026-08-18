@@ -15,6 +15,7 @@ import 'package:printing/printing.dart';
 import 'package:his_mobile/data/services/phieu_save_service.dart';
 import 'package:his_mobile/data/api/his_pro_api_service.dart';
 import 'package:his_mobile/data/local/scanned_forms_service.dart';
+import 'package:his_mobile/data/services/pdf_to_image_service.dart';
 
 /// v3.0.134: Form Giấy cam kết ra viện không theo chỉ định của bác sĩ
 /// Mẫu: MS 46/BV2 - BỆNH VIỆN ĐA KHOA NINH THUẬN
@@ -595,6 +596,8 @@ class _PhieuRaVienScreenState extends State<PhieuRaVienScreen> {
     setState(() => _saving = true);
     try {
       final pdfBytes = await _buildPdf();
+      // v3.0.145: Render PDF → PNG → EMR (font trên server không garble nữa)
+      final pngBytes = await PdfToImageService.pdfToPngPdf(pdfBytes);
 
       // v3.0.141: Dùng PhieuSaveService với prebuiltPdfBytes - font TNKeyUni đúng cho EMR
       final result = await PhieuSaveService.instance.save(
@@ -604,7 +607,7 @@ class _PhieuRaVienScreenState extends State<PhieuRaVienScreen> {
           formName: 'GIẤY RA VIỆN KHÔNG THEO CHỈ ĐỊNH BÁC SỸ',
           formData: const {},
           documentTypeId: 20,
-          prebuiltPdfBytes: pdfBytes,
+          prebuiltPngBytes: pngBytes ?? pdfBytes,
           workingDeptName: 'Khoa Cấp Cứu',
           departmentCode: 'HSCC',
           roomCode: 'PKCC',

@@ -23,6 +23,7 @@ import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:his_mobile/data/api/emr_push_service.dart';
 import 'package:his_mobile/data/api/his_pro_api_service.dart';
 import 'package:his_mobile/data/services/emr_upload_queue.dart';
+import 'package:his_mobile/data/services/image_pdf_service.dart';
 import 'package:his_mobile/data/services/smart_ca_service.dart';
 import 'package:his_mobile/data/services/vnpt_signature_service.dart';
 
@@ -64,6 +65,10 @@ class PhieuSaveInput {
   /// Optional - ảnh/PDF gốc đã có sẵn (cho trường hợp đặc biệt)
   final Uint8List? prebuiltPdfBytes;
 
+  /// v3.0.145: PNG image bytes đã render sẵn (font trên EMR sẽ không garble)
+  /// Ưu tiên hơn prebuiltPdfBytes - nếu có PNG thì push PNG thay vì PDF
+  final Uint8List? prebuiltPngBytes;
+
   /// Optional - department/room
   final String? departmentCode;
   final String? roomCode;
@@ -87,6 +92,7 @@ class PhieuSaveInput {
     this.imagePath,
     this.signaturePath,
     this.prebuiltPdfBytes,
+    this.prebuiltPngBytes,
     this.departmentCode,
     this.roomCode,
     this.roomTypeCode,
@@ -195,6 +201,16 @@ class PhieuSaveService {
       // 3. Build PDF
       debugPrint('[PhieuSave] Bước 2: Build PDF');
       Uint8List? pdfBytes = input.prebuiltPdfBytes;
+      // v3.0.145: Nếu có PNG bytes (đã render sẵn) → convert PNG → PDF (image-only)
+      // PDF này chỉ chứa ảnh, không có text → EMR server hiển thị đúng font
+      if (pdfBytes == null && input.prebuiltPngBytes != null) {
+        debugPrint('[PhieuSave] Converting PNG → PDF (image-only, no text)');
+        pdfBytes = await imageBytesToPdf(input.prebuiltPngBytes!);
+        if (pdfBytes == null) {
+          return _fail(PhieuSaveStage.buildPdf, 'Lỗi convert PNG → PDF', sw);
+        }
+        debugPrint('[PhieuSave] PNG → PDF done: ${pdfBytes.length} bytes');
+      }
       if (pdfBytes == null) {
         try {
           final signerName = _getSignerName();

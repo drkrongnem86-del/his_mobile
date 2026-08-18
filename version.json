@@ -1,5 +1,5 @@
 {
-  "version": "3.0.144",
-  "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.144/his_mobile_v3.0.144_arm64.apk",
-  "message": "Cập nhật phiên bản 3.0.144"
+    "message": "v3.0.145: PDF -> PNG -> PDF(image-only) flow cho 5 form. Render form thành ảnh trước khi push EMR -> font không garble trên EMR server.",
+    "version": "3.0.145",
+    "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.145/his_mobile_v3.0.145_arm64.apk"
 }
