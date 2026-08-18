@@ -119,6 +119,10 @@ import 'dart:typed_data';
 
 
 import 'dart:ui' as ui;
+import 'package:flutter/services.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 
 
@@ -507,6 +511,10 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
+
+  // PDF font (TNKeyUni - v3.0.143)
+  static pw.Font? _pdfFont;
+  static pw.Font? _pdfFontBold;
 
   String? _result;
 
@@ -1744,6 +1752,179 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
+  // =================================================================
+  // PDF GENERATION v3.0.143 (TNKeyUni font - SCAN PHIEU pattern)
+  // =================================================================
+  Future<void> _ensurePdfFonts() async {
+    if (_pdfFont != null) return;
+    try {
+      final fd = await rootBundle.load('assets/fonts/TNKeyUni-Times.ttf');
+      final bd = await rootBundle.load('assets/fonts/TNKeyUni-Timesbd.ttf');
+      _pdfFont = pw.Font.ttf(fd.buffer.asByteData()!);
+      _pdfFontBold = pw.Font.ttf(bd.buffer.asByteData()!);
+    } catch (e) {
+      debugPrint('TNKeyUni font error: $e');
+      _pdfFont = pw.Font.helvetica();
+      _pdfFontBold = pw.Font.helveticaBold();
+    }
+  }
+
+  pw.TextStyle _s(double sz, {bool bold = false, PdfColor? color, pw.FontStyle fs = pw.FontStyle.normal}) {
+    return pw.TextStyle(
+      font: bold ? (_pdfFontBold ?? _pdfFont) : _pdfFont,
+      fontSize: sz,
+      fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
+      color: color, fontStyle: fs,
+    );
+  }
+
+  Future<Uint8List> _buildPdf({Uint8List? signatureBytes}) async {
+    await _ensurePdfFonts();
+    final now = DateTime.now();
+    final tCode = _treatmentCode ?? '';
+    final pName = _patientName ?? '';
+    final user = _getUsername();
+    final cls = _selectedServices.take(20).map((s) => '  - ' + (s.code ?? '') + ' - ' + (s.name ?? '')).join('\n');
+    final meds = _medicines.take(20).map((m) => '  - ' + (m.medicine.name ?? '') + ' (' + m.amountPerDose.toString() + ' ' + m.route + ') x' + m.timesPerDay.toString() + ' lan').join('\n');
+    final icd = _icdValues.isNotEmpty ? _icdValues.first.code + ' - ' + _icdValues.first.name : 'Z00.0 - Kham benh';
+    final lyDo = _lyDoCtrl.text.isEmpty ? '(...)' : _lyDoCtrl.text;
+    final gc = _ghiChuCtrl.text.isEmpty ? '(...)' : _ghiChuCtrl.text;
+    final m = _machCtrl.text.isEmpty ? '(...)' : _machCtrl.text;
+    final n = _nhietCtrl.text.isEmpty ? '(...)' : _nhietCtrl.text;
+    final ha1 = _hhaTTCtrl.text.isEmpty ? '(...)' : _hhaTTCtrl.text;
+    final ha2 = _hhaTDCtrl.text.isEmpty ? '(...)' : _hhaTDCtrl.text;
+    final sp = _spo2Ctrl.text.isEmpty ? '(...)' : _spo2Ctrl.text;
+    final date = now.day.toString().padLeft(2,'0') + '/' + now.month.toString().padLeft(2,'0') + '/' + now.year.toString();
+    final pdf = pw.Document(theme: pw.ThemeData.withFont(base: _pdfFont));
+    pdf.addPage(pw.MultiPage(
+      pageFormat: PdfPageFormat.a4,
+      margin: const pw.EdgeInsets.all(20),
+      build: (ctx) => [
+        pw.Row(
+          crossAxisAlignment: pw.CrossAxisAlignment.start,
+          children: [
+            pw.Expanded(child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text('SO Y TE TINH KHANH HOA', style: _s(11, bold: true)),
+                pw.Text('BENH VIEN DA KHOA NINH THUAN', style: _s(11, bold: true)),
+                pw.SizedBox(height: 4),
+                pw.Text('Khoa Cap Cuu', style: _s(10)),
+              ],
+            )),
+            pw.Expanded(child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.center,
+              children: [
+                pw.Text('CONG HOA XA HOI CHU NGHIA VIET NAM', style: _s(10, bold: true)),
+                pw.Text('Doc lap - Tu do - Hanh phuc', style: _s(10, fs: pw.FontStyle.italic)),
+              ],
+            )),
+          ],
+        ),
+        pw.SizedBox(height: 8),
+        pw.Center(child: pw.Text('PHIEU KHAM BENH', style: _s(14, bold: true, color: PdfColors.purple900))),
+        pw.SizedBox(height: 4),
+        pw.Center(child: pw.Text('MS: 01/BV2', style: _s(10, fs: pw.FontStyle.italic))),
+        pw.SizedBox(height: 10),
+        pw.Container(
+          padding: const pw.EdgeInsets.all(8),
+          decoration: pw.BoxDecoration(border: pw.Border.all()),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text('I. THONG TIN BENH NHAN', style: _s(11, bold: true, color: PdfColors.purple900)),
+              pw.SizedBox(height: 4),
+              pw.Row(children: [
+                pw.Text('So vao vien: ', style: _s(11)),
+                pw.Text(tCode.isEmpty ? '(...)' : tCode, style: _s(11, bold: true)),
+                pw.SizedBox(width: 20),
+                pw.Text('Ho ten: ', style: _s(11)),
+                pw.Text(pName.isEmpty ? '(...)' : pName, style: _s(11, bold: true)),
+              ]),
+            ],
+          ),
+        ),
+        pw.SizedBox(height: 8),
+        pw.Container(
+          padding: const pw.EdgeInsets.all(8),
+          decoration: pw.BoxDecoration(border: pw.Border.all()),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text('II. SINH HIEU', style: _s(11, bold: true, color: PdfColors.purple900)),
+              pw.SizedBox(height: 4),
+              pw.Text('Mach: $m l/p  |  Nhiet: $n C  |  HA: $ha1/$ha2 mmHg  |  SpO2: $sp%', style: _s(10)),
+            ],
+          ),
+        ),
+        pw.SizedBox(height: 8),
+        pw.Container(
+          padding: const pw.EdgeInsets.all(8),
+          decoration: pw.BoxDecoration(border: pw.Border.all()),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text('III. KHAM BENH', style: _s(11, bold: true, color: PdfColors.purple900)),
+              pw.SizedBox(height: 4),
+              pw.Text('Ly do: $lyDo', style: _s(11)),
+              pw.SizedBox(height: 2),
+              pw.Text('Chan doan: $icd', style: _s(11, bold: true)),
+              pw.SizedBox(height: 2),
+              pw.Text('Ghi chu: $gc', style: _s(11)),
+            ],
+          ),
+        ),
+        if (_selectedServices.isNotEmpty) ...[
+          pw.SizedBox(height: 8),
+          pw.Container(
+            padding: const pw.EdgeInsets.all(8),
+            decoration: pw.BoxDecoration(border: pw.Border.all()),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text('IV. CHI DINH CLS (' + _selectedServices.length.toString() + ' dv)', style: _s(11, bold: true, color: PdfColors.purple900)),
+                pw.SizedBox(height: 4),
+                pw.Text(cls.isEmpty ? '(...)' : cls, style: _s(9)),
+              ],
+            ),
+          ),
+        ],
+        if (_medicines.isNotEmpty) ...[
+          pw.SizedBox(height: 8),
+          pw.Container(
+            padding: const pw.EdgeInsets.all(8),
+            decoration: pw.BoxDecoration(border: pw.Border.all()),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text('V. DON THUOC (' + _medicines.length.toString() + ' thuoc)', style: _s(11, bold: true, color: PdfColors.purple900)),
+                pw.SizedBox(height: 4),
+                pw.Text(meds.isEmpty ? '(...)' : meds, style: _s(9)),
+              ],
+            ),
+          ),
+        ],
+        pw.SizedBox(height: 20),
+        pw.Row(children: [
+          pw.Spacer(),
+          pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.center, children: [
+            pw.Text(date, style: _s(10)),
+            pw.SizedBox(height: 4),
+            pw.Text('Bac si kham', style: _s(10, fs: pw.FontStyle.italic)),
+            pw.SizedBox(height: 30),
+            if (signatureBytes != null)
+              pw.Container(height: 60, width: 150, child: pw.Image(pw.MemoryImage(signatureBytes), height: 60, fit: pw.BoxFit.contain))
+            else
+              pw.Container(height: 60, width: 150, decoration: const pw.BoxDecoration(border: pw.Border(bottom: pw.BorderSide()))),
+            pw.SizedBox(height: 2),
+            pw.Text(user, style: _s(9, bold: true)),
+          ]),
+        ]),
+      ],
+    ));
+    return pdf.save();
+  }
+
   /// Build content for HIS Tracking (mô tả sinh hiệu)
 
 
@@ -2470,7 +2651,8 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-          String? signaturePath;
+          String? signaturePath;  // kept for backward compat (unused when prebuiltPdfBytes used)
+          Uint8List? signatureBytes;
 
 
 
@@ -2530,7 +2712,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-              await sigFile.writeAsBytes(autoBytes);
+              signatureBytes = autoBytes;
 
 
 
@@ -2542,7 +2724,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-              await sigFile.writeAsBytes(sigBytes);
+              signatureBytes = sigBytes;
 
 
 
@@ -2656,6 +2838,9 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
+          // v3.0.143: Build PDF with TNKeyUni font
+          final pdfBytes = await _buildPdf(signatureBytes: signatureBytes);
+
           final result = await PhieuSaveService.instance.save(
 
 
@@ -2670,7 +2855,6 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
             input: PhieuSaveInput(
 
-              useVnptSignature: useVnptSignature,
 
 
 
@@ -2688,25 +2872,24 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-              formData: formData,
+              formData: const {},
+              prebuiltPdfBytes: pdfBytes,
 
 
 
 
 
-              signaturePath: signaturePath,
 
 
 
 
 
-              documentTypeId: EmrDocumentKind.phieuKhamVaoVien.docTypeId,
+              documentTypeId: 2,
 
 
 
 
 
-              phieuLabel: 'Phiếu khám',
 
 
 

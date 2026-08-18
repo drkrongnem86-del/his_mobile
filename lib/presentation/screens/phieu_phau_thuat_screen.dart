@@ -202,6 +202,13 @@ class _PhieuPhauThuatScreenState extends State<PhieuPhauThuatScreen> {
     super.dispose();
   }
 
+  void _toast(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg), duration: const Duration(seconds: 5)),
+    );
+  }
+
   // ===========================================================================
   // UI BUILD
   // ===========================================================================
@@ -1119,8 +1126,7 @@ class _PhieuPhauThuatScreenState extends State<PhieuPhauThuatScreen> {
       setState(() => _saving = false);
 
       if (result.emrPushed) {
-        _toast('✅ Đã lưu EMR (unsigned)
-${_docType.name}');
+        _toast('✅ Đã lưu EMR (unsigned) ${_docType.name}');
         Navigator.of(context).pop(true);
       } else if (result.success) {
         _toast('⚠️ Đã lưu local. EMR: ${result.error}');
@@ -1179,8 +1185,7 @@ ${_docType.name}');
       setState(() => _saving = false);
 
       if (result.emrPushed) {
-        _toast('✅ Đã ký + lưu EMR
-${_docType.name}');
+        _toast('✅ Đã ký + lưu EMR ${_docType.name}');
         Navigator.of(context).pop(true);
       } else if (result.success) {
         _toast('⚠️ Đã lưu local. EMR: ${result.error}');
