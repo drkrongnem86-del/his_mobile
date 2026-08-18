@@ -647,8 +647,8 @@ class _PhieuRaVienScreenState extends State<PhieuRaVienScreen> {
     if (_pdfFont != null) return;
     try {
       // v3.0.140: TNKeyUni Times New Roman - font chuẩn HIS Pro (full Vietnamese glyphs)
-      final fontData = await rootBundle.load('assets/fonts/TNKeyUni-Times.ttf');
-      final boldData = await rootBundle.load('assets/fonts/TNKeyUni-Timesbd.ttf');
+      final fontData = await rootBundle.load('assets/fonts/times.ttf');
+      final boldData = await rootBundle.load('assets/fonts/timesbd.ttf');
       _pdfFont = pw.Font.ttf(fontData.buffer.asByteData()!);
       _pdfFontBold = pw.Font.ttf(boldData.buffer.asByteData()!);
     } catch (e) {

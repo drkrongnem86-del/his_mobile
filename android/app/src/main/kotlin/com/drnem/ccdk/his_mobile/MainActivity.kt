@@ -115,17 +115,24 @@ class MainActivity : FlutterActivity() {
                             // Commit session - hệ thống sẽ show install dialog
                             session.commit(pendingIntent.intentSender)
                             session.close()
-                            // v3.0.135: Đợi 4 giây rồi đóng app để system installer khởi động
-                            // PackageInstaller.Session commit() chạy async - hệ thống schedule
-                            // install dialog. App cần alive trong ~4s để system xử lý dialog.
-                            // Sau 4s → finishAndRemoveTask() để app không block install.
+                            // v3.0.144: FIX Samsung - finishAndRemoveTask() + killProcess
+                            // finishAndRemoveTask() alone không đủ trên Samsung (Flutter engine keep-alive)
+                            // → process vẫn alive → PackageInstaller bị block → "App not installed"
+                            // Fix: sau finishAndRemoveTask() + 600ms → killProcess() để chắc chắn
                             Handler(Looper.getMainLooper()).postDelayed({
                                 try {
                                     finishAndRemoveTask()
                                 } catch (e: Exception) {
                                     android.util.Log.w("HISMobile", "finishAndRemoveTask failed: $e")
                                 }
-                            }, 4000)
+                            }, 500)
+                            Handler(Looper.getMainLooper()).postDelayed({
+                                try {
+                                    android.os.Process.killProcess(android.os.Process.myPid())
+                                } catch (e: Exception) {
+                                    android.util.Log.w("HISMobile", "killProcess failed: $e")
+                                }
+                            }, 1200)
                             result.success(true)
                         } catch (e: Exception) {
                             result.error("INSTALL_FAILED", e.message, e.stackTrace.toString())

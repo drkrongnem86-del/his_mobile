@@ -9,7 +9,7 @@ import 'package:his_mobile/core/theme/app_theme.dart';
 import 'package:his_mobile/core/theme/theme_manager.dart';
 import 'package:his_mobile/data/api/his_api_service.dart';
 import 'package:his_mobile/data/api/his_catalog_service.dart';
-import 'package:his_mobile/data/api/his_pro_api_service.dart' as his_pro_api;  // v3.0.139: class CHÍNH (EMR push)
+import 'package:his_mobile/data/api/his_pro_api_service.dart' as his_pro_api;  // v3.0.144: class CHÍNH (EMR push)
 import 'package:his_mobile/data/api/his_service_req_service.dart';
 import 'package:his_mobile/data/api/his_tracking_service.dart';
 import 'package:his_mobile/data/api/thongke_auth_service.dart';
@@ -53,13 +53,13 @@ void main() async {
   //   → App dùng token cũ → EMR push fail
   // - Fix: hardcode là source of truth, LUÔN ghi đè SharedPreferences
   // - Nếu cần test token khác, dùng Settings → "Token HIS Pro (override)"
-  // v3.0.142: CRITICAL - Có 2 class HisProApiService khác nhau!
+  // v3.0.144: CRITICAL - Có 2 class HisProApiService khác nhau!
   //   1. lib/data/api/his_pro_api_service.dart (class CHÍNH) - dùng cho EMR push
   //   2. lib/data/services/his_pro_api_service.dart (class PHỤ) - dùng cho service khác
   // → Fix: set token ở CẢ 2 class + update hardcode HisProHardcoded.tokenCode
   try {
     const String latestToken = '1ee41ae967caa75e7c2891a3d9612259d70b4645c67852ab0e5f07546c2f3dfb';
-    const String latestIp = '172.16.200.109';  // v3.0.137: IP mới (đổi từ 171.15.0.9)
+    const String latestIp = '172.16.200.109';  // v3.0.144: IP mới (đổi từ 171.15.0.9)
     // Check override từ Settings (nếu BS muốn dùng token khác)
     final String? overrideToken = prefs.getString('his_pro_token_override');
     final String? overrideIp = prefs.getString('his_pro_ip_override');
@@ -68,11 +68,11 @@ void main() async {
     // v3.0.49: LUÔN ghi đè SharedPreferences cache với hardcode mới nhất
     await prefs.setString('his_pro_token_code', emrToken);
     await prefs.setString('his_pro_client_ip', emrIp);
-    // v3.0.137: Set token cho HisApiService (procedure room dùng cái này)
+    // v3.0.144: Set token cho HisApiService (procedure room dùng cái này)
     HisApiService().setAuthToken(emrToken);
-    // v3.0.139: Set token cho class PHỤ (services/his_pro_api_service.dart)
+    // v3.0.144: Set token cho class PHỤ (services/his_pro_api_service.dart)
     HisProApiService.instance.setTokenCode(token: emrToken, clientIp: emrIp);
-    // v3.0.139: Set token cho class CHÍNH (api/his_pro_api_service.dart) - dùng cho EMR push
+    // v3.0.144: Set token cho class CHÍNH (api/his_pro_api_service.dart) - dùng cho EMR push
     // Trước tiên xóa cache cũ (tránh token cũ paste trước đó còn trong SecureStorage)
     try {
       await his_pro_api.HisProApiService.instance.clearCustomBearer();
@@ -80,7 +80,7 @@ void main() async {
       print('⚠️ clearCustomBearer: $e');
     }
     await his_pro_api.HisProApiService.instance.setCustomBearer(emrToken);
-    print('🔑 [v3.0.139] Force EMR Token: ${emrToken.substring(0, 8)}… IP=$emrIp (cả 2 class)');
+    print('🔑 [v3.0.144] Force EMR Token: ${emrToken.substring(0, 8)}… IP=$emrIp (cả 2 class)');
   } catch (e) {
     print('⚠️ Bootstrap EMR Token failed: $e');
   }
@@ -149,11 +149,11 @@ class _HisMobileAppState extends State<HisMobileApp> with WidgetsBindingObserver
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // v3.0.111: Auto check update sau 3s khi mở app
+    // v3.0.144: Auto check update sau 3s khi mở app
     _autoCheckUpdateOnStart();
   }
 
-  /// v3.0.111: Tự động check update khi mở app
+  /// v3.0.144: Tự động check update khi mở app
   /// Delay 5s để app init xong (VPN, theme, routing) rồi mới check
   /// Nếu có bản mới → hiện dialog thông báo
   Future<void> _autoCheckUpdateOnStart() async {
@@ -161,7 +161,7 @@ class _HisMobileAppState extends State<HisMobileApp> with WidgetsBindingObserver
       delay: const Duration(seconds: 5),
     );
     if (info != null && mounted) {
-      // v3.0.111: Lấy context từ GoRouter's root navigator (an toàn)
+      // v3.0.144: Lấy context từ GoRouter's root navigator (an toàn)
       final navKey = AppRouter.router.routerDelegate.navigatorKey;
       final ctx = navKey.currentContext;
       if (ctx != null) {
@@ -201,7 +201,7 @@ class _HisMobileAppState extends State<HisMobileApp> with WidgetsBindingObserver
         builder: (_, mode, __) => MaterialApp.router(
           title: 'HIS Mobile - Khoa Cap Cuu',
           debugShowCheckedModeBanner: false,
-          // v3.0.111: navigatorKey không có sẵn trên MaterialApp.router
+          // v3.0.144: navigatorKey không có sẵn trên MaterialApp.router
           // Dùng builder để lấy context thông qua Navigator.of
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,

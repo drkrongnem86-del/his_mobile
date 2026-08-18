@@ -407,10 +407,10 @@ class UpdateService {
                 LinearProgressIndicator(),
                 SizedBox(height: 16),
                 Text(
-                  '1️⃣ Đợi SYSTEM INSTALLER mở ra (~4 giây)\n'
+                  '1️⃣ Đợi SYSTEM INSTALLER mở ra (~1-2 giây)\n'
                   '2️⃣ Nhấn "Cài đặt" (Install)\n'
                   '3️⃣ App cũ sẽ được thay thế tự động\n\n'
-                  '⚠️ Nếu installer không mở sau 4s:\n'
+                  '⚠️ Nếu installer không mở:\n'
                   'Vào Download/HisMobile → tap file APK để cài thủ công.',
                   style: TextStyle(fontSize: 13, height: 1.6),
                 ),
