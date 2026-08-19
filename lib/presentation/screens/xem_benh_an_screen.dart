@@ -704,7 +704,9 @@ class _XemBenhAnScreenState extends State<XemBenhAnScreen> {
           patientName: g<String>('VIR_PATIENT_NAME', 'VirPatientName')?.toString(),
 
           documentDate: docDate,
-
+          // v3.0.147: Track creator cho phân quyền xóa EMR
+          creator: g<String>('CREATOR', 'Creator')?.toString(),
+          requestLoginname: g<String>('REQUEST_LOGINNAME', 'RequestLoginname')?.toString(),
         );
 
       }).toList();
@@ -935,6 +937,80 @@ class _XemBenhAnScreenState extends State<XemBenhAnScreen> {
   }
 
 
+
+
+  // v3.0.147: Xac nhan xoa EMR document (chi khi user la nguoi tao)
+  Future<void> _confirmDeleteEmr(DataDocument d) async {
+    HapticFeedback.mediumImpact();
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.delete_forever, color: Colors.red),
+            SizedBox(width: 8),
+            Text('Xoa phieu EMR?'),
+          ],
+        ),
+        content: Text(
+          '"${d.name}"\n'
+          'se bi xoa khoi EMR server HIS Pro.\n\n'
+          'Hanh dong nay khong the hoan tac.',
+          style: TextStyle(fontSize: 13),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Huy'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Xoa'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await _deleteEmrDoc(d);
+    }
+  }
+
+  // v3.0.147: Xoa EMR document qua HIS Pro API
+  Future<void> _deleteEmrDoc(DataDocument d) async {
+    if (d.id <= 0) return;
+
+    // Loading indicator
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+            SizedBox(width: 12),
+            Text('Dang xoa...'),
+          ],
+        ),
+        duration: Duration(seconds: 10),
+      ),
+    );
+
+    final result = await HisProApiService.instance.deleteEmrDocument(d.id);
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
+
+    if (result.success) {
+      HapticFeedback.mediumImpact();
+      _showSnack('Da xoa phieu "${d.name}"');
+      // Reload list
+      await _load();
+    } else {
+      _showSnack('Loi xoa: ${result.message}', isError: true);
+    }
+  }
 
   /// Tải về folder Download của Android (/storage/emulated/0/Download)
 
@@ -1875,6 +1951,14 @@ class _XemBenhAnScreenState extends State<XemBenhAnScreen> {
     // v2.42.0: Check if local scanned (id am)
 
     final isLocal = d.id < 0;
+    // v3.0.147: Check if EMR doc can be deleted by current user
+
+    final currentLogin = HisProApiService.instance.loginName;
+
+    final canDeleteEmr = d.id > 0 &&
+
+        (d.requestLoginname == currentLogin || d.creator == currentLogin);
+
 
     return InkWell(
 
@@ -1887,6 +1971,12 @@ class _XemBenhAnScreenState extends State<XemBenhAnScreen> {
         if (isLocal) {
 
           _confirmDeleteScanned(d);
+
+        } else if (canDeleteEmr) {
+
+          // v3.0.147: Long-press on EMR doc -> hoi xoa EMR
+
+          _confirmDeleteEmr(d);
 
         }
 

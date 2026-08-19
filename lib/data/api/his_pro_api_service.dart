@@ -1344,4 +1344,60 @@ class HisProApiService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_kSessionKey);
   }
+
+  // ============================================================
+  // v3.0.147: EMR DELETE - soft delete (IS_DELETE=true)
+  // Inventec HIS pattern: POST /api/EmrDocument/Change với IS_DELETE
+  // ============================================================
+
+  /// Xóa phiếu EMR (soft delete - set IS_DELETE=true)
+  /// Chỉ work nếu người tạo = user hiện tại
+  /// Returns true nếu xóa thành công
+  Future<({bool success, String message})> deleteEmrDocument(int documentId) async {
+    // Standard Inventec HIS soft-delete pattern
+    final sdo = {
+      'ID': documentId,
+      'IS_DELETE': true,
+    };
+
+    final body = {
+      'ApiData': sdo,
+    };
+
+    final headers = <String, String>{}..addAll(getEffectiveAuthHeaders());
+
+    try {
+      // Thử Change endpoint (Inventec standard)
+      final r = await _dio.post(
+        '${getEmrBaseUrlSync()}api/EmrDocument/Change',
+        data: body,
+        options: Options(
+          headers: headers,
+          receiveTimeout: const Duration(seconds: 30),
+          sendTimeout: const Duration(seconds: 30),
+          validateStatus: (s) => s != null && s < 500,
+        ),
+      );
+
+      if (r.statusCode == 200) {
+        final data = r.data;
+        if (data is Map && data['Success'] == false) {
+          String msg = 'Server từ chối';
+          final param2 = data['Param'];
+          if (param2 is Map && param2['Messages'] is List && (param2['Messages'] as List).isNotEmpty) {
+            msg = (param2['Messages'] as List).first.toString();
+          }
+          return (success: false, message: msg);
+        }
+        debugPrint('✅ deleteEmrDocument($documentId) success');
+        return (success: true, message: 'Đã xóa phiếu EMR');
+      }
+
+      return (success: false, message: 'HTTP ${r.statusCode}');
+    } catch (e) {
+      final err = e.toString().split('\n').first;
+      debugPrint('❌ deleteEmrDocument($documentId) error: $err');
+      return (success: false, message: err);
+    }
+  }
 }

@@ -125,6 +125,9 @@ class DataDocument {
   final String? patientCode;
   final String? patientName;
   final String? documentDate;
+  // v3.0.147: Track creator để phân quyền xóa EMR
+  final String? creator;
+  final String? requestLoginname;
 
   const DataDocument({
     required this.id,
@@ -140,6 +143,8 @@ class DataDocument {
     this.patientCode,
     this.patientName,
     this.documentDate,
+    this.creator,
+    this.requestLoginname,
   });
 }
 
