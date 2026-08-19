@@ -1,21 +1,17 @@
 // PdfToImageService v3.0.145
 //
 // Convert PDF bytes → PNG-embedded PDF.
-// Workflow: PDF(form with fonts) → render to RGBA pixels → embed as PNG image in new PDF → push to EMR
+// Workflow: PDF(form with fonts) → render to raster PNG → embed as PNG image in new PDF → push to EMR
 // The resulting PDF contains ONLY an image → no text/font rendering on EMR server → Vietnamese displays correctly
 //
-// Uses Android native PdfRenderer via platform channel (no external packages needed).
-// Uses `image` package (already in pubspec) for PNG encoding.
+// Uses `printing` package's Printing.raster() API (already in pubspec) - no extra packages needed.
 
-import 'dart:typed_data';
-import 'package:flutter/services.dart';
-import 'package:image/image.dart' as img;
+import 'package:flutter/foundation.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:printing/printing.dart';
 
 class PdfToImageService {
-  static const _channel = MethodChannel('his_mobile/pdf_renderer');
-
   /// Convert PDF to a PDF that contains the rendered form as a PNG image.
   /// No text elements - only embedded image → EMR server displays correctly.
   ///
@@ -28,25 +24,30 @@ class PdfToImageService {
     int dpi = 150,
   }) async {
     try {
-      // Step 1: Render PDF page to PNG using Android native PdfRenderer
-      final pngBytes = await _channel.invokeMethod<Uint8List>('renderPdfPageToPng', {
-        'pdfBytes': pdfBytes,
-        'dpi': dpi,
-        'pageIndex': 0,
-      });
+      // Step 1: Render PDF page to PNG using printing package's raster API
+      final pages = <Uint8List>[];
 
-      if (pngBytes == null) {
+      await for (final raster in Printing.raster(pdfBytes, dpi: dpi.toDouble())) {
+        final pngBytes = await raster.toPng();
+        pages.add(pngBytes);
+        break; // Only first page
+      }
+
+      if (pages.isEmpty) {
+        debugPrint('[PdfToImage] No pages rendered from PDF');
         return null;
       }
 
-      // Step 2: Get page dimensions from PDF for proper page sizing
-      // Use default A4 dimensions (595 x 842 points) - close enough for most medical forms
+      final pngBytes = pages.first;
+      debugPrint('[PdfToImage] PDF → PNG: ${pngBytes.length} bytes @ $dpi DPI');
+
+      // Step 2: Build new PDF containing only the PNG image
+      // Get page dimensions - use A4 default (595 x 842 points) scaled to DPI
       const pageWidthPt = 595.0;
       const pageHeightPt = 842.0;
       final scale = dpi / 72.0;
       final pageFormat = PdfPageFormat(pageWidthPt * scale, pageHeightPt * scale);
 
-      // Step 3: Build new PDF containing only the PNG image
       final doc = pw.Document();
       doc.addPage(
         pw.Page(
@@ -64,8 +65,10 @@ class PdfToImageService {
       );
 
       final outputPdf = await doc.save();
+      debugPrint('[PdfToImage] PNG-in-PDF created: ${outputPdf.length} bytes');
       return outputPdf;
     } catch (e, st) {
+      debugPrint('[PdfToImage] Error: $e\n$st');
       return null;
     }
   }
