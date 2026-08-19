@@ -86,11 +86,18 @@ class PatientNameHelper {
     return false;
   }
 
-  /// Lấy 1 field cụ thể
+  /// Lấy 1 field cụ thể - thử cả UPPERCASE và lowercase (port 1425 vs 1429)
   static String _getByField(Map<String, dynamic> p, NameField field) {
     final candidates = _candidatesFor(field);
     for (final c in candidates) {
-      final v = p[c]?.toString() ?? '';
+      // Thử đúng case trước
+      var v = p[c]?.toString() ?? '';
+      if (v.isNotEmpty && v != 'null' && v != '-') return v;
+      // Thử lowercase
+      v = p[c.toLowerCase()]?.toString() ?? '';
+      if (v.isNotEmpty && v != 'null' && v != '-') return v;
+      // Thử UPPERCASE
+      v = p[c.toUpperCase()]?.toString() ?? '';
       if (v.isNotEmpty && v != 'null' && v != '-') return v;
     }
     return '';

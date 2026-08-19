@@ -145,6 +145,8 @@ class _ProcedureRoomScreenState extends State<ProcedureRoomScreen> with WidgetsB
   Timer? _autoRefreshTimer;
   // v3.1.08: Track danh sách BN cũ để detect BN mới
   Set<String> _previousPatientKeys = {};
+  // DEBUG: count để chỉ log 3 patient đầu tiên
+  int _debugLogCount = 0;
 
   @override
   void initState() {
@@ -1356,6 +1358,17 @@ class _ProcedureRoomScreenState extends State<ProcedureRoomScreen> with WidgetsB
   }
 
   Widget _buildPatientTile(Map<String, dynamic> p) {
+    // DEBUG: log field names từ API response để debug tên BN không hiện
+    assert(() {
+      if (_debugLogCount < 3) {
+        _debugLogCount++;
+        final keys = p.keys.where((k) => k.toLowerCase().contains('patient') || k.toLowerCase().contains('name') || k.toLowerCase().contains('hoten') || k.toLowerCase().contains('ten_')).toList();
+        debugPrint('🔍 [ProcRoom] Patient #$_debugLogCount name fields: $keys');
+        debugPrint('🔍 [ProcRoom] Raw: TDL_PATIENT_NAME=${p['TDL_PATIENT_NAME']} tdl_patient_name=${p['tdl_patient_name']} TEN_BENH_NHAN=${p['TEN_BENH_NHAN']} hotenbn=${p['hotenbn']}');
+        debugPrint('🔍 [ProcRoom] Helper result: ${PatientNameHelper.getName(p)}');
+      }
+      return true;
+    }());
     final name = fixVietnameseMojibake(PatientNameHelper.getName(p));
     final code = (p['TDL_PATIENT_CODE'] ?? p['TDL_PATIENT_NAME'] ?? '').toString();
     final serviceReqCode = (p['SERVICE_REQ_CODE'] ?? p['service_req_code'] ?? '').toString();
