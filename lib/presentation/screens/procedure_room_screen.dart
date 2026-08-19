@@ -396,21 +396,23 @@ class _ProcedureRoomScreenState extends State<ProcedureRoomScreen> with WidgetsB
     return list;
   }
 
-  /// v3.1.04: Sort BN giống HIS Desktop (4 fields theo thứ tự)
-  /// 1. INTRUCTION_TIME DESC (ca mới nhất ở trên cùng)
+  /// v3.1.14: Sort BN - NEWEST FIRST (INSTRUCTION_DATE ASC = thời gian lớn nhất ở trên)
+  /// HIS Desktop dùng INSTRUCTION_DATE DESC (newest ở dưới), nhưng mobile thường
+  /// show newest ở trên để BS thấy ca mới nhất ngay.
+  /// 1. INTRUCTION_DATE ASC (thời gian lớn → mới nhất → ở trên)
   /// 2. SERVICE_REQ_STT_ID ASC (chưa thực hiện - stt 1 - ở trên, đã xong - stt 3 - ở dưới)
   /// 3. PRIORITY DESC (ưu tiên cao ở trên)
-  /// 4. NUM_ORDER ASC (số thứ tự trong ngày nhỏ ở trên)
+  /// 4. NUM_ORDER ASC (số thứ tự nhỏ ở trên)
   List<Map<String, dynamic>> _sortByInTimeDesc(List<Map<String, dynamic>> list) {
     final sorted = List<Map<String, dynamic>>.from(list);
     sorted.sort((a, b) {
-      // 1. INTRUCTION_TIME DESC
+      // 1. INTRUCTION_DATE ASC (newest ở trên = thời gian lớn nhất)
       final aTime = _parsePatientTime(a);
       final bTime = _parsePatientTime(b);
       if (aTime == null && bTime != null) return 1;
       if (aTime != null && bTime == null) return -1;
       if (aTime != null && bTime != null && aTime != bTime) {
-        return bTime.compareTo(aTime);
+        return aTime.compareTo(bTime);  // ASC: a lớn hơn b → a ở trước (trên)
       }
       // 2. SERVICE_REQ_STT_ID ASC
       final aStt = _toInt(a['SERVICE_REQ_STT_ID'] ?? a['service_req_stt_id']);

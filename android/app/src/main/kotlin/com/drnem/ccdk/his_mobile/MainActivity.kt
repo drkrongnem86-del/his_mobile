@@ -162,24 +162,9 @@ class MainActivity : FlutterActivity() {
                             // Commit session - hệ thống sẽ show install dialog
                             session.commit(pendingIntent.intentSender)
                             session.close()
-                            // v3.0.144: FIX Samsung - finishAndRemoveTask() + killProcess
-                            // finishAndRemoveTask() alone không đủ trên Samsung (Flutter engine keep-alive)
-                            // → process vẫn alive → PackageInstaller bị block → "App not installed"
-                            // Fix: sau finishAndRemoveTask() + 600ms → killProcess() để chắc chắn
-                            Handler(Looper.getMainLooper()).postDelayed({
-                                try {
-                                    finishAndRemoveTask()
-                                } catch (e: Exception) {
-                                    android.util.Log.w("HISMobile", "finishAndRemoveTask failed: $e")
-                                }
-                            }, 500)
-                            Handler(Looper.getMainLooper()).postDelayed({
-                                try {
-                                    android.os.Process.killProcess(android.os.Process.myPid())
-                                } catch (e: Exception) {
-                                    android.util.Log.w("HISMobile", "killProcess failed: $e")
-                                }
-                            }, 1200)
+                            // v3.1.14: KHÔNG kill process/finish app nữa
+                            // PackageInstaller.Session tự quản lý lifecycle - hệ thống sẽ
+                            // tự close app khi user confirm install trong system dialog
                             result.success(true)
                         } catch (e: Exception) {
                             result.error("INSTALL_FAILED", e.message, e.stackTrace.toString())

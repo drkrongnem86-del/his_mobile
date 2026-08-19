@@ -144,8 +144,9 @@ class HisApiService {
                         d.day * 1000000;
 
       // Filter thực tế từ log HIS Pro
+      // v3.1.14: Thêm status 3 (đã thực hiện) giống HIS Desktop - lấy đủ 87 BN
       final apiData = {
-        'SERVICE_REQ_STT_IDs': [1, 2],
+        'SERVICE_REQ_STT_IDs': [1, 2, 3],
         'NOT_IN_SERVICE_REQ_TYPE_IDs': [6, 16, 15, 14, 7],
         'TDL_PATIENT_TYPE_IDs': [206, 1, 210, 202, 262, 182, 162, 2, 45, 102, 204, 205, 203, 44, 122, 242, 222, 142, 143, 209, 208, 207, 42, 43],
         'KEYWORD__SERVICE_REQ_CODE__TREATMENT_CODE__PATIENT_NAME__PATIENT_CODE': '',
@@ -195,7 +196,8 @@ class HisApiService {
                        d.day * 1000000;
 
       final apiData = {
-        'SERVICE_REQ_STT_IDs': [1, 2],
+        // v3.1.14: Thêm status 3 (đã thực hiện) giống HIS Desktop
+        'SERVICE_REQ_STT_IDs': [1, 2, 3],
         'NOT_IN_SERVICE_REQ_TYPE_IDs': [6, 16, 15, 14, 7],
         'TDL_PATIENT_TYPE_IDs': [206, 1, 210, 202, 262, 182, 162, 2, 45, 102, 204, 205, 203, 44, 122, 242, 222, 142, 143, 209, 208, 207, 42, 43],
         'KEYWORD__SERVICE_REQ_CODE__TREATMENT_CODE__PATIENT_NAME__PATIENT_CODE': '',
@@ -247,7 +249,8 @@ class HisApiService {
                        d.day * 1000000;
 
       final apiData = {
-        'SERVICE_REQ_STT_IDs': [1, 2],
+        // v3.1.14: Thêm status 3 (đã thực hiện) giống HIS Desktop
+        'SERVICE_REQ_STT_IDs': [1, 2, 3],
         'NOT_IN_SERVICE_REQ_TYPE_IDs': [6, 16, 15, 14, 7],
         'TDL_PATIENT_TYPE_IDs': [206, 1, 210, 202, 262, 182, 162, 2, 45, 102, 204, 205, 203, 44, 122, 242, 222, 142, 143, 209, 208, 207, 42, 43],
         'KEYWORD__SERVICE_REQ_CODE__TREATMENT_CODE__PATIENT_NAME__PATIENT_CODE': '',
@@ -321,7 +324,8 @@ class HisApiService {
 
       // 2. Lấy tất cả service req hôm nay (KHÔNG filter room)
       final apiData = {
-        'SERVICE_REQ_STT_IDs': [1, 2],
+        // v3.1.14: Thêm status 3 (đã thực hiện) giống HIS Desktop
+        'SERVICE_REQ_STT_IDs': [1, 2, 3],
         'NOT_IN_SERVICE_REQ_TYPE_IDs': [6, 16, 15, 14, 7],
         'TDL_PATIENT_TYPE_IDs': [206, 1, 210, 202, 262, 182, 162, 2, 45, 102, 204, 205, 203, 44, 122, 242, 222, 142, 143, 209, 208, 207, 42, 43],
         'KEYWORD__SERVICE_REQ_CODE__TREATMENT_CODE__PATIENT_NAME__PATIENT_CODE': '',
@@ -390,7 +394,8 @@ class HisApiService {
                        d.day * 1000000;
 
       final apiData = {
-        'SERVICE_REQ_STT_IDs': [1, 2],
+        // v3.1.14: Thêm status 3 (đã thực hiện) giống HIS Desktop
+        'SERVICE_REQ_STT_IDs': [1, 2, 3],
         'NOT_IN_SERVICE_REQ_TYPE_IDs': [6, 16, 15, 14, 7],
         'TDL_PATIENT_TYPE_IDs': [206, 1, 210, 202, 262, 182, 162, 2, 45, 102, 204, 205, 203, 44, 122, 242, 222, 142, 143, 209, 208, 207, 42, 43],
         'KEYWORD__SERVICE_REQ_CODE__TREATMENT_CODE__PATIENT_NAME__PATIENT_CODE': '',

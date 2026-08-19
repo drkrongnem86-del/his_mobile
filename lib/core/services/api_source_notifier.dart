@@ -76,7 +76,9 @@ class AppApiSourceNotifier {
   AppApiSourceNotifier._();
   static final AppApiSourceNotifier instance = AppApiSourceNotifier._();
 
-  final ValueNotifier<AppApiSource> notifier = ValueNotifier<AppApiSource>(AppApiSource.dataRoom);
+  // v3.1.14: Đổi default sang hisPro (API 1) - để align với HIS Desktop data
+  // Fallback tự động chuyển sang dataRoom/public nếu HIS Pro không truy cập được
+  final ValueNotifier<AppApiSource> notifier = ValueNotifier<AppApiSource>(AppApiSource.hisPro);
 
   AppApiSource get value => notifier.value;
   set value(AppApiSource src) {
