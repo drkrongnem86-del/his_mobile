@@ -133,6 +133,9 @@ class _ProcedureRoomScreenState extends State<ProcedureRoomScreen> with WidgetsB
   // 0=Tất cả, 1=Khám, 2=CĐHA, 3=Thủ thuật, 4=Vật tư
   int _serviceTypeTab = 0;
 
+  // v3.1.15: Filter trạng thái - 3 nút riêng biệt (bật/tắt), tự reload khi tap
+  Set<int> _sttFilters = {1, 2, 3};
+
   String _searchQuery = '';
   final TextEditingController _searchCtrl = TextEditingController();
   final FocusNode _searchFocus = FocusNode();
@@ -335,16 +338,18 @@ class _ProcedureRoomScreenState extends State<ProcedureRoomScreen> with WidgetsB
   }
 
   /// v3.1.07: Gọi API theo source
-  Future<HisResult> _callApi(ProcedureApiSource src, int roomId, int deptId, {int limit = 200}) async {
+  /// v3.1.15: thêm sttFilters param - danh sách status được chọn
+  Future<HisResult> _callApi(ProcedureApiSource src, int roomId, int deptId, {int limit = 200, Set<int>? sttFilters}) async {
+    final statuses = sttFilters ?? _sttFilters;
     switch (src) {
       case ProcedureApiSource.hisPro:
-        return await _api.getServiceRequestsByRoom(roomId, limit: limit)
+        return await _api.getServiceRequestsByRoom(roomId, limit: limit, serviceReqSttIds: statuses)
             .timeout(const Duration(seconds: 8), onTimeout: () => HisResult(success: false, message: 'HIS Pro timeout'));
       case ProcedureApiSource.dataApi:
-        return await _api.getServiceRequestsByRoomDataApi(roomId, limit: limit, departmentId: deptId)
+        return await _api.getServiceRequestsByRoomDataApi(roomId, limit: limit, departmentId: deptId, serviceReqSttIds: statuses)
             .timeout(const Duration(seconds: 8), onTimeout: () => HisResult(success: false, message: 'Data API timeout'));
       case ProcedureApiSource.public:
-        return await _api.getServiceRequestsByRoomPublic(roomId, limit: limit, departmentCatalogId: deptId)
+        return await _api.getServiceRequestsByRoomPublic(roomId, limit: limit, departmentCatalogId: deptId, serviceReqSttIds: statuses)
             .timeout(const Duration(seconds: 8), onTimeout: () => HisResult(success: false, message: 'Public API timeout'));
     }
   }
@@ -628,6 +633,8 @@ class _ProcedureRoomScreenState extends State<ProcedureRoomScreen> with WidgetsB
       _buildStatsBar(),
       // ===== SERVICE TYPE TABS (Tất cả / Khám / CĐHA / Thủ thuật / Vật tư) =====
       _buildServiceTypeTabs(),
+      // ===== STATUS FILTER: 3 nút riêng biệt bật/tắt =====
+      _buildStatusFilterBar(),
       // ===== PATIENT LIST =====
       Expanded(child: _buildList()),
       // ===== FOOTER: SLDV counter (giống HIS Desktop "SLDV đã xử lý: X/Y") =====
@@ -1220,6 +1227,74 @@ class _ProcedureRoomScreenState extends State<ProcedureRoomScreen> with WidgetsB
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  /// v3.1.15: 3 nút filter trạng thái - bật/tắt từng nút, tự reload khi tap
+  /// Status: 1=Chờ, 2=Đang thực hiện, 3=Đã hoàn thành
+  Widget _buildStatusFilterBar() {
+    // Count BN theo từng status trong _allPatients (trước khi filter service type)
+    int countFor(int stt) => _allPatients.where((p) {
+      final s = _toInt(p['SERVICE_REQ_STT_ID'] ?? p['service_req_stt_id']);
+      return s == stt;
+    }).length;
+
+    final c1 = countFor(1);
+    final c2 = countFor(2);
+    final c3 = countFor(3);
+
+    return Container(
+      color: const Color(0xFFF5F5F5),
+      padding: const EdgeInsets.fromLTRB(8, 3, 8, 3),
+      child: Row(children: [
+        const Text('TT:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF424242))),
+        const SizedBox(width: 8),
+        _sttToggleBtn(1, 'Chờ', c1, const Color(0xFFE65100)),
+        const SizedBox(width: 6),
+        _sttToggleBtn(2, 'Đang', c2, const Color(0xFF1565C0)),
+        const SizedBox(width: 6),
+        _sttToggleBtn(3, 'Xong', c3, const Color(0xFF2E7D32)),
+      ]),
+    );
+  }
+
+  /// v3.1.15: 1 nút toggle status - bật/tắt + auto-reload
+  Widget _sttToggleBtn(int stt, String label, int count, Color color) {
+    final active = _sttFilters.contains(stt);
+    return InkWell(
+      onTap: () {
+        setState(() {
+          final newSet = Set<int>.from(_sttFilters);
+          if (active) {
+            // Đang active → tắt đi
+            if (newSet.length > 1) newSet.remove(stt); // Giữ ít nhất 1 active
+          } else {
+            // Đang inactive → bật lên
+            newSet.add(stt);
+          }
+          _sttFilters = newSet;
+        });
+        _loadPatients(); // auto-reload
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 10),
+        decoration: BoxDecoration(
+          color: active ? color : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: active ? color : const Color(0xFFBDBDBD), width: 1.5),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Text(
+            '$stt',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: active ? Colors.white : color),
+          ),
+          const SizedBox(width: 3),
+          Text(
+            '$label ($count)',
+            style: TextStyle(fontSize: 11, color: active ? Colors.white : Colors.black54),
+          ),
+        ]),
       ),
     );
   }

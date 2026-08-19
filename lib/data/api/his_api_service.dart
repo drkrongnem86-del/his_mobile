@@ -188,16 +188,20 @@ class HisApiService {
   }
 
   /// Lấy danh sách yêu cầu dịch vụ theo EXECUTE_ROOM_ID (phòng khám)
-  Future<HisResult> getServiceRequestsByRoom(int executeRoomId, {int limit = 100}) async {
+  /// v3.1.15: thêm serviceReqSttIds param - cho phép lọc theo status (mặc định {1,2,3})
+  Future<HisResult> getServiceRequestsByRoom(int executeRoomId, {int limit = 100, Set<int>? serviceReqSttIds}) async {
     try {
       final d = DateTime.now();
       final dateLong = d.year * 10000000000 +
                        d.month * 100000000 +
                        d.day * 1000000;
 
+      // v3.1.15: Dùng filter từ caller, mặc định {1,2,3} nếu không truyền
+      final statuses = serviceReqSttIds?.toList() ?? [1, 2, 3];
+
       final apiData = {
-        // v3.1.14: Thêm status 3 (đã thực hiện) giống HIS Desktop
-        'SERVICE_REQ_STT_IDs': [1, 2, 3],
+        // v3.1.15: Status filter động từ UI (3 nút riêng biệt)
+        'SERVICE_REQ_STT_IDs': statuses,
         'NOT_IN_SERVICE_REQ_TYPE_IDs': [6, 16, 15, 14, 7],
         'TDL_PATIENT_TYPE_IDs': [206, 1, 210, 202, 262, 182, 162, 2, 45, 102, 204, 205, 203, 44, 122, 242, 222, 142, 143, 209, 208, 207, 42, 43],
         'KEYWORD__SERVICE_REQ_CODE__TREATMENT_CODE__PATIENT_NAME__PATIENT_CODE': '',
@@ -1019,7 +1023,8 @@ class HisApiService {
   /// POST http://113.163.187.3:3000/v1/patient/benh-nhan-buong-benh
   /// v3.1.13: Trả về BN có BED_ROOM_ID trùng với executeRoomId (mapping ngược)
   /// - deptId: filter thêm theo DEPARTMENT_ID (nếu muốn giới hạn)
-  Future<HisResult> getServiceRequestsByRoomDataApi(int roomId, {int limit = 100, int? departmentId}) async {
+  /// v3.1.15: thêm serviceReqSttIds param - filter client-side theo status
+  Future<HisResult> getServiceRequestsByRoomDataApi(int roomId, {int limit = 100, int? departmentId, Set<int>? serviceReqSttIds}) async {
     try {
       // Data 3000 API: POST /v1/patient/benh-nhan-buong-benh
       // Yêu cầu: Bearer token từ /v1/auth/login
@@ -1084,7 +1089,14 @@ class HisApiService {
           });
         }
       }
-      return HisResult(success: true, data: list);
+      // v3.1.15: Filter theo status (client-side)
+      final statuses = serviceReqSttIds ?? {1, 2, 3};
+      final filtered = list.where((p) {
+        final stt = (p['SERVICE_REQ_STT_ID'] ?? 1) as int;
+        return statuses.contains(stt);
+      }).toList();
+
+      return HisResult(success: true, data: filtered);
     } catch (e) {
       return HisResult(success: false, message: 'Data 3000: ${_handleError(e)}');
     }
@@ -1093,7 +1105,8 @@ class HisApiService {
   /// Lấy danh sách yêu cầu dịch vụ từ Public API 8080 (113.163.187.3:8080)
   /// GET /emr-checker/emr-checker-list?department_catalog={id}
   /// v3.1.13: Filter theo department_catalog (HSCC=22)
-  Future<HisResult> getServiceRequestsByRoomPublic(int roomId, {int limit = 100, int? departmentCatalogId}) async {
+  /// v3.1.15: thêm serviceReqSttIds param (no-op for public API - nó không trả status)
+  Future<HisResult> getServiceRequestsByRoomPublic(int roomId, {int limit = 100, int? departmentCatalogId, Set<int>? serviceReqSttIds}) async {
     try {
       // Public 8080 dùng login session cookie (CSRF) - cần auth trước
       final dio = Dio(BaseOptions(
