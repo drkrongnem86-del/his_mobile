@@ -2876,7 +2876,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
               formData: const {},
-              prebuiltPngBytes: pngBytes ?? pdfBytes,
+              prebuiltPdfBytes: pngBytes ?? pdfBytes,
 
 
 

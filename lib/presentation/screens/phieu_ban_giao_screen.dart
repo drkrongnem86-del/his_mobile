@@ -714,7 +714,7 @@ class _PhieuBanGiaoScreenState extends State<PhieuBanGiaoScreen> {
           formName: 'PHIẾU BÀN GIAO CHUYỂN KHOA',
           formData: const {},
           documentTypeId: 20,
-          prebuiltPngBytes: pngBytes ?? pdfBytes,
+          prebuiltPdfBytes: pngBytes ?? pdfBytes,
           workingDeptName: 'Khoa Cấp Cứu',
           departmentCode: 'HSCC',
           roomCode: 'PKCC',

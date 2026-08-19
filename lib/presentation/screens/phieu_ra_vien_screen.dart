@@ -607,7 +607,7 @@ class _PhieuRaVienScreenState extends State<PhieuRaVienScreen> {
           formName: 'GIẤY RA VIỆN KHÔNG THEO CHỈ ĐỊNH BÁC SỸ',
           formData: const {},
           documentTypeId: 20,
-          prebuiltPngBytes: pngBytes ?? pdfBytes,
+          prebuiltPdfBytes: pngBytes ?? pdfBytes,
           workingDeptName: 'Khoa Cấp Cứu',
           departmentCode: 'HSCC',
           roomCode: 'PKCC',

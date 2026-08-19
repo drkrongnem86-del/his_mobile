@@ -569,7 +569,7 @@ class _PhieuTuChoiScreenState extends State<PhieuTuChoiScreen> {
           formName: 'GIẤY TỪ CHỐI SỬ DỤNG DỊCH VỤ',
           formData: const {},
           documentTypeId: 20,
-          prebuiltPngBytes: pngBytes ?? pdfBytes,
+          prebuiltPdfBytes: pngBytes ?? pdfBytes,
           workingDeptName: 'Khoa Cấp Cứu',
           departmentCode: 'HSCC',
           roomCode: 'PKCC',
