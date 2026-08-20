@@ -22,6 +22,7 @@
 // - User nhập mã điều trị (15 số) từ HIS Desktop → xem BN + danh sách phiếu EMR
 // - Cũng extract được service_req_code từ HIS_CODE field của mỗi phiếu
 import 'dart:async';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/material.dart';
 import 'package:his_mobile/core/constants/app_constants.dart';
 import 'package:his_mobile/core/services/api_source_notifier.dart';
@@ -919,7 +920,7 @@ class _ProcedureRoomScreenState extends State<ProcedureRoomScreen> with WidgetsB
                 style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
                 decoration: const InputDecoration(
                   border: OutlineInputBorder(),
-                  hintText: '805953ca1e7f5a67e86a21108b0b921f336041a2829214364d49ab83c724c575',
+                  hintText: '1ee41ae967caa75e7c2891a3d9612259d70b4645c67852ab0e5f07546c2f3dfb',
                   hintStyle: TextStyle(fontSize: 9, color: Colors.black38, fontFamily: 'monospace'),
                   isDense: true,
                 ),

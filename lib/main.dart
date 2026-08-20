@@ -17,7 +17,6 @@ import 'package:his_mobile/modules/auth/presentation/blocs/auth_bloc.dart';
 import 'package:his_mobile/presentation/navigation/app_router.dart';
 import 'package:his_mobile/core/services/vpn_benh_vien_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:his_mobile/data/services/his_pro_api_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -70,8 +69,7 @@ void main() async {
     await prefs.setString('his_pro_client_ip', emrIp);
     // v3.0.144: Set token cho HisApiService (procedure room dùng cái này)
     HisApiService().setAuthToken(emrToken);
-    // v3.0.144: Set token cho class PHỤ (services/his_pro_api_service.dart)
-    HisProApiService.instance.setTokenCode(token: emrToken, clientIp: emrIp);
+    // v3.0.157: class PHỤ (services/his_pro_api_service.dart) đã merge vào class CHÍNH
     // v3.0.144: Set token cho class CHÍNH (api/his_pro_api_service.dart) - dùng cho EMR push
     // Trước tiên xóa cache cũ (tránh token cũ paste trước đó còn trong SecureStorage)
     try {

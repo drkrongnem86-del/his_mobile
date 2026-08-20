@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:cookie_jar/cookie_jar.dart';
 import 'package:dio/dio.dart';
 import 'package:dio_cookie_manager/dio_cookie_manager.dart';
@@ -64,7 +65,7 @@ class HisApiService {
     // Thử cả 2 server URLs
     for (final baseUrl in ConnectionService.instance.acsUrlCandidates) {
       try {
-        print('🔐 Trying: $baseUrl');
+        debugPrint('🔐 Trying: $baseUrl');
 
         final response = await _dio.get(
           '${baseUrl}api/AcsToken/Authorize',
@@ -79,7 +80,7 @@ class HisApiService {
 
         if (response.statusCode != 200) {
           lastError = 'HTTP ${response.statusCode}';
-          print('   HTTP ${response.statusCode} - thử server tiếp');
+          debugPrint('   HTTP ${response.statusCode} - thử server tiếp');
           continue;
         }
 
@@ -111,14 +112,14 @@ class HisApiService {
           } else if (tokenData is String) {
             token = tokenData;
           }
-          print('   ✅ Login OK!');
+          debugPrint('   ✅ Login OK!');
           return LoginResult(success: true, token: token, userData: tokenData);
         }
 
         lastError = 'Phản hồi không xác định';
       } catch (e) {
         lastError = '${e.toString().substring(0, 60)}';
-        print('   ❌ Error: $lastError - thử server tiếp');
+        debugPrint('   ❌ Error: $lastError - thử server tiếp');
         continue;
       }
     }
@@ -166,10 +167,10 @@ class HisApiService {
 
       final param = _encodeParam(apiData, limit);
 
-      print('📡 MCH GetLView: ${ConnectionService.instance.ocrUrl}api/HisServiceReq/GetLView');
+      debugPrint('📡 MCH GetLView: ${ConnectionService.instance.mosUrl}api/HisServiceReq/GetLView');
 
       final response = await _dio.get(
-        '${ConnectionService.instance.ocrUrl}api/HisServiceReq/GetLView',
+        '${ConnectionService.instance.mosUrl}api/HisServiceReq/GetLView',
         queryParameters: {'param': param},
         options: Options(
           headers: {'Content-Type': 'application/json'},
@@ -221,10 +222,10 @@ class HisApiService {
 
       final param = _encodeParam(apiData, limit);
 
-      print('📡 MCH GetLView (RoomID=$executeRoomId): ${ConnectionService.instance.ocrUrl}api/HisServiceReq/GetLView');
+      debugPrint('📡 MCH GetLView (RoomID=$executeRoomId): ${ConnectionService.instance.mosUrl}api/HisServiceReq/GetLView');
 
       final response = await _dio.get(
-        '${ConnectionService.instance.ocrUrl}api/HisServiceReq/GetLView',
+        '${ConnectionService.instance.mosUrl}api/HisServiceReq/GetLView',
         queryParameters: {'param': param},
         options: Options(
           headers: {'Content-Type': 'application/json'},
@@ -274,10 +275,10 @@ class HisApiService {
 
       final param = _encodeParam(apiData, limit);
 
-      print('📡 MCH GetLView (DeptID=$departmentId): ${ConnectionService.instance.ocrUrl}api/HisServiceReq/GetLView');
+      debugPrint('📡 MCH GetLView (DeptID=$departmentId): ${ConnectionService.instance.mosUrl}api/HisServiceReq/GetLView');
 
       final response = await _dio.get(
-        '${ConnectionService.instance.ocrUrl}api/HisServiceReq/GetLView',
+        '${ConnectionService.instance.mosUrl}api/HisServiceReq/GetLView',
         queryParameters: {'param': param},
         options: Options(
           headers: {'Content-Type': 'application/json'},
@@ -294,7 +295,7 @@ class HisApiService {
         }
         final innerData = data['Data'];
         if (innerData is List && innerData.isEmpty) {
-          print('⚠️ Dept filter rỗng → fallback lấy all + filter client-side');
+          debugPrint('⚠️ Dept filter rỗng → fallback lấy all + filter client-side');
           return await _fallbackFilterByDepartment(departmentId, dateLong, limit);
         }
         return HisResult(success: true, data: response.data);
@@ -348,7 +349,7 @@ class HisApiService {
 
       final param = _encodeParam(apiData, 500); // Lấy nhiều hơn để filter
       final response = await _dio.get(
-        '${ConnectionService.instance.ocrUrl}api/HisServiceReq/GetLView',
+        '${ConnectionService.instance.mosUrl}api/HisServiceReq/GetLView',
         queryParameters: {'param': param},
         options: Options(
           headers: {'Content-Type': 'application/json'},
@@ -419,7 +420,7 @@ class HisApiService {
       final param = _encodeParam(apiData, limit);
 
       final response = await _dio.get(
-        '${ConnectionService.instance.ocrUrl}api/HisServiceReq/GetLView',
+        '${ConnectionService.instance.mosUrl}api/HisServiceReq/GetLView',
         queryParameters: {'param': param},
         options: Options(
           headers: {'Content-Type': 'application/json'},
@@ -479,7 +480,7 @@ class HisApiService {
   /// Thực ra dùng HIS Pro API token (LOGIN_NAME only, không cần password)
   Future<HisResult> thongkeLogin(String username, String password) async {
     try {
-      print('🔐 HIS Pro token login: $username');
+      debugPrint('🔐 HIS Pro token login: $username');
 
       // Bước 1: Gọi api/AcsToken/Authorize với LOGIN_NAME only
       // Token được cache ở client, không cần password trong API call
@@ -503,7 +504,7 @@ class HisApiService {
         ),
       );
 
-      print('📡 Token response: ${r1.statusCode}');
+      debugPrint('📡 Token response: ${r1.statusCode}');
 
       if (r1.statusCode != 200) {
         return HisResult(success: false, message: 'Cannot get token: HTTP ${r1.statusCode}');
@@ -531,7 +532,7 @@ class HisApiService {
         if (tkm != null) tokenCode = tkm.group(1);
       }
 
-      print('🔑 TokenCode: ${tokenCode?.substring(0, tokenCode.length > 20 ? 20 : tokenCode.length)}...');
+      debugPrint('🔑 TokenCode: ${tokenCode?.substring(0, tokenCode.length > 20 ? 20 : tokenCode.length)}...');
 
       if (tokenCode == null || tokenCode.isEmpty) {
         return HisResult(success: false, message: 'No TokenCode in response');
@@ -554,11 +555,11 @@ class HisApiService {
       await prefs.setString('hispro_user', username);
       await prefs.setString('hispro_token', tokenCode);
       await prefs.setString('hispro_cmdLn', _cmdLn!);
-      print('💾 Saved HIS Pro session to SharedPreferences');
+      debugPrint('💾 Saved HIS Pro session to SharedPreferences');
 
       return HisResult(success: true, data: {'tokenCode': tokenCode, 'cmdLn': _cmdLn});
     } catch (e) {
-      print('❌ Login error: $e');
+      debugPrint('❌ Login error: $e');
       return HisResult(success: false, message: _handleError(e));
     }
   }
@@ -571,10 +572,10 @@ class HisApiService {
       _cmdLn = prefs.getString('hispro_cmdLn');
       if (_tokenCode != null && _cmdLn != null) {
         final len = _tokenCode!.length > 20 ? 20 : _tokenCode!.length;
-        print('🔄 Restored HIS Pro token: ${_tokenCode!.substring(0, len)}...');
+        debugPrint('🔄 Restored HIS Pro token: ${_tokenCode!.substring(0, len)}...');
       }
     } catch (e) {
-      print('❌ Restore error: $e');
+      debugPrint('❌ Restore error: $e');
     }
   }
 
@@ -601,10 +602,10 @@ class HisApiService {
         }
       }
       if (_sessionCookies.isNotEmpty) {
-        print('🔄 Restored ${_sessionCookies.length} thongke cookies');
+        debugPrint('🔄 Restored ${_sessionCookies.length} thongke cookies');
       }
     } catch (e) {
-      print('❌ Restore session error: $e');
+      debugPrint('❌ Restore session error: $e');
     }
   }
 
@@ -621,7 +622,7 @@ class HisApiService {
     // If 401/403/302 → re-login then retry
     final msg = first.message ?? '';
     if (msg.contains('401') || msg.contains('403') || msg.contains('302')) {
-      print('🔄 Got $msg → re-login thongke...');
+      debugPrint('🔄 Got $msg → re-login thongke...');
       final relogin = await thongkeLogin(username, password);
       if (relogin.success) {
         return await originalCall();
@@ -671,7 +672,7 @@ class HisApiService {
         params['treatment_code'] = treatmentCode;
       }
 
-      print('🌐 Thongke get-list-emr-treatment: date=$dateStr, dept=$department');
+      debugPrint('🌐 Thongke get-list-emr-treatment: date=$dateStr, dept=$department');
 
       final r = await _dio.get(
         '${ConnectionService.instance.acsUrl}/emr/index/get-list-emr-treatment',
@@ -686,7 +687,7 @@ class HisApiService {
         ),
       );
 
-      print('📡 Response: ${r.statusCode}, content-type: ${r.headers.value("content-type")}');
+      debugPrint('📡 Response: ${r.statusCode}, content-type: ${r.headers.value("content-type")}');
 
       // Response có thể là HTML (nếu session hết hạn) hoặc JSON
       if (r.statusCode == 200 && r.data is Map) {
@@ -700,9 +701,9 @@ class HisApiService {
               final dept = p['department_code']?.toString() ?? '';
               return dept == department;
             }).toList();
-            print('✅ Got ${list.length} BN in dept $department (filtered from ${m["recordsTotal"]} total)');
+            debugPrint('✅ Got ${list.length} BN in dept $department (filtered from ${m["recordsTotal"]} total)');
           } else {
-            print('✅ Got ${list.length} BN (total: ${m["recordsTotal"]})');
+            debugPrint('✅ Got ${list.length} BN (total: ${m["recordsTotal"]})');
           }
           return HisResult(success: true, data: list);
         }
@@ -710,7 +711,7 @@ class HisApiService {
       }
       return HisResult(success: false, message: 'HTTP ${r.statusCode}', data: r.data);
     } catch (e) {
-      print('❌ Get patients error: $e');
+      debugPrint('❌ Get patients error: $e');
       return HisResult(success: false, message: _handleError(e));
     }
   }
@@ -736,7 +737,7 @@ class HisApiService {
         'exact': exact.toString(),
       };
 
-      print('🌐 Dashboard search-patient: name="$searchName" exact=$exact');
+      debugPrint('🌐 Dashboard search-patient: name="$searchName" exact=$exact');
 
       final response = await _dio.get(
         '${ConnectionService.instance.acsUrl}/search-patient',
@@ -752,7 +753,7 @@ class HisApiService {
         ),
       );
 
-      print('📡 Response: status=${response.statusCode}, type=${response.data.runtimeType}');
+      debugPrint('📡 Response: status=${response.statusCode}, type=${response.data.runtimeType}');
 
       if (response.statusCode == 200) {
         // Response có thể là array trực tiếp hoặc {data: [...]}
@@ -766,15 +767,15 @@ class HisApiService {
           else if (m['patients'] is List) data = m['patients'];
           else if (m['result'] is List) data = m['result'];
         }
-        print('✅ Dashboard returned ${data.length} patients');
+        debugPrint('✅ Dashboard returned ${data.length} patients');
         if (data.isNotEmpty) {
-          print('📋 First item keys: ${(data.first as Map).keys.take(10).join(", ")}');
+          debugPrint('📋 First item keys: ${(data.first as Map).keys.take(10).join(", ")}');
         }
         return HisResult(success: true, data: List<Map<String, dynamic>>.from(data));
       }
       return HisResult(success: false, message: 'HTTP ${response.statusCode}', data: response.data);
     } catch (e) {
-      print('❌ Search error: $e');
+      debugPrint('❌ Search error: $e');
       return HisResult(success: false, message: _handleError(e));
     }
   }
@@ -1221,7 +1222,7 @@ class HisApiService {
       };
       final param = _encodeParam(apiData, 50);
       final response = await _dio.get(
-        '${ConnectionService.instance.ocrUrl}api/HisServiceReq/GetLView',
+        '${ConnectionService.instance.mosUrl}api/HisServiceReq/GetLView',
         queryParameters: {'param': param},
         options: Options(headers: {'Content-Type': 'application/json'}, receiveTimeout: const Duration(seconds: 30), validateStatus: (s) => s != null && s < 500),
       );
@@ -1257,10 +1258,10 @@ class HisApiService {
         'IS_AUTO_FINISH': true,
       };
       final param = _encodeParam(apiData, 0);
-      print('📡 MCH FinishWithTime (ID=$serviceReqId): ${ConnectionService.instance.ocrUrl}api/HisServiceReq/FinishWithTime');
+      debugPrint('📡 MCH FinishWithTime (ID=$serviceReqId): ${ConnectionService.instance.mosUrl}api/HisServiceReq/FinishWithTime');
 
       final response = await _dio.post(
-        '${ConnectionService.instance.ocrUrl}api/HisServiceReq/FinishWithTime',
+        '${ConnectionService.instance.mosUrl}api/HisServiceReq/FinishWithTime',
         queryParameters: {'param': param},
         options: Options(headers: {'Content-Type': 'application/json'}, receiveTimeout: const Duration(seconds: 60), validateStatus: (s) => s != null && s < 500),
       );
@@ -1289,7 +1290,7 @@ class HisApiService {
         'ORDER_DIRECTION': 'ASC',
       };
       final param = _encodeParam(apiData, limit);
-      print('📡 MCH GetExecuteRoleUsers: ${ConnectionService.instance.ocrUrl}api/HisExecuteUser/GetView');
+      debugPrint('📡 MCH GetExecuteRoleUsers: ${ConnectionService.instance.ocrUrl}api/HisExecuteUser/GetView');
       final response = await _dio.get(
         '${ConnectionService.instance.ocrUrl}api/HisExecuteUser/GetView',
         queryParameters: {'param': param},

@@ -1,4 +1,7 @@
-/// HIS Pro REST API Client
+/// HIS Pro Tracking Service (Legacy)
+/// v3.0.156: Renamed from HisProApiService to HisProTrackingService to avoid
+///   conflict with the main HisProApiService class in data/api/.
+/// Original:
 /// Kết nối tới HIS Pro backend (qua OpenVPN BV profile)
 /// Base URL: http://172.16.9.6:1401 (LAN BV) hoặc http://117.2.25.67:1401
 ///
@@ -19,9 +22,9 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
 
-class HisProApiService {
-  static final HisProApiService instance = HisProApiService._();
-  HisProApiService._();
+class HisProTrackingService {
+  static final HisProTrackingService instance = HisProTrackingService._();
+  HisProTrackingService._();
 
   // Base URL mặc định (qua VPN)
   static const String defaultBaseUrl = 'http://172.16.9.6:1401';

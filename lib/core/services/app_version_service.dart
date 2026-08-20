@@ -1,7 +1,7 @@
 // AppVersionService v2.66.0 - Lấy version app động từ package_info_plus
 // Hiển thị ở Settings - số phiên bản + build number
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:package_info_plus/package_info_plus.dart';
 
 class AppVersionService {

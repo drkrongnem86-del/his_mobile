@@ -1,5 +1,5 @@
 {
-  "version": "3.0.149",
-  "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.149/his_mobile_v3.0.149_arm64.apk",
-  "message": "Cập nhật phiên bản 3.0.149"
+  "version": "3.0.158",
+  "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.158/his_mobile_v3.0.158_arm64.apk",
+  "message": "v3.0.158 - Sync full source từ D:/his_mobile_github (team version 3.0.157) + fix main.dart (remove duplicate import his_pro_api_service.dart) + bump version 3.0.158+302. Bao gom H1-H7 + M1-M12 fix từ team + status filter 3 nut + killProcess + font TNKeyUni."
 }

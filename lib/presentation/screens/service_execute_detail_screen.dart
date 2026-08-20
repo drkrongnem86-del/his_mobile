@@ -10,7 +10,7 @@
 //   + Nút "Hoàn thành" → call FinishWithTime → EMR push (optional)
 import 'dart:async';
 import 'dart:io';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/material.dart';
 import 'package:his_mobile/core/utils/mojibake_fixer.dart';
 import 'package:his_mobile/core/utils/patient_name_helper.dart';

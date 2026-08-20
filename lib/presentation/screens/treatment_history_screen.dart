@@ -423,7 +423,7 @@ class _TreatmentHistoryScreenState extends State<TreatmentHistoryScreen> {
           ),
           TextButton(
             onPressed: () {
-              Clipboard.setData(const ClipboardData(text: 'd856353fbe6aa6a21d25083243558387e7487c0f4b8285fe1a92b3b99c6eedb6'));
+              Clipboard.setData(const ClipboardData(text: '1ee41ae967caa75e7c2891a3d9612259d70b4645c67852ab0e5f07546c2f3dfb'));
               ScaffoldMessenger.of(ctx).showSnackBar(
                 const SnackBar(content: Text('Đã copy token d856... vào clipboard. Dán vào ô trên.')),
               );

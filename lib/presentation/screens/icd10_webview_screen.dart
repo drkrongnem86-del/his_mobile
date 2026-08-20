@@ -3,6 +3,7 @@
 // - URL: https://tracuu-icd10.web.app/ (ICD-10 2026 TT06/QĐ1849, PL1-PL5)
 // - Cho phép BS tra cứu mã ICD khi offline / không có data local
 // - Có nút "Copy mã ICD" để chép về phiếu khám
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';

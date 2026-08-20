@@ -7,7 +7,7 @@
 // - Return true → caller (ProcedureRoom) auto-refresh + BN chuyển sang "Đã thực hiện"
 import 'dart:async';
 import 'dart:io';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:his_mobile/core/utils/mojibake_fixer.dart';

@@ -6,6 +6,7 @@
 // - Lưu+Ký: embed signature PNG vào PDF bytes → pass unsigned cho attachFile
 // - Date picker: 3 trường Ngày/Tháng/Năm có thể chỉnh sửa
 import 'dart:io';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';

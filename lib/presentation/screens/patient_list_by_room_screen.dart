@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/material.dart';
 import 'package:his_mobile/data/api/his_api_service.dart';
 import 'package:his_mobile/presentation/navigation/safe_navigator.dart';
@@ -39,7 +40,7 @@ class _PatientListByRoomScreenState extends State<PatientListByRoomScreen> {
       final roomId = widget.room['ROOM_ID'] ?? widget.room['ID'];
       final roomName = widget.room['ROOM_NAME']?.toString() ?? widget.room['DEPARTMENT_NAME']?.toString() ?? 'Phòng';
 
-      print('📡 Loading BN cho phòng $roomId ($roomName)');
+      debugPrint('📡 Loading BN cho phòng $roomId ($roomName)');
 
       final result = await _api.getServiceRequests(
         executeRoomId: (roomId is int) ? roomId : 36, // v3.0.105: PKCC = 36
@@ -53,7 +54,7 @@ class _PatientListByRoomScreenState extends State<PatientListByRoomScreen> {
             if (data['Success'] == true && data['Data'] is List) {
               _allPatients = List<Map<String, dynamic>>.from(data['Data']);
               _patients = _allPatients;
-              print('   ✅ Loaded ${_patients.length} BN thật');
+              debugPrint('   ✅ Loaded ${_patients.length} BN thật');
             } else {
               _error = 'Không có dữ liệu';
             }

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:his_mobile/core/constants/app_constants.dart';
@@ -110,9 +111,9 @@ class _SplashScreenState extends State<SplashScreen> {
           return (success: false, message: 'Timeout - kiểm tra VPN', session: null);
         });
         if (r.success && r.session != null) {
-          print('✅ HIS Pro auto-login OK: ${r.session!.loginName}');
+          debugPrint('✅ HIS Pro auto-login OK: ${r.session!.loginName}');
         } else {
-          print('ℹ HIS Pro auto-login skipped: ${r.message}');
+          debugPrint('ℹ HIS Pro auto-login skipped: ${r.message}');
         }
       } catch (e) {
         debugPrint('HIS Pro auto-login error: $e');
