@@ -122,9 +122,9 @@ class ThongkeAuthService {
         ignoreExpires: false,
         storage: FileStorage('${cookiesDir.path}/thongke_cookies'),
       );
-      print('ThongkeAuthService: cookies persist at ${cookiesDir.path}');
+      debugPrint('ThongkeAuthService: cookies persist at ${cookiesDir.path}');
     } catch (e) {
-      print('ThongkeAuthService: persist error, fallback in-memory: $e');
+      debugPrint('ThongkeAuthService: persist error, fallback in-memory: $e');
       _cookieJar = CookieJar();
     }
 

@@ -143,13 +143,25 @@ class HisProPdfBuilder {
   static const _khoa = 'Khoa Hồi Sức Cấp Cứu';
   static const _ms = 'MS: 43/BV2';
 
-  static pw.Document _baseDoc(PhieuPdf phieu, PatientContext p, {pw.Widget? extra}) {
+  // v3.0.156: Load TNKeyUni-Times font (full Vietnamese support)
+  static pw.Font? _pdfFont;
+  static pw.Font? _pdfFontBold;
+  static Future<void> _loadFonts() async {
+    if (_pdfFont != null) return;
+    final regularData = await rootBundle.load('assets/fonts/TNKeyUni-Times.ttf');
+    final boldData = await rootBundle.load('assets/fonts/TNKeyUni-Timesbd.ttf');
+    _pdfFont = pw.Font.ttf(regularData.buffer.asByteData()!);
+    _pdfFontBold = pw.Font.ttf(boldData.buffer.asByteData()!);
+  }
+
+  static Future<pw.Document> _baseDoc(PhieuPdf phieu, PatientContext p, {pw.Widget? extra}) async {
+    await _loadFonts();
     return pw.Document(
       title: phieu.name,
       author: _benhvien,
       creator: 'HIS Pro Mobile v2.30',
       pageMode: PdfPageMode.none,
-      theme: pw.ThemeData.withFont(),
+      theme: pw.ThemeData.withFont(base: _pdfFont, bold: _pdfFontBold),
     );
   }
 
@@ -258,7 +270,7 @@ class HisProPdfBuilder {
 
   /// ========== 1. BỆNH ÁN CẤP CỨU ==========
   static Future<Uint8List> buildBenhAnCapCuu(PatientContext p) async {
-    final doc = _baseDoc(PhieuCatalog.byId('benh_an_cap_cuu')!, p);
+    final doc = await _baseDoc(PhieuCatalog.byId('benh_an_cap_cuu')!, p);
     doc.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4.copyWith(marginLeft: 36, marginRight: 36, marginTop: 32, marginBottom: 32),
@@ -317,7 +329,7 @@ class HisProPdfBuilder {
   /// ========== 2. PHIẾU KHÁM VÀO VIỆN ==========
   static Future<Uint8List> buildPhieuKhamVaoVien(PatientContext p) async {
     final phieu = PhieuCatalog.byId('phieu_kham_vao_vien')!;
-    final doc = _baseDoc(phieu, p);
+    final doc = await _baseDoc(phieu, p);
     doc.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4.copyWith(marginLeft: 36, marginRight: 36, marginTop: 32, marginBottom: 32),
@@ -386,7 +398,7 @@ class HisProPdfBuilder {
   /// ========== 3. TỜ ĐIỀU TRỊ ==========
   static Future<Uint8List> buildToDieuTri(PatientContext p) async {
     final phieu = PhieuCatalog.byId('to_dieu_tri')!;
-    final doc = _baseDoc(phieu, p);
+    final doc = await _baseDoc(phieu, p);
     doc.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4.copyWith(marginLeft: 36, marginRight: 36, marginTop: 32, marginBottom: 32),
@@ -434,7 +446,7 @@ class HisProPdfBuilder {
   /// ========== 4. PHIẾU CHẸ SÓC ==========
   static Future<Uint8List> buildPhieuChamSoc(PatientContext p) async {
     final phieu = PhieuCatalog.byId('phieu_cham_soc')!;
-    final doc = _baseDoc(phieu, p);
+    final doc = await _baseDoc(phieu, p);
     doc.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4.copyWith(marginLeft: 36, marginRight: 36, marginTop: 32, marginBottom: 32),
@@ -462,7 +474,7 @@ class HisProPdfBuilder {
   /// ========== 5. PHIẾU THEO DÕI SH ==========
   static Future<Uint8List> buildPhieuTheoDoiSH(PatientContext p) async {
     final phieu = PhieuCatalog.byId('phieu_theo_doi_sh')!;
-    final doc = _baseDoc(phieu, p);
+    final doc = await _baseDoc(phieu, p);
     doc.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4.copyWith(marginLeft: 36, marginRight: 36, marginTop: 32, marginBottom: 32),
@@ -493,7 +505,7 @@ class HisProPdfBuilder {
   /// ========== 6. PHIẾU BÀN GIAO ==========
   static Future<Uint8List> buildPhieuBanGiao(PatientContext p) async {
     final phieu = PhieuCatalog.byId('phieu_ban_giao')!;
-    final doc = _baseDoc(phieu, p);
+    final doc = await _baseDoc(phieu, p);
     doc.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4.copyWith(marginLeft: 36, marginRight: 36, marginTop: 32, marginBottom: 32),
@@ -523,7 +535,7 @@ class HisProPdfBuilder {
   /// ========== 7. BIÊN BẢN HỘI CHẨN ==========
   static Future<Uint8List> buildBienBanHoiChan(PatientContext p) async {
     final phieu = PhieuCatalog.byId('bien_ban_hoi_chan')!;
-    final doc = _baseDoc(phieu, p);
+    final doc = await _baseDoc(phieu, p);
     doc.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4.copyWith(marginLeft: 36, marginRight: 36, marginTop: 32, marginBottom: 32),
@@ -567,7 +579,7 @@ class HisProPdfBuilder {
   /// ========== 8. PHIẾU CHỈ ĐỊNH ==========
   static Future<Uint8List> buildPhieuChiDinh(PatientContext p, {String? serviceName, String? serviceCode, String? indication, String? priority}) async {
     final phieu = PhieuCatalog.byId('phieu_chi_dinh')!;
-    final doc = _baseDoc(phieu, p);
+    final doc = await _baseDoc(phieu, p);
     doc.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4.copyWith(marginLeft: 36, marginRight: 36, marginTop: 32, marginBottom: 32),
@@ -604,7 +616,7 @@ class HisProPdfBuilder {
 
   /// ========== 9-13: Generic ==========
   static Future<Uint8List> _buildGeneric(PhieuPdf phieu, PatientContext p, String subtitle, List<MapEntry<String, String>> rows) async {
-    final doc = _baseDoc(phieu, p);
+    final doc = await _baseDoc(phieu, p);
     doc.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4.copyWith(marginLeft: 36, marginRight: 36, marginTop: 32, marginBottom: 32),

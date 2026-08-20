@@ -1,4 +1,5 @@
 // PdfToImageService v3.0.145
+import 'dart:typed_data';
 //
 // Convert PDF bytes → PNG-embedded PDF.
 // Workflow: PDF(form with fonts) → render to raster PNG → embed as PNG image in new PDF → push to EMR
@@ -6,7 +7,7 @@
 //
 // Uses `printing` package's Printing.raster() API (already in pubspec) - no extra packages needed.
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
@@ -24,13 +25,13 @@ class PdfToImageService {
     int dpi = 150,
   }) async {
     try {
-      // Step 1: Render PDF page to PNG using printing package's raster API
+      // Step 1: Render ALL PDF pages to PNG (v3.0.156 - fix multi-page bug)
       final pages = <Uint8List>[];
 
       await for (final raster in Printing.raster(pdfBytes, dpi: dpi.toDouble())) {
         final pngBytes = await raster.toPng();
         pages.add(pngBytes);
-        break; // Only first page
+        // v3.0.156: Removed `break;` - was causing only first page to be captured
       }
 
       if (pages.isEmpty) {
@@ -38,10 +39,9 @@ class PdfToImageService {
         return null;
       }
 
-      final pngBytes = pages.first;
-      debugPrint('[PdfToImage] PDF → PNG: ${pngBytes.length} bytes @ $dpi DPI');
+      debugPrint('[PdfToImage] PDF → ${pages.length} PNG pages @ $dpi DPI');
 
-      // Step 2: Build new PDF containing only the PNG image
+      // Step 2: Build new PDF containing ALL PNG pages
       // Get page dimensions - use A4 default (595 x 842 points) scaled to DPI
       const pageWidthPt = 595.0;
       const pageHeightPt = 842.0;
@@ -49,23 +49,25 @@ class PdfToImageService {
       final pageFormat = PdfPageFormat(pageWidthPt * scale, pageHeightPt * scale);
 
       final doc = pw.Document();
-      doc.addPage(
-        pw.Page(
-          pageFormat: pageFormat,
-          margin: pw.EdgeInsets.zero,
-          build: (ctx) {
-            return pw.Image(
-              pw.MemoryImage(pngBytes),
-              fit: pw.BoxFit.contain,
-              width: pageWidthPt * scale,
-              height: pageHeightPt * scale,
-            );
-          },
-        ),
-      );
+      for (final pngBytes in pages) {
+        doc.addPage(
+          pw.Page(
+            pageFormat: pageFormat,
+            margin: pw.EdgeInsets.zero,
+            build: (ctx) {
+              return pw.Image(
+                pw.MemoryImage(pngBytes),
+                fit: pw.BoxFit.contain,
+                width: pageWidthPt * scale,
+                height: pageHeightPt * scale,
+              );
+            },
+          ),
+        );
+      }
 
       final outputPdf = await doc.save();
-      debugPrint('[PdfToImage] PNG-in-PDF created: ${outputPdf.length} bytes');
+      debugPrint('[PdfToImage] PNG-in-PDF created: ${outputPdf.length} bytes, ${pages.length} pages');
       return outputPdf;
     } catch (e, st) {
       debugPrint('[PdfToImage] Error: $e\n$st');

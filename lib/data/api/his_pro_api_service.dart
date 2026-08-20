@@ -54,6 +54,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:his_mobile/core/security/secure_config_service.dart';
 import 'package:his_mobile/core/constants/app_constants.dart';
 import 'package:his_mobile/core/services/connection_service.dart';
 import 'package:his_mobile/data/services/secure_storage_service.dart';
@@ -65,10 +66,13 @@ class HisProHardcoded {
   /// v3.0.142: TokenCode MỚI (active 17/08/2026 17:08, từ log HIS Desktop)
   /// Token xoay mỗi session - lấy từ `dti:"...|TOKEN|..."` trong LogSystem.txt
   /// Previous: cb356d3891b1e01ccbca37bafa5c61ef038e7c091de8cb09e019f061d20e77d3 (v3.0.65 - đã hết hạn)
-  static const String tokenCode = '1ee41ae967caa75e7c2891a3d9612259d70b4645c67852ab0e5f07546c2f3dfb';
+  // v3.0.156: Read from SecureConfigService (Android Keystore)
+  // Hardcoded fallback removed - use SecureConfigService.getTokenCodeSync()
+  static String get tokenCode => SecureConfigService.instance.getTokenCodeSync();
 
   /// IP máy BV chạy HIS Pro (cố định, từ memory dump)
-  static const String clientIpAddress = '172.16.200.109';
+  // v3.0.156: Read from SecureConfigService
+  static String get clientIpAddress => SecureConfigService.instance.getClientIpSync();
 
   /// ApplicationCode cố định
   static const String applicationCode = 'HIS';
@@ -261,9 +265,9 @@ class HisProApiService {
           if (options.uri.path.contains('CreateByTdo')) {
             final bodyStr = options.data?.toString() ?? 'null';
             final preview = bodyStr.length > 1000 ? '${bodyStr.substring(0, 1000)}...' : bodyStr;
-            print('🔍 [DEBUG CreateByTdo Request] ${options.method} ${options.uri.path}');
-            print('   body: $preview');
-            print('   headers: ${options.headers}');
+            debugPrint('🔍 [DEBUG CreateByTdo Request] ${options.method} ${options.uri.path}');
+            debugPrint('   body: $preview');
+            debugPrint('   headers: ${options.headers}');
           }
           handler.next(options);
         },
@@ -298,7 +302,7 @@ class HisProApiService {
           String? bodyForLog;
           if (response.requestOptions.path.contains('CreateByTdo')) {
             final bodyStr = data is String ? data.substring(0, data.length > 500 ? 500 : data.length) : data.toString();
-            print('🔍 [DEBUG CreateByTdo Response] status=$status body=$bodyStr');
+            debugPrint('🔍 [DEBUG CreateByTdo Response] status=$status body=$bodyStr');
             bodyForLog = bodyStr;
           }
           UploadLogService.instance.logResponse(
@@ -427,7 +431,7 @@ class HisProApiService {
     final url = '${ConnectionService.instance.acsUrl}api/Token/Login';
 
     try {
-      print('🔐 HIS Pro login: $url ($loginName)');
+      debugPrint('🔐 HIS Pro login: $url ($loginName)');
 
       // v3.0.42: Dùng TokenCode headers thay vì Bearer
       final r = await _dio.get(
@@ -441,7 +445,7 @@ class HisProApiService {
         ),
       );
 
-      print('   Status: ${r.statusCode}');
+      debugPrint('   Status: ${r.statusCode}');
 
       if (r.statusCode != 200) {
         return (success: false, message: 'HTTP ${r.statusCode}', session: null);
@@ -473,7 +477,7 @@ class HisProApiService {
       if (tokenCode == null || tokenCode.isEmpty) {
         // v3.0.42: /Token/Login không trả token mới → dùng hardcode
         tokenCode = HisProHardcoded.tokenCode;
-        print('   ⚠ Server không trả token mới → dùng hardcoded af89...');
+        debugPrint('   ⚠ Server không trả token mới → dùng hardcoded af89...');
       }
 
       // Tạo session
@@ -487,11 +491,11 @@ class HisProApiService {
         expiresAt: now.add(const Duration(days: 30)), // HIS Pro token expire 30 ngày
       );
       await _saveSession();
-      print('   ✅ TokenCode: ${tokenCode.substring(0, 12)}... (expire 30 ngày)');
+      debugPrint('   ✅ TokenCode: ${tokenCode.substring(0, 12)}... (expire 30 ngày)');
       return (success: true, message: 'OK', session: _session);
     } catch (e) {
       // v3.0.42: Nếu login fail → fallback về hardcoded token
-      print('   ❌ ${e.toString().split("\n").first} → fallback hardcoded token');
+      debugPrint('   ❌ ${e.toString().split("\n").first} → fallback hardcoded token');
       final now = DateTime.now();
       _session = HisProSession(
         token: HisProHardcoded.tokenCode,
@@ -512,7 +516,7 @@ class HisProApiService {
     if (_session!.expiresAt.difference(DateTime.now()) > const Duration(days: 1)) {
       return true; // còn hơn 1 ngày
     }
-    print('🔄 HIS Pro token sắp hết hạn → gọi /Token/Renew...');
+    debugPrint('🔄 HIS Pro token sắp hết hạn → gọi /Token/Renew...');
     final r = await _renewToken();
     return r;
   }
@@ -536,11 +540,11 @@ class HisProApiService {
         ),
       );
       if (r.statusCode == 200 && r.data is Map && r.data['Success'] == true) {
-        print('   ✅ Token renewed');
+        debugPrint('   ✅ Token renewed');
         return true;
       }
     } catch (e) {
-      print('   ⚠ Renew fail: $e → tiếp tục dùng token cũ');
+      debugPrint('   ⚠ Renew fail: $e → tiếp tục dùng token cũ');
     }
     return false;
   }
@@ -548,7 +552,7 @@ class HisProApiService {
   /// v2.47.0: Auto-login lại bằng saved loginName
   Future<({bool success, String message, HisProSession? session})> tryAutoLogin() async {
     if (_session != null && _session!.isValid) {
-      print('✅ HIS Pro session vẫn còn hiệu lực: ${_session!.loginName}');
+      debugPrint('✅ HIS Pro session vẫn còn hiệu lực: ${_session!.loginName}');
       return (success: true, message: 'Session còn hiệu lực', session: _session);
     }
     if (_session == null) {
@@ -563,16 +567,16 @@ class HisProApiService {
 
   /// v2.48.0: Auto-bootstrap HOÀN TOÀN tự động
   Future<({bool loggedIn, String message})> silentBootstrap() async {
-    print('🔄 HIS Pro silent bootstrap (v3.0.42 TokenCode pattern)...');
+    debugPrint('🔄 HIS Pro silent bootstrap (v3.0.42 TokenCode pattern)...');
     try {
       await getCustomBearer();
       final saved = await loadSavedSession();
       if (saved != null && saved.isValid) {
-        print('  ✅ Session vẫn valid: ${saved.loginName}');
+        debugPrint('  ✅ Session vẫn valid: ${saved.loginName}');
         return (loggedIn: true, message: 'Session loaded');
       }
       if (saved != null) {
-        print('  🔄 Session hết hạn → refresh...');
+        debugPrint('  🔄 Session hết hạn → refresh...');
         final r = await login(saved.loginName);
         if (r.success) {
           await _loadAllHelpers();
@@ -580,7 +584,7 @@ class HisProApiService {
         }
       }
       // v3.0.42: Không có session → dùng hardcoded token trực tiếp
-      print('  ⚠ No session → dùng hardcoded TokenCode af89...');
+      debugPrint('  ⚠ No session → dùng hardcoded TokenCode af89...');
       final now = DateTime.now();
       _session = HisProSession(
         token: HisProHardcoded.tokenCode,
@@ -593,7 +597,7 @@ class HisProApiService {
       await _loadAllHelpers();
       return (loggedIn: true, message: 'Hardcoded token (expire 2026-08-16)');
     } catch (e) {
-      print('  ❌ silentBootstrap error: $e');
+      debugPrint('  ❌ silentBootstrap error: $e');
       return (loggedIn: false, message: e.toString());
     }
   }
@@ -845,13 +849,13 @@ class HisProApiService {
           }
         }
         if (_userRooms.isNotEmpty) {
-          print('✅ Loaded ${_userRooms.length} user-rooms from $base');
+          debugPrint('✅ Loaded ${_userRooms.length} user-rooms from $base');
           return true;
         }
       }
     }
     // v3.0.43: Không fail toàn bộ - app vẫn work với danh sách phòng local
-    print('⚠ fetchUserRooms: không lấy được từ bất kỳ port nào - dùng local');
+    debugPrint('⚠ fetchUserRooms: không lấy được từ bất kỳ port nào - dùng local');
     return true;
   }
 
@@ -864,7 +868,7 @@ class HisProApiService {
       limit: 500,
     );
     if (!r.success) {
-      print('⚠ fetchEmrSigners: ${r.message}');
+      debugPrint('⚠ fetchEmrSigners: ${r.message}');
       return false;
     }
     _signers = [];
@@ -895,7 +899,7 @@ class HisProApiService {
         await _saveSession();
       }
     }
-    print('✅ Loaded ${_signers.length} signers (me: ${_session?.loginName})');
+    debugPrint('✅ Loaded ${_signers.length} signers (me: ${_session?.loginName})');
     return true;
   }
 
@@ -907,7 +911,7 @@ class HisProApiService {
       limit: 200,
     );
     if (!r.success) {
-      print('⚠ fetchEmrBusinesses: ${r.message}');
+      debugPrint('⚠ fetchEmrBusinesses: ${r.message}');
       return false;
     }
     _businesses = [];
@@ -919,7 +923,7 @@ class HisProApiService {
         }
       }
     }
-    print('✅ Loaded ${_businesses.length} businesses');
+    debugPrint('✅ Loaded ${_businesses.length} businesses');
     return true;
   }
 
@@ -1331,7 +1335,7 @@ class HisProApiService {
         return s;
       }
     } catch (e) {
-      print('⚠ loadSavedSession: $e');
+      debugPrint('⚠ loadSavedSession: $e');
     }
     return null;
   }

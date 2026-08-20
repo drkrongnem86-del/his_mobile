@@ -2,6 +2,7 @@
 // - BỎ ô "Public VPN / LAN" toggle (v2.98.0 - BS yêu cầu)
 // - Sửa mojibake: "TĂi khoản" → "tài khoản", "Lá»—i mạng" → "Lỗi mạng", "vĂ o" → "vào"
 // - 4 endpoints test: 1401/Authorize, 1408/HisBranch/Get, 1410/SdaConfig/Get, 1401/Timer/Sync
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';

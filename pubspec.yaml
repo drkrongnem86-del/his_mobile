@@ -1,7 +1,7 @@
-﻿name: his_mobile
+name: his_mobile
 description: "HIS Pro Mobile - Khoa Cap Cuu"
 publish_to: 'none'
-version: 3.0.150+290
+version: 3.0.158+302
 environment:
   sdk: ^3.11.5
 
@@ -75,3 +75,4 @@ flutter:
     - assets/vpn/his_vpn.ovpn
     - assets/vpn/nemk_vpn.ovpn
     - assets/fonts/
+

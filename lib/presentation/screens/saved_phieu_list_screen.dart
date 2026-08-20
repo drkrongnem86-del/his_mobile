@@ -9,6 +9,7 @@
 //   - Lưu ký: đã đẩy EMR + ký số (IsFinishSign=true)
 //
 // Click từng dòng → mở PDF viewer (nếu local có file) hoặc mở EMR portal (nếu đã đẩy)
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/material.dart';
 import 'package:his_mobile/data/services/clinical_forms_store.dart';
 import 'package:his_mobile/data/services/his_pro_vpn_service.dart';

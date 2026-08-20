@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:dio/dio.dart';
 
 /// Dashboard BV Ninh Thuận API Service
@@ -30,7 +31,7 @@ class DashboardApiService {
     // Try multiple base URLs
     for (final base in [DEFAULT_BASE, ALT_BASE]) {
       try {
-        print('🔐 Trying login at: $base');
+        debugPrint('🔐 Trying login at: $base');
         
         _dio.options.baseUrl = base;
         
@@ -65,12 +66,12 @@ class DashboardApiService {
           return LoginResult(success: false, message: data['message']?.toString() ?? 'Sai tài khoản');
         } else if (response.statusCode == 401 || response.statusCode == 404) {
           // Try next base URL
-          print('   ❌ $base: ${response.statusCode}');
+          debugPrint('   ❌ $base: ${response.statusCode}');
           continue;
         }
         return LoginResult(success: false, message: 'HTTP ${response.statusCode}');
       } catch (e) {
-        print('   ❌ $base: ${e.toString().substring(0, e.toString().length.clamp(0, 80))}');
+        debugPrint('   ❌ $base: ${e.toString().substring(0, e.toString().length.clamp(0, 80))}');
         continue;
       }
     }
@@ -157,7 +158,7 @@ class DashboardApiService {
         return HisResult(success: false, message: 'Chưa kết nối server');
       }
 
-      print('📡 GET $_baseUrl/$path');
+      debugPrint('📡 GET $_baseUrl/$path');
       final response = await _dio.get(
         '$_baseUrl/$path',
         queryParameters: params,

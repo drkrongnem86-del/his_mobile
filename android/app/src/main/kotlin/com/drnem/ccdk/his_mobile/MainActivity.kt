@@ -229,9 +229,10 @@ class MainActivity : FlutterActivity() {
                             } catch (e: Exception) {
                                 android.util.Log.w("HISMobile", "broadcast disconnect failed: $e")
                             }
-                            // Wait 2s cho service thực sự stop
-                            try { Thread.sleep(2000) } catch (_: Exception) {}
-                            result.success(true)
+                            // v3.0.156: Use Handler.postDelayed instead of Thread.sleep to avoid blocking UI thread
+                            Handler(Looper.getMainLooper()).postDelayed({
+                                try { result.success(true) } catch (_: Exception) {}
+                            }, 2000)
                         } catch (e: Exception) {
                             android.util.Log.e("HISMobile", "disconnectVpn fatal error: $e")
                             result.success(false)  // Best effort - không fail update

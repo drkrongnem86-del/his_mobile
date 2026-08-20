@@ -4,6 +4,7 @@
 // - Tự cập nhật tên khoa + chips Hôm nay/7/30/90 ngày khi load
 // v2.40.2: Xem BN của 1 khoa với TYPE-AHEAD SEARCH
 // v2.96.0: Thêm API selector (←/→)
+import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
