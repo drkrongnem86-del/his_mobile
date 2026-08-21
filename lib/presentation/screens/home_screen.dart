@@ -598,25 +598,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   const Divider(height: 16),
 
-                  // v3.0.115: Phòng thủ thuật HSCC (mở từ Drawer - shortcut)
-                  _drawerItem(
-                    icon: Icons.medical_services,
-                    color: const Color(0xFFB71C1C),
-                    title: 'Phòng thủ thuật HSCC',
-                    subtitle: 'Danh sách BN + ECG (3 nguồn API)',
-                    onTap: () {
-                      context.safePop();
-                      Future.delayed(const Duration(milliseconds: 100), () {
-                        if (mounted) {
-                          // v3.0.116: Mở ProcedureRoomScreen thay vì PhongThuThuatHsccScreen (đã port)
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (_) => const ProcedureRoomScreen()),
-                          );
-                        }
-                      });
-                    },
-                  ),
+                  // v3.0.159: Xóa drawer tile 'Phòng thủ thuật HSCC' (đã có ở Tiện ích tab)
+                  // Truy cập duy nhất: Tiện ích tab → tile 'Phòng TT HSCC' → ProcedureRoomScreen
 
                   const Divider(height: 16),
 
@@ -1017,37 +1000,19 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _pickDept(int i) {
-    // v3.0.116: Special index 9999 = Phòng thủ thuật HSCC (port từ v3.1.13)
-    // v3.0.109: Old 99001 (backward compat)
-    if (i == 9999 || i == 99001) {
-      // Render embedded - set _currentDeptIndex đến entry 9999
-      final procIdx = AppConstants.departments.indexWhere((d) => d['isProcedureRoom'] == true);
-      if (procIdx >= 0) {
-        _onDeptChanged(procIdx);
-      } else {
-        // Fallback: mở standalone
+    // v3.0.159: Xóa special case 9999 (Phòng thử thuật HSCC fake dept đã bỏ)
+    // v3.0.101: Check "Phòng" đặc biệt từ AppConstants (dialog dùng list này)
+    // Tránh index lệch khi DepartmentService load từ API (số entry khác 54)
+    if (i == _currentDeptIndex) return;
+    if (i >= 0 && i < AppConstants.departments.length) {
+      final d = AppConstants.departments[i];
+      // v3.0.159: isPhong cũng không còn (chỉ còn departments thật từ HIS API)
+      if (d['isPhong'] == true || d['isProcedureRoom'] == true) {
+        // Fallback: mở procedure room nếu còn entry đặc biệt (không xảy ra sau v3.0.159)
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const ProcedureRoomScreen()),
         );
-      }
-      return;
-    }
-    if (i == _currentDeptIndex) return;
-    // v3.0.101: Check "Phòng" đặc biệt từ AppConstants (dialog dùng list này)
-    // Tránh index lệch khi DepartmentService load từ API (số entry khác 53)
-    if (i >= 0 && i < AppConstants.departments.length) {
-      final d = AppConstants.departments[i];
-      if (d['isPhong'] == true || d['isProcedureRoom'] == true) {
-        final procIdx = AppConstants.departments.indexWhere((d) => d['isProcedureRoom'] == true);
-        if (procIdx >= 0) {
-          _onDeptChanged(procIdx);
-        } else {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const ProcedureRoomScreen()),
-          );
-        }
         return;
       }
     }
