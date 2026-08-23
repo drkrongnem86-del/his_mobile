@@ -22,7 +22,6 @@
 // - User nhập mã điều trị (15 số) từ HIS Desktop → xem BN + danh sách phiếu EMR
 // - Cũng extract được service_req_code từ HIS_CODE field của mỗi phiếu
 import 'dart:async';
-import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/material.dart';
 import 'package:his_mobile/core/constants/app_constants.dart';
 import 'package:his_mobile/core/services/api_source_notifier.dart';
@@ -30,6 +29,8 @@ import 'package:his_mobile/core/utils/mojibake_fixer.dart';
 import 'package:his_mobile/core/utils/patient_name_helper.dart';
 import 'package:his_mobile/data/api/his_api_service.dart';
 import 'package:his_mobile/data/api/his_pro_api_service.dart';
+import 'package:his_mobile/data/services/auto_token_service.dart';  // v3.0.164: sync token
+import 'package:his_mobile/data/services/token_sync_service.dart';  // v3.0.165: token hub
 import 'package:his_mobile/data/services/data_service.dart';
 import 'package:his_mobile/presentation/screens/ecg_execute_screen.dart';
 import 'package:his_mobile/presentation/screens/service_execute_detail_screen.dart';
@@ -134,8 +135,9 @@ class _ProcedureRoomScreenState extends State<ProcedureRoomScreen> with WidgetsB
   // 0=Tất cả, 1=Khám, 2=CĐHA, 3=Thủ thuật, 4=Vật tư
   int _serviceTypeTab = 0;
 
-  // v3.1.15: Filter trạng thái - 3 nút riêng biệt (bật/tắt), tự reload khi tap
-  Set<int> _sttFilters = {1, 2, 3};
+  // v3.0.167: Default = "Chưa kết thúc" (1, 2) để match HIS Desktop
+  // Trước đây default {1, 2, 3} → hiện cả BN đã xong (HIS Desktop chỉ hiện 1, 2)
+  Set<int> _sttFilters = {1, 2};
 
   String _searchQuery = '';
   final TextEditingController _searchCtrl = TextEditingController();
@@ -261,20 +263,31 @@ class _ProcedureRoomScreenState extends State<ProcedureRoomScreen> with WidgetsB
     final roomId = widget.executeRoomId ?? AppConstants.ROOM_ID_KHAM_CAP_CUU;
     final deptId = widget.executeDepartmentId ?? AppConstants.DEPARTMENT_ID_CAP_CUU;
 
-    // v3.1.07: Auto-fallback chain - thử HIS Pro trước, nếu lỗi thì thử các API khác
+    // v3.0.167: LUÔN thử HIS Pro trước - đây là source chính thức từ HIS Desktop
+    // Fallback chain chỉ chạy nếu user đã chọn thủ công API khác
     final sources = <ProcedureApiSource>[
-      _apiSource,
-      // Fallback chain - nếu API hiện tại lỗi
+      // Ưu tiên #1: HIS Pro (luôn thử trước để có data mới nhất từ server)
       if (_apiSource != ProcedureApiSource.hisPro) ProcedureApiSource.hisPro,
-      if (_apiSource != ProcedureApiSource.dataApi) ProcedureApiSource.dataApi,
-      if (_apiSource != ProcedureApiSource.public) ProcedureApiSource.public,
+      // Sau đó mới đến API user đã chọn
+      _apiSource,
+      // Cuối cùng: các API còn lại
+      if (_apiSource != ProcedureApiSource.hisPro && _apiSource != ProcedureApiSource.dataApi) ProcedureApiSource.dataApi,
+      if (_apiSource != ProcedureApiSource.hisPro && _apiSource != ProcedureApiSource.public) ProcedureApiSource.public,
     ];
+    // Loại bỏ duplicate
+    final uniqueSources = <ProcedureApiSource>[];
+    for (final s in sources) {
+      if (!uniqueSources.contains(s)) uniqueSources.add(s);
+    }
+    final finalSources = uniqueSources;
+
+    debugPrint('🔍 [ProcRoom] _loadPatients room=$roomId source=${_apiSource.label}, chain=${finalSources.map((s) => s.label).join("→")}');
 
     HisResult? result;
     ProcedureApiSource? usedSource;
     String? lastError;
 
-    for (final src in sources) {
+    for (final src in finalSources) {
       try {
         if (!silent) setState(() => _debugInfo = '☁ Đang thử ${src.label}...');
         result = await _callApi(src, roomId, deptId, limit: 200);
@@ -682,6 +695,15 @@ class _ProcedureRoomScreenState extends State<ProcedureRoomScreen> with WidgetsB
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
         ),
+        // v3.0.165: Nút TỰ LẤY TOKEN từ multi-source (proxy → login API → renew → hardcoded)
+        IconButton(
+          icon: const Icon(Icons.cloud_sync, size: 16, color: Color(0xFF2E7D32)),
+          onPressed: _autoFetchToken,
+          tooltip: 'Tự lấy token tự động (multi-source)',
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+        ),
         // v3.1.12: Nút Dán token HIS Pro (paste token từ log khi cần)
         IconButton(
           icon: const Icon(Icons.vpn_key, size: 14, color: Color(0xFF6A1B9A)),
@@ -886,6 +908,63 @@ class _ProcedureRoomScreenState extends State<ProcedureRoomScreen> with WidgetsB
 
   /// v3.1.12: Dialog dán token HIS Pro (khi token cũ hết hạn)
   /// - User mở HIS Desktop → mở file log → copy token từ "dti:...|...|TOKEN|..."
+  /// v3.0.165: TỰ LẤY TOKEN tự động từ multi-source
+  /// - Proxy → Login API → Renew API → Hardcoded fallback
+  /// - Hiển thị SnackBar kết quả + tự reload DSBN sau khi thành công
+  Future<void> _autoFetchToken() async {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(children: [
+            SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+            SizedBox(width: 12),
+            Expanded(child: Text('🔄 Đang tự lấy token...', style: TextStyle(fontSize: 12))),
+          ]),
+          backgroundColor: Color(0xFF2E7D32),
+          duration: Duration(seconds: 30),
+        ),
+      );
+    }
+    try {
+      final event = await TokenSyncService.instance.autoFetchToken(force: true);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).removeCurrentSnackBar();
+      if (event.token != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(children: [
+              const Icon(Icons.check_circle, color: Colors.white, size: 18),
+              const SizedBox(width: 6),
+              Expanded(child: Text('✅ Token mới từ: ${event.source} • tải lại DSBN...')),
+            ]),
+            backgroundColor: const Color(0xFF2E7D32),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+        _loadPatients();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(children: [
+              const Icon(Icons.error, color: Colors.white, size: 18),
+              const SizedBox(width: 6),
+              Expanded(child: Text('❌ Không lấy được token: ${event.message ?? "không rõ"}')),
+            ]),
+            backgroundColor: const Color(0xFFD32F2F),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).removeCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('❌ Lỗi: $e'), backgroundColor: const Color(0xFFD32F2F)),
+        );
+      }
+    }
+  }
+
   /// - Paste vào dialog → Save → app sẽ dùng token mới
   Future<void> _showPasteTokenDialog() async {
     final prefs = await SharedPreferences.getInstance();
@@ -920,7 +999,7 @@ class _ProcedureRoomScreenState extends State<ProcedureRoomScreen> with WidgetsB
                 style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
                 decoration: const InputDecoration(
                   border: OutlineInputBorder(),
-                  hintText: '1ee41ae967caa75e7c2891a3d9612259d70b4645c67852ab0e5f07546c2f3dfb',
+                  hintText: '805953ca1e7f5a67e86a21108b0b921f336041a2829214364d49ab83c724c575',
                   hintStyle: TextStyle(fontSize: 9, color: Colors.black38, fontFamily: 'monospace'),
                   isDense: true,
                 ),
@@ -942,18 +1021,15 @@ class _ProcedureRoomScreenState extends State<ProcedureRoomScreen> with WidgetsB
       ),
     );
     if (saved != null && saved.isNotEmpty) {
-      await prefs.setString('his_pro_token_override', saved);
-      // Set ngay cho HisApiService (procedure room dùng cái này)
-      _api.setAuthToken(saved);
-      // Set cho HisProApiService (EMR push) - dùng setCustomBearer
-      await _hisPro.setCustomBearer(saved);
+      // v3.0.165: Dùng TokenSyncService - 1 dòng apply cho tất cả services + broadcast
+      await TokenSyncService.instance.setManualToken(saved);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(children: [
               const Icon(Icons.check_circle, color: Colors.white, size: 18),
               const SizedBox(width: 6),
-              Expanded(child: Text('Đã lưu token mới: ${saved.substring(0, 8)}…${saved.substring(saved.length - 4)}')),
+              Expanded(child: Text('Đã lưu token: ${saved.substring(0, 8)}…${saved.substring(saved.length - 4)} (áp dụng mọi nơi)')),
             ]),
             backgroundColor: const Color(0xFF388E3C),
             duration: const Duration(seconds: 3),

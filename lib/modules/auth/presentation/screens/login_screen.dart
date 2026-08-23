@@ -2,16 +2,17 @@
 // - BỎ ô "Public VPN / LAN" toggle (v2.98.0 - BS yêu cầu)
 // - Sửa mojibake: "TĂi khoản" → "tài khoản", "Lá»—i mạng" → "Lỗi mạng", "vĂ o" → "vào"
 // - 4 endpoints test: 1401/Authorize, 1408/HisBranch/Get, 1410/SdaConfig/Get, 1401/Timer/Sync
-import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:his_mobile/core/constants/app_constants.dart';
 import 'package:his_mobile/core/services/connection_service.dart';
 import 'package:his_mobile/core/theme/app_theme.dart';
-import 'package:his_mobile/data/api/his_pro_api_service.dart';
+import 'package:his_mobile/data/api/his_pro_api_service.dart' as his_pro_api;  // v3.0.159: class CHÍNH (EMR push)
+import 'package:his_mobile/data/services/his_pro_api_service.dart';
 import 'package:his_mobile/data/api/y_te_so_service.dart';
 import 'package:his_mobile/data/services/data_service.dart';
+import 'package:his_mobile/data/services/auto_token_service.dart';  // v3.0.159: Auto-token multi-source
 import 'package:his_mobile/presentation/screens/connection_check_screen.dart';
 import 'package:his_mobile/presentation/screens/his_config_screen.dart';
 import 'package:his_mobile/presentation/screens/vpn_benh_vien_screen.dart';
@@ -36,6 +37,11 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _loading = false;
   final _passwordFocus = FocusNode();
   bool _isExiting = false;
+  // v3.0.159: Auto-login với stored credentials
+  // v3.0.169: Mặc định FALSE - user phải chủ động bật (an toàn hơn, tránh lưu password nhầm)
+  bool _rememberCredentials = false;
+  bool _autoLoginBusy = false;
+  String _autoLoginStatus = '';
 
   @override
   void dispose() {
@@ -52,6 +58,11 @@ class _LoginScreenState extends State<LoginScreen> {
     if (email.isEmpty || pass.isEmpty) return;
 
     setState(() => _loading = true);
+
+    // v3.0.159: Lưu credentials cho auto-login (nếu user chọn)
+    if (_rememberCredentials) {
+      await AutoTokenService.instance.saveCredentials(email, pass);
+    }
 
     final result = await DataService.instance.login(email, pass);
 
@@ -114,7 +125,8 @@ class _LoginScreenState extends State<LoginScreen> {
       await Future.wait([
         () async {
           try {
-            final r = await HisProApiService.instance.login(email);
+            // v3.0.159: dùng class CHÍNH (his_pro_api) cho login flow cũ
+            final r = await his_pro_api.HisProApiService.instance.login(email);
             if (r.success && r.session != null) {
               debugPrint('✅ BG: Auto-fetched HIS Pro token: ${r.session!.token.length} chars');
             }
@@ -137,6 +149,61 @@ class _LoginScreenState extends State<LoginScreen> {
       ]);
     } catch (e) {
       debugPrint('⚠️ BG fetch tokens error: $e');
+    }
+  }
+
+  /// v3.0.159: Auto-fetch HIS Pro token từ nhiều nguồn
+  /// Thứ tự: proxy → login API → renew → hardcoded
+  /// Nếu user chưa nhập credentials, dùng hardcoded token ngay
+  Future<void> _handleAutoFetchToken() async {
+    setState(() {
+      _autoLoginBusy = true;
+      _autoLoginStatus = '🔄 Đang thử tất cả nguồn...';
+    });
+    try {
+      // Lưu credentials nếu user đã nhập
+      if (_rememberCredentials) {
+        final email = _loginNameController.text.trim();
+        final pass = _passwordController.text;
+        if (email.isNotEmpty && pass.isNotEmpty) {
+          await AutoTokenService.instance.saveCredentials(email, pass);
+        }
+      }
+
+      final result = await AutoTokenService.instance.fetchToken(forceRefresh: true, tryAllSources: true);
+      if (result.success && result.token != null) {
+        // Apply token ngay vào cả 2 class
+        try {
+          await his_pro_api.HisProApiService.instance.clearCustomBearer();
+        } catch (_) {}
+        await his_pro_api.HisProApiService.instance.setCustomBearer(result.token!);
+        HisProApiService.instance.setTokenCode(token: result.token!, clientIp: result.clientIp ?? '');
+
+        setState(() {
+          _autoLoginStatus = '✅ Token: ${result.token!.substring(0, 12)}...\n'
+              '📡 Nguồn: ${result.source.name}\n'
+              '🕐 Lúc: ${result.fetchedAt?.toString().substring(0, 19) ?? "?"}';
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('✅ Đã lấy token từ ${result.source.name}'),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      } else {
+        setState(() {
+          _autoLoginStatus = '❌ Thất bại: ${result.message ?? "unknown"}';
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _autoLoginStatus = '❌ Lỗi: $e';
+      });
+    } finally {
+      if (mounted) setState(() => _autoLoginBusy = false);
     }
   }
 
@@ -374,6 +441,108 @@ class _LoginScreenState extends State<LoginScreen> {
                             : const Text('Đăng nhập', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                       ),
                     ),
+                    const SizedBox(height: 8),
+                    // v3.0.169: Checkbox lưu credentials - default FALSE, có dialog cảnh báo khi bật
+                    CheckboxListTile(
+                      contentPadding: EdgeInsets.zero,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      title: const Text('Lưu thông tin để tự lấy token HIS Pro', style: TextStyle(fontSize: 13)),
+                      subtitle: const Text('Auto-fetch token mỗi lần mở app (mật khẩu lưu SecureStorage)', style: TextStyle(fontSize: 11, color: Colors.black54)),
+                      value: _rememberCredentials,
+                      onChanged: (v) async {
+                        if (v == true) {
+                          // v3.0.169: Hiện dialog cảnh báo trước khi bật
+                          final confirmed = await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              title: const Row(children: [
+                                Icon(Icons.shield, color: Colors.orange),
+                                SizedBox(width: 8),
+                                Text('Lưu thông tin đăng nhập?'),
+                              ]),
+                              content: const Text(
+                                'Mật khẩu sẽ được lưu trong Android Keystore (mã hóa AES).\n\n'
+                                'App sẽ tự động lấy token HIS Pro mỗi lần mở - bạn không cần đăng nhập lại.\n\n'
+                                'Bạn có thể tắt tính năng này bất kỳ lúc nào trong Cài đặt.',
+                                style: TextStyle(fontSize: 13),
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(ctx, false),
+                                  child: const Text('Hủy'),
+                                ),
+                                FilledButton(
+                                  onPressed: () => Navigator.pop(ctx, true),
+                                  child: const Text('Đồng ý'),
+                                ),
+                              ],
+                            ),
+                          );
+                          if (!mounted) return;
+                          setState(() => _rememberCredentials = confirmed ?? false);
+                        } else {
+                          setState(() => _rememberCredentials = false);
+                          // v3.0.169: Nếu tắt → xóa credentials đã lưu
+                          await AutoTokenService.instance.clearCredentials();
+                        }
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              // v3.0.159: Nút Auto-fetch token (multi-source)
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue.shade200),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.cloud_outlined, size: 18, color: Colors.blue),
+                        const SizedBox(width: 8),
+                        const Expanded(
+                          child: Text(
+                            'Auto-fetch Token (v3.0.159)',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.blue),
+                          ),
+                        ),
+                        if (_autoLoginBusy)
+                          const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Thử login API → renew → hardcoded. '
+                      'Chỉ cần bấm nút - không cần paste token tay.',
+                      style: TextStyle(fontSize: 11, color: Colors.grey.shade700),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _autoLoginBusy ? null : _handleAutoFetchToken,
+                        icon: const Icon(Icons.refresh, size: 18),
+                        label: const Text('🔄 Lấy token tự động ngay', style: TextStyle(fontSize: 13)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blue,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                        ),
+                      ),
+                    ),
+                    if (_autoLoginStatus.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        _autoLoginStatus,
+                        style: const TextStyle(fontSize: 11, color: Colors.black87),
+                      ),
+                    ],
                   ],
                 ),
               ),

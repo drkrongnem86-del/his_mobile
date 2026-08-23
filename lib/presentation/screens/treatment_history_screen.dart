@@ -21,7 +21,10 @@ import 'package:flutter/services.dart';
 import 'package:his_mobile/core/services/vpn_benh_vien_service.dart';
 import 'package:his_mobile/data/api/thongke_auth_service.dart';
 import 'package:his_mobile/data/api/treatment_history_service.dart';
+import 'package:his_mobile/data/api/his_api_service.dart';  // v3.0.162: kết quả Xquang
 import 'package:his_mobile/data/services/his_proxy_token_service.dart';
+import 'package:his_mobile/data/services/auto_token_service.dart';  // v3.0.160: tự cập nhật token
+import 'package:his_mobile/data/services/token_sync_service.dart';  // v3.0.165: token hub
 
 class TreatmentHistoryScreen extends StatefulWidget {
   final Map<String, dynamic> patient;
@@ -72,8 +75,38 @@ class _TreatmentHistoryScreenState extends State<TreatmentHistoryScreen> {
   @override
   void initState() {
     super.initState();
-    _load();
+    // v3.0.160: Tự cập nhật token trước khi load (không cần user paste)
+    _autoUpdateTokenThenLoad();
+  }
+
+  /// v3.0.165: Tự động lấy token mới rồi load dữ liệu
+  /// - Nếu TokenSyncService đã có token còn hạn → load thẳng
+  /// - Nếu không có / token hết hạn → gọi autoFetchToken() tự động
+  /// - Apply cho TẤT CẢ services (HisApi + HisProApi + Thongke)
+  Future<void> _autoUpdateTokenThenLoad() async {
     _refreshTokenAge();
+    try {
+      // v3.0.165: Dùng TokenSyncService thay vì gọi AutoTokenService trực tiếp
+      // TokenSyncService sẽ apply cho HisApi + HisProApi + broadcast
+      if (!TokenSyncService.instance.hasToken) {
+        debugPrint('🔄 [TreatmentHistory] No cached token, auto-fetching...');
+        final event = await TokenSyncService.instance.autoFetchToken(force: false);
+        if (event.token != null) {
+          // v3.0.165: Apply cho ThongkeAuthService (nếu còn dùng ở đâu đó)
+          await ThongkeAuthService.instance.setHisProToken(
+            event.token!,
+            source: event.source ?? 'auto',
+          );
+          await ThongkeAuthService.instance.loadHisProToken();
+          debugPrint('✅ [TreatmentHistory] Auto-fetched token from ${event.source}');
+        } else {
+          debugPrint('⚠️ [TreatmentHistory] Auto-fetch failed: ${event.message}');
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ [TreatmentHistory] Auto-update token error: $e');
+    }
+    if (mounted) _load();
   }
 
   /// v3.0.90: Load lại thông tin token (gọi khi init + sau khi user paste token)
@@ -394,10 +427,9 @@ class _TreatmentHistoryScreenState extends State<TreatmentHistoryScreen> {
                 style: TextStyle(fontSize: 13)),
             const SizedBox(height: 8),
             const Text(
-              '💡 Cách 1 (tự động): HIS Proxy - đọc log HIS.exe\n'
-              '   Chạy: python tools/his_proxy_server.py\n'
-              '   trên PC cùng WiFi (cần mở port 9999)\n\n'
-              '💡 Cách 2 (thủ công): Mở D:\\Soft\\HISPRO_THAT\\Logs\\LogSystem.txt\n'
+              '💡 Cách 1 (tự động): Bấm nút "🔄 Tự lấy token" bên dưới\n'
+              '   App sẽ thử login API → renew → hardcoded\n\n'
+              '💡 Cách 2 (thủ công): Mở D:\\Nem\\HISPRO_THAT\\Logs\\LogSystem.txt\n'
               '   Ctrl+F "___dti:" → copy phần giữa dấu | thứ 3 và thứ 4',
               style: TextStyle(fontSize: 11, color: Colors.black54, height: 1.4),
             ),
@@ -417,18 +449,9 @@ class _TreatmentHistoryScreenState extends State<TreatmentHistoryScreen> {
         actions: [
           TextButton(
             onPressed: () => _autoFetchToken(ctx),
-            child: const Text('Lấy từ HIS Proxy',
+            child: const Text('🔄 Tự lấy token',
                 style: TextStyle(
-                    color: Color(0xFF455A64), fontWeight: FontWeight.bold)),
-          ),
-          TextButton(
-            onPressed: () {
-              Clipboard.setData(const ClipboardData(text: '1ee41ae967caa75e7c2891a3d9612259d70b4645c67852ab0e5f07546c2f3dfb'));
-              ScaffoldMessenger.of(ctx).showSnackBar(
-                const SnackBar(content: Text('Đã copy token d856... vào clipboard. Dán vào ô trên.')),
-              );
-            },
-            child: const Text('Copy d856...'),
+                    color: Color(0xFF1565C0), fontWeight: FontWeight.bold)),
           ),
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
           FilledButton(
@@ -459,7 +482,7 @@ class _TreatmentHistoryScreenState extends State<TreatmentHistoryScreen> {
     }
   }
 
-  /// v3.0.82: Auto-fetch token từ local proxy (his_proxy_server.py)
+  /// v3.0.160: Auto-fetch token từ AutoTokenService (login API → renew → hardcoded)
   /// Returns true nếu thành công, false nếu fail
   Future<bool> _autoFetchToken(BuildContext dialogContext) async {
     final messenger = ScaffoldMessenger.of(dialogContext);
@@ -468,7 +491,7 @@ class _TreatmentHistoryScreenState extends State<TreatmentHistoryScreen> {
         content: Row(children: [
           SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
           SizedBox(width: 10),
-          Text('Đang gọi proxy server...'),
+          Text('Đang tự lấy token...'),
         ]),
         duration: Duration(seconds: 2),
       ),
@@ -478,8 +501,8 @@ class _TreatmentHistoryScreenState extends State<TreatmentHistoryScreen> {
       if (!mounted) return false;
       messenger.showSnackBar(
         const SnackBar(
-          content: Text('❌ Không kết nối được proxy. Hãy chạy:\npython tools/his_proxy_server.py\ntrên PC cùng WiFi.'),
-          duration: Duration(seconds: 5),
+          content: Text('❌ Không lấy được token. Vui lòng paste thủ công.'),
+          duration: Duration(seconds: 3),
           backgroundColor: Color(0xFFC62828),
         ),
       );
@@ -492,7 +515,7 @@ class _TreatmentHistoryScreenState extends State<TreatmentHistoryScreen> {
     await _refreshTokenAge();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('✅ Đã lấy token tự động từ HIS desktop (${newToken.length} ký tự)'),
+        content: Text('✅ Đã lấy token tự động (${newToken.length} ký tự)'),
         backgroundColor: const Color(0xFF2E7D32),
         duration: const Duration(seconds: 2),
       ),
@@ -546,6 +569,23 @@ class _TreatmentHistoryScreenState extends State<TreatmentHistoryScreen> {
               final icd = _g(t, 'ICD_NAME');
               final icdCode = _g(t, 'ICD_CODE');
               final endType = _g(t, 'TREATMENT_END_TYPE_NAME');
+              // v3.0.161: Trạng thái (Đang khám / Ra viện / Xin về / Chuyển viện)
+              final outTimeVal = t['OUT_TIME'];
+              final isActive = t['IS_ACTIVE'];
+              final isOpen = outTimeVal == null && (isActive == null || isActive == 1 || isActive == 0);
+              // isOpen = true → đang khám
+              String statusText;
+              Color statusColor;
+              if (isOpen) {
+                statusText = '🟢 Đang khám';
+                statusColor = const Color(0xFF2E7D32);
+              } else if (endType.isNotEmpty) {
+                statusText = '🔵 $endType';
+                statusColor = const Color(0xFF1565C0);
+              } else {
+                statusText = '⚪ Đã đóng';
+                statusColor = const Color(0xFF757575);
+              }
               final isSelected = id == _selectedTreatmentId;
               return InkWell(
                 onTap: () => _loadDepartments(id, code),
@@ -579,17 +619,17 @@ class _TreatmentHistoryScreenState extends State<TreatmentHistoryScreen> {
                                 code.isEmpty ? '#$id' : code,
                                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                               ),
-                              if (endType.isNotEmpty) ...[
+                              if (endType.isNotEmpty || isOpen) ...[
                                 const SizedBox(width: 4),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                                   decoration: BoxDecoration(
-                                    color: const Color(0xFFE8F5E9),
+                                    color: statusColor.withValues(alpha: 0.15),
                                     borderRadius: BorderRadius.circular(3),
                                   ),
                                   child: Text(
-                                    endType,
-                                    style: const TextStyle(color: Color(0xFF2E7D32), fontSize: 9),
+                                    statusText,
+                                    style: TextStyle(color: statusColor, fontSize: 9, fontWeight: FontWeight.bold),
                                   ),
                                 ),
                               ],
@@ -654,7 +694,12 @@ class _TreatmentHistoryScreenState extends State<TreatmentHistoryScreen> {
               final name = _g(d, 'DEPARTMENT_NAME');
               final code = _g(d, 'DEPARTMENT_CODE');
               final inTime = _fmtDate(d['DEPARTMENT_IN_TIME']);
+              final outTime = _fmtDate(d['DEPARTMENT_OUT_TIME']);
               final prevName = _g(d, 'PREVIOUS_DEPARTMENT_NAME');
+              final nextName = _g(d, 'DEPARTMENT_NAME_AFTER');
+              // v3.0.161: Trạng thái khoa - nếu không có outTime là đang ở đây
+              final outTimeRaw = d['DEPARTMENT_OUT_TIME'];
+              final isCurrentDept = outTimeRaw == null;
               final isSelected = id == _selectedDeptTranId;
               return InkWell(
                 onTap: () {
@@ -692,12 +737,28 @@ class _TreatmentHistoryScreenState extends State<TreatmentHistoryScreen> {
                             ),
                           ),
                       ]),
-                      if (inTime.isNotEmpty || prevName.isNotEmpty)
+                      if (inTime.isNotEmpty || prevName.isNotEmpty || outTime.isNotEmpty)
                         Padding(
                           padding: const EdgeInsets.only(top: 2, left: 18),
                           child: Text(
-                            'Vào: $inTime${prevName.isNotEmpty ? '  (từ $prevName)' : ''}',
+                            '${inTime.isEmpty ? '' : 'Vào: $inTime'}${prevName.isNotEmpty ? '  (từ $prevName)' : ''}${outTime.isEmpty ? (nextName.isNotEmpty ? '  •  Qua: $nextName' : '') : '  •  Ra: $outTime'}',
                             style: const TextStyle(fontSize: 10, color: Color(0xFF616161)),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      if (isCurrentDept)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 2, left: 18),
+                          child: Row(
+                            children: const [
+                              Icon(Icons.fiber_manual_record, size: 8, color: Color(0xFF2E7D32)),
+                              SizedBox(width: 4),
+                              Text(
+                                '🟢 Đang điều trị tại khoa này',
+                                style: TextStyle(fontSize: 10, color: Color(0xFF2E7D32), fontWeight: FontWeight.bold),
+                              ),
+                            ],
                           ),
                         ),
                     ],
@@ -705,6 +766,383 @@ class _TreatmentHistoryScreenState extends State<TreatmentHistoryScreen> {
                 ),
               );
             },
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// v3.0.164: Show kết quả CLS khi user tap 1 service item (Xquang/Siêu âm/XN/ECG)
+  /// Auto-detect service type và gọi API phù hợp:
+  /// - type 3 (XN) → LIS
+  /// - type 4/5 (CĐHA/Thủ thuật) → SAR / SubclinicalResult / HisSereServExt fallback
+  Future<void> _showServiceResult(Map<String, dynamic> s) async {
+    final sereServId = s['SERE_SERV_ID'] ?? s['ID'];
+    final serviceReqId = s['SERVICE_REQ_ID'] ?? s['TDL_SERVICE_REQ_ID'] ?? s['SERVICE_REQ_ID'];
+    final name = s['SERVICE_NAME'] ?? s['TDL_SERVICE_NAME'] ?? 'DV';
+    final typeId = s['TDL_SERVICE_TYPE_ID'] ?? s['SERVICE_TYPE_ID'];
+    if (sereServId == null && serviceReqId == null) return;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const Center(child: CircularProgressIndicator()),
+    );
+    try {
+      final api = HisApiService();
+      HisResult r;
+      // v3.0.164: Ưu tiên dùng SERVICE_REQ_ID (vì nhiều sere_serv có thể cùng 1 service_req)
+      if (serviceReqId != null) {
+        r = await api.getServiceResultByType(
+          serviceReqId: int.tryParse(serviceReqId.toString()) ?? 0,
+          sereServId: sereServId != null ? int.tryParse(sereServId.toString()) : null,
+          serviceTypeId: int.tryParse(typeId?.toString() ?? ''),
+        );
+      } else {
+        r = await api.getSereServExtResult(int.tryParse(sereServId.toString()) ?? 0);
+      }
+      if (!mounted) return;
+      Navigator.pop(context); // close loading
+      if (!r.success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('❌ Lỗi: ${r.message ?? "Không rõ"}')),
+        );
+        return;
+      }
+      // Show dialog với kết quả
+      await showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(_getServiceTypeIcon(typeId), color: const Color(0xFF1565C0), size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Kết quả: $name',
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          content: SizedBox(
+            width: 500,
+            child: _buildServiceResultContent(r.data, typeId),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Đóng'),
+            ),
+          ],
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // close loading
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('❌ Lỗi: $e')),
+        );
+      }
+    }
+  }
+
+  /// v3.0.164: Icon theo loại DV
+  IconData _getServiceTypeIcon(dynamic typeId) {
+    final t = int.tryParse(typeId?.toString() ?? '') ?? 0;
+    switch (t) {
+      case 3: return Icons.science; // XN
+      case 4: return Icons.medical_services; // CĐHA
+      case 5: return Icons.medical_services; // Thủ thuật
+      default: return Icons.description;
+    }
+  }
+
+  /// v3.0.166: Render nội dung kết quả theo service type
+  /// - Thêm hiển thị "serviceName" + "source" để user biết đang dùng API nào
+  /// - Empty list (results: []) → "Chưa có kết quả" thay vì báo lỗi
+  Widget _buildServiceResultContent(dynamic data, dynamic typeId) {
+    if (data == null) {
+      return const Padding(
+        padding: EdgeInsets.all(16),
+        child: Text(
+          'Chưa có kết quả (DV có thể chưa thực hiện hoặc đang chờ kết quả)',
+          style: TextStyle(fontSize: 12, color: Colors.black54),
+        ),
+      );
+    }
+    // Nếu data là wrapper {serviceType, serviceTypeName, source, serviceName, results}
+    if (data is Map && data.containsKey('results') && data['serviceTypeName'] != null) {
+      final t = data['serviceType'] is int ? data['serviceType'] as int : int.tryParse(data['serviceType'].toString()) ?? 0;
+      final source = data['source']?.toString() ?? '';
+      final serviceName = data['serviceName']?.toString() ?? '';
+      final results = data['results'];
+      // v3.0.166: Empty results → "Chưa có kết quả" thay vì báo lỗi "Chưa hỗ trợ loại DV này"
+      if (results == null || (results is List && results.isEmpty) || (results is Map && (results['Data'] == null || (results['Data'] is List && (results['Data'] as List).isEmpty)))) {
+        return Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '⏳ Chưa có kết quả',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFFFFA000)),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'DV này có thể chưa thực hiện hoặc đang chờ kết quả từ khoa CĐHA/XN.',
+                style: const TextStyle(fontSize: 11, color: Colors.black54),
+              ),
+              if (serviceName.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    'DV: $serviceName',
+                    style: const TextStyle(fontSize: 10, color: Colors.black45, fontStyle: FontStyle.italic),
+                  ),
+                ),
+            ],
+          ),
+        );
+      }
+      // type 3 = XN - dùng format LIS
+      if (t == 3) {
+        return _buildLabResultContent(results, source);
+      }
+      // type 4/5 = CĐHA/Thủ thuật - dùng format SAR/Subclinical/HisSereServExt
+      return _buildImagingResultContent(results, source);
+    }
+    // Fallback cũ: list các SereServExt
+    if (data is List) {
+      if (data.isEmpty) {
+        return const Padding(
+          padding: EdgeInsets.all(16),
+          child: Text(
+            '⏳ Chưa có kết quả',
+            style: TextStyle(fontSize: 13, color: Color(0xFFFFA000)),
+          ),
+        );
+      }
+      return _buildImagingResultContent({'Data': data}, '');
+    }
+    // Single result map
+    if (data is Map) {
+      return _buildImagingResultContent(data, '');
+    }
+    return const Padding(
+      padding: EdgeInsets.all(16),
+      child: Text(
+        '⏳ Chưa có kết quả',
+        style: TextStyle(fontSize: 13, color: Color(0xFFFFA000)),
+      ),
+    );
+  }
+
+  /// v3.0.164: Hiển thị kết quả CĐHA (Siêu âm/Xquang) - format giống HIS Desktop
+  Widget _buildImagingResultContent(dynamic data, String source) {
+    List<dynamic> results = [];
+    if (data is Map && data['Data'] is List) {
+      results = data['Data'] as List;
+    } else if (data is Map && data['Data'] is Map) {
+      results = [data['Data']];
+    } else if (data is List) {
+      results = data;
+    }
+    if (results.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.all(16),
+        child: Text('Chưa có kết quả', style: TextStyle(fontSize: 12, color: Colors.black54)),
+      );
+    }
+    return ListView(
+      shrinkWrap: true,
+      children: results.map<Widget>((item) {
+        Map? ext;
+        Map? ss;
+        if (item is Map) {
+          // Nếu wrapped trong {SERE_SERV_EXT, SERE_SERV} (từ getServiceReqResult cũ)
+          ext = item['SERE_SERV_EXT'] as Map?;
+          ss = item['SERE_SERV'] as Map?;
+          // Nếu là SAR result trực tiếp
+          if (ext == null) {
+            ext = item;
+          }
+        }
+        if (ext == null) {
+          return const Padding(
+            padding: EdgeInsets.all(8),
+            child: Text('Không có dữ liệu mở rộng', style: TextStyle(fontSize: 11)),
+          );
+        }
+        final conclude = ext['CONCLUDE']?.toString() ?? '';
+        final description = ext['DESCRIPTION']?.toString() ?? '';
+        final machineCode = ext['MACHINE_CODE']?.toString() ?? '';
+        final note = ext['NOTE']?.toString() ?? '';
+        final numFilm = ext['NUMBER_OF_FILM'];
+        final beginTime = ext['BEGIN_TIME'];
+        final endTime = ext['END_TIME'];
+        final subclinicalNurse = ext['SUBCLINICAL_NURSE_USERNAME']?.toString() ?? '';
+        final subclinicalResult = ext['SUBCLINICAL_RESULT_USERNAME']?.toString() ?? '';
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF5F5F5),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: const Color(0xFFE0E0E0)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (conclude.isNotEmpty) ...[
+                const Text('🩺 KẾT LUẬN:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1565C0))),
+                const SizedBox(height: 2),
+                Text(conclude, style: const TextStyle(fontSize: 12)),
+                const SizedBox(height: 6),
+              ],
+              if (description.isNotEmpty) ...[
+                const Text('📝 MÔ TẢ:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1565C0))),
+                const SizedBox(height: 2),
+                Text(description, style: const TextStyle(fontSize: 12)),
+                const SizedBox(height: 6),
+              ],
+              if (note.isNotEmpty) ...[
+                const Text('📌 GHI CHÚ:', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1565C0))),
+                const SizedBox(height: 2),
+                Text(note, style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic)),
+                const SizedBox(height: 6),
+              ],
+              Row(
+                children: [
+                  if (machineCode.isNotEmpty)
+                    Expanded(
+                      child: Text('Máy: $machineCode', style: const TextStyle(fontSize: 10, color: Colors.black54)),
+                    ),
+                  if (numFilm != null && numFilm is num && numFilm > 0)
+                    Text('Số film: $numFilm', style: const TextStyle(fontSize: 10, color: Colors.black54)),
+                ],
+              ),
+              if (beginTime != null || endTime != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    '⏱ ${beginTime ?? '?'} → ${endTime ?? '?'}',
+                    style: const TextStyle(fontSize: 10, color: Colors.black54),
+                  ),
+                ),
+              if (subclinicalNurse.isNotEmpty || subclinicalResult.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    '👤 ${subclinicalNurse.isNotEmpty ? "KTV: $subclinicalNurse" : ""}${subclinicalResult.isNotEmpty ? "  •  BS đọc: $subclinicalResult" : ""}',
+                    style: const TextStyle(fontSize: 10, color: Colors.black54),
+                  ),
+                ),
+              if (ss != null && (ss['SERVICE_REQ_CODE'] != null))
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    'Mã YL: ${ss['SERVICE_REQ_CODE']}',
+                    style: const TextStyle(fontSize: 9, color: Colors.black45),
+                  ),
+                ),
+              if (source.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    'Nguồn: $source',
+                    style: const TextStyle(fontSize: 9, color: Colors.black45, fontStyle: FontStyle.italic),
+                  ),
+                ),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  /// v3.0.164: Hiển thị kết quả Xét nghiệm - format giống HIS Desktop
+  /// (Mã XN, Tên chỉ số, Kết quả, Đơn vị, Bình thường, H/L cảnh báo)
+  Widget _buildLabResultContent(dynamic data, String source) {
+    List<dynamic> results = [];
+    if (data is Map && data['Data'] is List) {
+      results = data['Data'] as List;
+    } else if (data is List) {
+      results = data;
+    } else if (data is Map && data['Data'] is Map) {
+      results = [data['Data']];
+    }
+    if (results.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.all(16),
+        child: Text('Chưa có kết quả XN', style: TextStyle(fontSize: 12, color: Colors.black54)),
+      );
+    }
+    // Tìm các field cho kết quả XN - thường là: TEST_CODE, TEST_NAME, VALUE, UNIT, NORMAL_RANGE, ALERT
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (source.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Text('Nguồn: $source', style: const TextStyle(fontSize: 9, color: Colors.black45)),
+          ),
+        Container(
+          decoration: BoxDecoration(
+            color: const Color(0xFFFAFAFA),
+            border: Border.all(color: const Color(0xFFE0E0E0)),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Column(
+            children: [
+              // Header
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                color: const Color(0xFF1565C0),
+                child: const Row(children: [
+                  Expanded(flex: 2, child: Text('Mã', style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold))),
+                  Expanded(flex: 5, child: Text('Chỉ số', style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold))),
+                  Expanded(flex: 2, child: Text('KQ', style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold), textAlign: TextAlign.right)),
+                  Expanded(flex: 2, child: Text('Đơn vị', style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold))),
+                  Expanded(flex: 3, child: Text('Bình thường', style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold), textAlign: TextAlign.right)),
+                ]),
+              ),
+              ...results.asMap().entries.map((e) {
+                final item = e.value;
+                if (item is! Map) return const SizedBox.shrink();
+                final code = (item['TEST_CODE'] ?? item['SHORT_NAME'] ?? item['MA_XN'] ?? '').toString();
+                final testName = (item['TEST_NAME'] ?? item['SERVICE_NAME'] ?? item['TEN_CHI_SO'] ?? code).toString();
+                final value = (item['VALUE'] ?? item['RESULT'] ?? item['KET_QUA'] ?? '').toString();
+                final unit = (item['UNIT'] ?? item['UNIT_NAME'] ?? item['DON_VI'] ?? '').toString();
+                final normalRange = (item['NORMAL_RANGE'] ?? item['REF_RANGE'] ?? item['GIA_TRI_BT'] ?? '').toString();
+                // alert: H (high) / L (low) / HL
+                final alert = (item['ALERT'] ?? item['IS_HIGH'] == true ? 'H' : (item['IS_LOW'] == true ? 'L' : '')).toString();
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  color: e.value % 2 == 0 ? Colors.white : const Color(0xFFF5F5F5),
+                  child: Row(children: [
+                    Expanded(flex: 2, child: Text(code, style: const TextStyle(fontSize: 9, color: Color(0xFF6A1B9A)))),
+                    Expanded(flex: 5, child: Text(testName, style: const TextStyle(fontSize: 10), overflow: TextOverflow.ellipsis)),
+                    Expanded(
+                      flex: 2,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          if (alert == 'H' || alert == 'HL')
+                            const Padding(padding: EdgeInsets.only(right: 2), child: Text('H', style: TextStyle(fontSize: 9, color: Color(0xFFD32F2F), fontWeight: FontWeight.bold))),
+                          if (alert == 'L' || alert == 'HL')
+                            const Padding(padding: EdgeInsets.only(right: 2), child: Text('L', style: TextStyle(fontSize: 9, color: Color(0xFF1976D2), fontWeight: FontWeight.bold))),
+                          Flexible(child: Text(value, style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600), textAlign: TextAlign.right, overflow: TextOverflow.ellipsis)),
+                        ],
+                      ),
+                    ),
+                    Expanded(flex: 2, child: Text(unit, style: const TextStyle(fontSize: 9, color: Colors.black54), overflow: TextOverflow.ellipsis)),
+                    Expanded(flex: 3, child: Text(normalRange, style: const TextStyle(fontSize: 9, color: Colors.black54), textAlign: TextAlign.right, overflow: TextOverflow.ellipsis)),
+                  ]),
+                );
+              }),
+            ],
           ),
         ),
       ],
@@ -722,14 +1160,29 @@ class _TreatmentHistoryScreenState extends State<TreatmentHistoryScreen> {
     if (_sereServs.isEmpty) {
       return const _EmptyPane(icon: Icons.medication_outlined, text: 'Khoa này chưa có DV/thuốc');
     }
-    // Group by SERVICE_TYPE_NAME
+    // v3.0.161: HIS Pro GetDHisSereServ2 returns fields without TDL_ prefix
+    // Real fields: SERVICE_CODE, SERVICE_NAME, TDL_SERVICE_TYPE_ID, AMOUNT, PRICE,
+    //               TUTORIAL (instruction note), REQUEST_DEPARTMENT_NAME, etc.
+    // Group by TDL_SERVICE_TYPE_ID → map to name
+    final typeName = <int, String>{
+      1: 'Khám', 2: 'Ngừng', 3: 'Xét nghiệm', 4: 'CĐHA', 5: 'Thủ thuật',
+      6: 'Thuốc', 7: 'Máu', 8: 'Vật tư', 9: 'Giường', 10: 'Phẫu thuật',
+      11: 'Khám ngoại trú', 14: 'Thuốc (YTế Số)', 15: 'CLS', 16: 'Phẫu thuật (PTTT)',
+    };
     final groups = <String, List<Map<String, dynamic>>>{};
     for (final s in _sereServs) {
-      final type = _g(s, 'TDL_SERVICE_TYPE_NAME').isEmpty
-          ? 'Khác'
-          : _g(s, 'TDL_SERVICE_TYPE_NAME');
+      final typeId = s['TDL_SERVICE_TYPE_ID'];
+      final type = typeName[typeId is int ? typeId : (typeId is num ? typeId.toInt() : -1)] ?? 'Khác (loại $typeId)';
       groups.putIfAbsent(type, () => []).add(s);
     }
+    // Sort groups: Thuốc/CLS/Thủ thuật trước
+    final order = ['Khám', 'CĐHA', 'Xét nghiệm', 'Thủ thuật', 'Phẫu thuật (PTTT)', 'Thuốc', 'Vật tư', 'Máu', 'Giường', 'CLS', 'Khác'];
+    final sortedKeys = groups.keys.toList()
+      ..sort((a, b) {
+        final ia = order.indexOf(a);
+        final ib = order.indexOf(b);
+        return (ia < 0 ? 999 : ia).compareTo(ib < 0 ? 999 : ib);
+      });
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -744,7 +1197,8 @@ class _TreatmentHistoryScreenState extends State<TreatmentHistoryScreen> {
         ),
         Expanded(
           child: ListView(
-            children: groups.entries.map((e) {
+            children: sortedKeys.map((k) {
+              final e = MapEntry(k, groups[k]!);
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -752,56 +1206,128 @@ class _TreatmentHistoryScreenState extends State<TreatmentHistoryScreen> {
                     width: double.infinity,
                     padding: const EdgeInsets.fromLTRB(12, 6, 12, 2),
                     color: const Color(0xFFE3F2FD),
-                    child: Text(
-                      e.key,
-                      style: const TextStyle(
-                        color: Color(0xFF0D47A1),
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
+                    child: Row(
+                      children: [
+                        Text(
+                          '${e.key}',
+                          style: const TextStyle(
+                            color: Color(0xFF0D47A1),
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const Spacer(),
+                        Text(
+                          '${e.value.length} món',
+                          style: const TextStyle(fontSize: 10, color: Color(0xFF1565C0)),
+                        ),
+                      ],
                     ),
                   ),
                   ...e.value.map((s) {
-                    final name = _g(s, 'TDL_SERVICE_NAME').isEmpty
-                        ? _g(s, 'SERVICE_NAME')
-                        : _g(s, 'TDL_SERVICE_NAME');
-                    final code = _g(s, 'TDL_SERVICE_CODE');
+                    // v3.0.161: Field names from HIS Pro GetDHisSereServ2
+                    final name = _g(s, 'SERVICE_NAME');
+                    final code = _g(s, 'SERVICE_CODE');
                     final amount = s['AMOUNT'];
                     final price = s['PRICE'];
-                    return ListTile(
-                      dense: true,
-                      visualDensity: VisualDensity.compact,
-                      leading: const Icon(Icons.circle, size: 6, color: Color(0xFF1565C0)),
-                      title: Text(
-                        name,
-                        style: const TextStyle(fontSize: 12),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      subtitle: code.isNotEmpty
-                          ? Text(
-                              code,
-                              style: const TextStyle(fontSize: 9, color: Color(0xFF9E9E9E)),
-                            )
-                          : null,
-                      trailing: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          if (amount != null)
+                    final unit = _g(s, 'SERVICE_UNIT_NAME');
+                    final tutorial = _g(s, 'TUTORIAL');
+                    final reqDept = _g(s, 'REQUEST_DEPARTMENT_NAME');
+                    final reqUser = _g(s, 'REQUEST_USERNAME');
+                    final sttId = s['SERVICE_REQ_STT_ID'];
+                    // Stt: 1=mới, 2=đang xử lý, 3=đang thực hiện, 4-6=hoàn thành
+                    final sttColor = sttId == null || sttId <= 2
+                        ? const Color(0xFFD32F2F)
+                        : sttId == 3
+                            ? const Color(0xFFFFA000)
+                            : const Color(0xFF2E7D32);
+                    final sttText = sttId == null || sttId <= 2
+                        ? 'Mới'
+                        : sttId == 3
+                            ? 'Đang làm'
+                            : 'Xong';
+                    return InkWell(
+                      onTap: () => _showServiceResult(s),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: const BoxDecoration(
+                          border: Border(bottom: BorderSide(color: Color(0xFFEEEEEE), width: 0.5)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      name.isEmpty ? code : name,
+                                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    if (code.isNotEmpty)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 1),
+                                        child: Text(
+                                          '$code${unit.isNotEmpty ? ' • $unit' : ''}',
+                                          style: const TextStyle(fontSize: 10, color: Color(0xFF9E9E9E)),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  if (amount != null)
+                                    Text(
+                                      '×$amount',
+                                      style: const TextStyle(fontSize: 12, color: Color(0xFF1565C0), fontWeight: FontWeight.bold),
+                                    ),
+                                  if (price != null && (price is num) && price > 0)
+                                    Text(
+                                      '${(price is num ? price : 0).toStringAsFixed(0)}đ',
+                                      style: const TextStyle(fontSize: 9, color: Color(0xFF616161)),
+                                    ),
+                                  Container(
+                                    margin: const EdgeInsets.only(top: 2),
+                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: sttColor.withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(3),
+                                    ),
+                                    child: Text(
+                                      sttText,
+                                      style: TextStyle(fontSize: 9, color: sttColor, fontWeight: FontWeight.bold),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                          if (tutorial.isNotEmpty || reqDept.isNotEmpty || reqUser.isNotEmpty) ...[
+                            const SizedBox(height: 2),
                             Text(
-                              '×$amount',
-                              style: const TextStyle(fontSize: 11, color: Color(0xFF1565C0), fontWeight: FontWeight.bold),
+                              [
+                                if (reqDept.isNotEmpty) 'YC: $reqDept',
+                                if (reqUser.isNotEmpty) '• BS: $reqUser',
+                                if (tutorial.isNotEmpty) '• $tutorial',
+                              ].join(' '),
+                              style: const TextStyle(fontSize: 9, color: Color(0xFF757575), fontStyle: FontStyle.italic),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                          if (price != null)
-                            Text(
-                              '${(price is num ? price : 0).toStringAsFixed(0)}đ',
-                              style: const TextStyle(fontSize: 9, color: Color(0xFF616161)),
-                            ),
+                          ],
                         ],
                       ),
-                    );
-                  }),
+                    ),
+                  );
+                  })
                 ],
               );
             }).toList(),

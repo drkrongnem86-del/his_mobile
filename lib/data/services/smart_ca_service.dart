@@ -17,12 +17,10 @@ import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:his_mobile/core/security/secure_config_service.dart';
 
 class SmartCaConfig {
   /// Cert serial từ SmartCA VNPT (verified 2026-07-16 từ ảnh BS - cert MỚI)
-  // v3.0.156: Read from SecureConfigService
-  static String get serialNumber => SecureConfigService.instance.getCertSerialSync();
+  static const String serialNumber = '54010101068bead6d571af00bdfa225a';
   /// Subject từ SmartCA VNPT (verified 2026-07-16)
   static const String subject = 'CN=K\'RONG NỄM, O=BỆNH VIỆN TỈNH NINH THUẬN, T=bác sĩ, C=VN';
   /// CCCD/CMND từ SmartCA VNPT
@@ -33,8 +31,7 @@ class SmartCaConfig {
   static const String validFrom = '2025-08-26';
   static const String validTo = '2026-08-26';
   /// Device đã kích hoạt: Samsung SM-A225F, Android 13, ID=58b6720dcd3d8be3
-  // v3.0.156: Read from SecureConfigService
-  static String get deviceId => SecureConfigService.instance.getDeviceIdSync();
+  static const String deviceId = '58b6720dcd3d8be3';
   static const String deviceModel = 'SM-A225F';
   /// Tên gói SmartCA
   static const String packageName = 'SmartCA Bác sĩ/ cán bộ y tế nâng cao (TH) - 12 tháng';

@@ -68,12 +68,16 @@ class TreatmentHistoryService {
 
   Dio _buildDio() {
     final token = _thongke.hisProToken ?? '';
+    // v3.0.161: HIS Pro dùng TokenCode headers (KHÔNG Bearer)
+    // Verified ngày 23/08/2026 - HIS Pro trả 200 OK với cả 2 cách nhưng
+    // ưu tiên đúng chuẩn HIS Desktop
     return Dio(BaseOptions(
       connectTimeout: const Duration(seconds: 5),
       receiveTimeout: const Duration(seconds: 15),
       headers: {
-        'Authorization': 'Bearer $token',
-        '___ipAddress': '127.0.0.1',
+        'TokenCode': token,
+        'ApplicationCode': 'HIS',
+        'ClientIpAddress': '172.16.200.101',
         'Accept': 'application/json',
       },
     ));
@@ -91,12 +95,23 @@ class TreatmentHistoryService {
       };
 
   /// Parse response từ HIS Pro (extract list từ Data field)
+  /// v3.0.161: HIS Pro trả Content-Type: text/plain; charset=utf-8
+  /// → Dio parse thành String, cần jsonDecode() trước khi check Map
   TreatmentHistoryResult _parseResponse(
     Response<dynamic> r,
     String endpoint,
     Map<String, dynamic> apiData,
   ) {
-    final data = r.data;
+    dynamic data = r.data;
+    // v3.0.161: Nếu là String, parse thành JSON
+    if (data is String && data.isNotEmpty) {
+      try {
+        data = jsonDecode(data);
+      } catch (e) {
+        debugPrint('⚠️ _parseResponse: không parse được JSON: $e');
+        return const TreatmentHistoryResult(data: []);
+      }
+    }
     if (data is Map && data['Success'] == true) {
       final list = data['Data'];
       if (list is List) {
@@ -243,8 +258,9 @@ class TreatmentHistoryService {
 
     debugPrint('🔍 getTreatmentHistory: code=$normalized, baseUrl=$_baseUrl, tokenLen=${_thongke.hisProToken?.length ?? 0}');
 
-    // Thử PATIENT_CODE__EXACT trước (đúng format HIS Desktop dùng)
-    var result = await _get('/api/HisTreatment/GetLView', {
+    // v3.0.161: HIS Pro filter đúng là PATIENT_CODE__EXACT
+    // (TDL_PATIENT_CODE__EXACT trả 0 results - đã verify ngày 23/08/2026)
+    final result = await _get('/api/HisTreatment/GetLView', {
       'ORDER_FIELD': 'MODIFY_TIME',
       'ORDER_DIRECTION': 'DESC',
       'PATIENT_CODE__EXACT': normalized,
@@ -252,15 +268,6 @@ class TreatmentHistoryService {
     if (result.isAuthError) {
       // Token hết hạn → trả luôn, không thử tiếp
       return result;
-    }
-    if (result.isOk && result.data.isEmpty) {
-      // Fallback: thử với TDL_PATIENT_CODE__EXACT (HIS Pro cũ)
-      debugPrint('ℹ PATIENT_CODE__EXACT rỗng, thử TDL_PATIENT_CODE__EXACT...');
-      result = await _get('/api/HisTreatment/GetLView', {
-        'ORDER_FIELD': 'MODIFY_TIME',
-        'ORDER_DIRECTION': 'DESC',
-        'TDL_PATIENT_CODE__EXACT': normalized,
-      });
     }
     return result;
   }

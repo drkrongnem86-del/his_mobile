@@ -1,15 +1,17 @@
 import 'dart:convert';
-import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:cookie_jar/cookie_jar.dart';
 import 'package:dio/dio.dart';
 import 'package:dio_cookie_manager/dio_cookie_manager.dart';
+import 'package:flutter/foundation.dart' show debugPrint;  // v3.0.168: for getAcsUsers
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:his_mobile/core/constants/app_constants.dart';
 import 'package:his_mobile/core/services/connection_service.dart';
 import 'package:his_mobile/data/services/data_service.dart';
 
 /// HIS Pro API Service - v1.4.1
-/// Server: 117.2.25.67 (qua VPN BV)
+/// Server: 117.2.25.67 (qua VPN BV) hoặc 172.16.9.6 (LAN)
+/// v3.0.162: Fix HIS Pro auth - dùng TokenCode headers thay vì Bearer
+/// v3.0.162: Fix response parsing - HIS Pro trả text/plain, cần jsonDecode
 class HisApiService {
   late final Dio _dio;
 
@@ -20,16 +22,46 @@ class HisApiService {
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
+        // v3.0.162: HIS Pro dùng TokenCode headers (KHÔNG Bearer)
+        'TokenCode': '',
+        'ApplicationCode': 'HIS',
+        'ClientIpAddress': '172.16.200.101',
       },
     ));
   }
 
   void setAuthToken(String token) {
+    // v3.0.162: Set cả 2 - Bearer (cho tương thích cũ) + TokenCode (HIS Pro chuẩn)
     _dio.options.headers['Authorization'] = 'Bearer $token';
+    _dio.options.headers['TokenCode'] = token;
   }
 
   void clearAuthToken() {
     _dio.options.headers.remove('Authorization');
+    _dio.options.headers.remove('TokenCode');
+  }
+
+  /// v3.0.162: Procedure room API thực tế ở port 1408 (MOS)
+  /// (mosUrl = 1429 sai, chỉ dùng cho MCH service)
+  /// ocrUrl = 1425 chỉ cho HisExecuteUser, KHÔNG có GetLView
+  String get _procedureRoomUrl {
+    final mos = ConnectionService.instance.mosUrl.replaceAll(RegExp(r'/$'), '');
+    final uri = Uri.parse(mos);
+    return '${uri.scheme}://${uri.host}:1408';
+  }
+
+  /// v3.0.162: Unwrap HIS Pro response
+  /// HIS Pro trả Content-Type: text/plain nên Dio parse thành String
+  /// → cần jsonDecode trước khi dùng
+  dynamic _unwrap(dynamic data) {
+    if (data is String && data.isNotEmpty) {
+      try {
+        return jsonDecode(data);
+      } catch (_) {
+        return data;
+      }
+    }
+    return data;
   }
 
   /// Tạo param base64 theo format HIS Pro
@@ -65,7 +97,7 @@ class HisApiService {
     // Thử cả 2 server URLs
     for (final baseUrl in ConnectionService.instance.acsUrlCandidates) {
       try {
-        debugPrint('🔐 Trying: $baseUrl');
+        print('🔐 Trying: $baseUrl');
 
         final response = await _dio.get(
           '${baseUrl}api/AcsToken/Authorize',
@@ -80,7 +112,7 @@ class HisApiService {
 
         if (response.statusCode != 200) {
           lastError = 'HTTP ${response.statusCode}';
-          debugPrint('   HTTP ${response.statusCode} - thử server tiếp');
+          print('   HTTP ${response.statusCode} - thử server tiếp');
           continue;
         }
 
@@ -112,14 +144,14 @@ class HisApiService {
           } else if (tokenData is String) {
             token = tokenData;
           }
-          debugPrint('   ✅ Login OK!');
+          print('   ✅ Login OK!');
           return LoginResult(success: true, token: token, userData: tokenData);
         }
 
         lastError = 'Phản hồi không xác định';
       } catch (e) {
         lastError = '${e.toString().substring(0, 60)}';
-        debugPrint('   ❌ Error: $lastError - thử server tiếp');
+        print('   ❌ Error: $lastError - thử server tiếp');
         continue;
       }
     }
@@ -167,10 +199,10 @@ class HisApiService {
 
       final param = _encodeParam(apiData, limit);
 
-      debugPrint('📡 MCH GetLView: ${ConnectionService.instance.mosUrl}api/HisServiceReq/GetLView');
+      print('📡 MCH GetLView: ${ConnectionService.instance.ocrUrl}api/HisServiceReq/GetLView');
 
       final response = await _dio.get(
-        '${ConnectionService.instance.mosUrl}api/HisServiceReq/GetLView',
+        '${ConnectionService.instance.ocrUrl}api/HisServiceReq/GetLView',
         queryParameters: {'param': param},
         options: Options(
           headers: {'Content-Type': 'application/json'},
@@ -222,10 +254,11 @@ class HisApiService {
 
       final param = _encodeParam(apiData, limit);
 
-      debugPrint('📡 MCH GetLView (RoomID=$executeRoomId): ${ConnectionService.instance.mosUrl}api/HisServiceReq/GetLView');
+      // v3.0.162: Fix port - procedure room API ở port 1408 (MOS), KHÔNG phải 1425 (OCR)
+      print('📡 ProcedureRoom GetLView (RoomID=$executeRoomId): $_procedureRoomUrl/api/HisServiceReq/GetLView');
 
       final response = await _dio.get(
-        '${ConnectionService.instance.mosUrl}api/HisServiceReq/GetLView',
+        '$_procedureRoomUrl/api/HisServiceReq/GetLView',
         queryParameters: {'param': param},
         options: Options(
           headers: {'Content-Type': 'application/json'},
@@ -235,7 +268,9 @@ class HisApiService {
       );
 
       if (response.statusCode == 200) {
-        return HisResult(success: true, data: response.data);
+        // v3.0.162: Unwrap String response (HIS Pro text/plain)
+        final unwrapped = _unwrap(response.data);
+        return HisResult(success: true, data: unwrapped);
       }
       return HisResult(success: false, message: 'HTTP ${response.statusCode}', data: response.data);
     } catch (e) {
@@ -275,10 +310,10 @@ class HisApiService {
 
       final param = _encodeParam(apiData, limit);
 
-      debugPrint('📡 MCH GetLView (DeptID=$departmentId): ${ConnectionService.instance.mosUrl}api/HisServiceReq/GetLView');
+      print('📡 MCH GetLView (DeptID=$departmentId): ${ConnectionService.instance.ocrUrl}api/HisServiceReq/GetLView');
 
       final response = await _dio.get(
-        '${ConnectionService.instance.mosUrl}api/HisServiceReq/GetLView',
+        '${ConnectionService.instance.ocrUrl}api/HisServiceReq/GetLView',
         queryParameters: {'param': param},
         options: Options(
           headers: {'Content-Type': 'application/json'},
@@ -295,7 +330,7 @@ class HisApiService {
         }
         final innerData = data['Data'];
         if (innerData is List && innerData.isEmpty) {
-          debugPrint('⚠️ Dept filter rỗng → fallback lấy all + filter client-side');
+          print('⚠️ Dept filter rỗng → fallback lấy all + filter client-side');
           return await _fallbackFilterByDepartment(departmentId, dateLong, limit);
         }
         return HisResult(success: true, data: response.data);
@@ -349,7 +384,7 @@ class HisApiService {
 
       final param = _encodeParam(apiData, 500); // Lấy nhiều hơn để filter
       final response = await _dio.get(
-        '${ConnectionService.instance.mosUrl}api/HisServiceReq/GetLView',
+        '${ConnectionService.instance.ocrUrl}api/HisServiceReq/GetLView',
         queryParameters: {'param': param},
         options: Options(
           headers: {'Content-Type': 'application/json'},
@@ -420,7 +455,7 @@ class HisApiService {
       final param = _encodeParam(apiData, limit);
 
       final response = await _dio.get(
-        '${ConnectionService.instance.mosUrl}api/HisServiceReq/GetLView',
+        '${ConnectionService.instance.ocrUrl}api/HisServiceReq/GetLView',
         queryParameters: {'param': param},
         options: Options(
           headers: {'Content-Type': 'application/json'},
@@ -480,7 +515,7 @@ class HisApiService {
   /// Thực ra dùng HIS Pro API token (LOGIN_NAME only, không cần password)
   Future<HisResult> thongkeLogin(String username, String password) async {
     try {
-      debugPrint('🔐 HIS Pro token login: $username');
+      print('🔐 HIS Pro token login: $username');
 
       // Bước 1: Gọi api/AcsToken/Authorize với LOGIN_NAME only
       // Token được cache ở client, không cần password trong API call
@@ -504,7 +539,7 @@ class HisApiService {
         ),
       );
 
-      debugPrint('📡 Token response: ${r1.statusCode}');
+      print('📡 Token response: ${r1.statusCode}');
 
       if (r1.statusCode != 200) {
         return HisResult(success: false, message: 'Cannot get token: HTTP ${r1.statusCode}');
@@ -532,7 +567,7 @@ class HisApiService {
         if (tkm != null) tokenCode = tkm.group(1);
       }
 
-      debugPrint('🔑 TokenCode: ${tokenCode?.substring(0, tokenCode.length > 20 ? 20 : tokenCode.length)}...');
+      print('🔑 TokenCode: ${tokenCode?.substring(0, tokenCode.length > 20 ? 20 : tokenCode.length)}...');
 
       if (tokenCode == null || tokenCode.isEmpty) {
         return HisResult(success: false, message: 'No TokenCode in response');
@@ -555,11 +590,11 @@ class HisApiService {
       await prefs.setString('hispro_user', username);
       await prefs.setString('hispro_token', tokenCode);
       await prefs.setString('hispro_cmdLn', _cmdLn!);
-      debugPrint('💾 Saved HIS Pro session to SharedPreferences');
+      print('💾 Saved HIS Pro session to SharedPreferences');
 
       return HisResult(success: true, data: {'tokenCode': tokenCode, 'cmdLn': _cmdLn});
     } catch (e) {
-      debugPrint('❌ Login error: $e');
+      print('❌ Login error: $e');
       return HisResult(success: false, message: _handleError(e));
     }
   }
@@ -572,10 +607,10 @@ class HisApiService {
       _cmdLn = prefs.getString('hispro_cmdLn');
       if (_tokenCode != null && _cmdLn != null) {
         final len = _tokenCode!.length > 20 ? 20 : _tokenCode!.length;
-        debugPrint('🔄 Restored HIS Pro token: ${_tokenCode!.substring(0, len)}...');
+        print('🔄 Restored HIS Pro token: ${_tokenCode!.substring(0, len)}...');
       }
     } catch (e) {
-      debugPrint('❌ Restore error: $e');
+      print('❌ Restore error: $e');
     }
   }
 
@@ -602,10 +637,10 @@ class HisApiService {
         }
       }
       if (_sessionCookies.isNotEmpty) {
-        debugPrint('🔄 Restored ${_sessionCookies.length} thongke cookies');
+        print('🔄 Restored ${_sessionCookies.length} thongke cookies');
       }
     } catch (e) {
-      debugPrint('❌ Restore session error: $e');
+      print('❌ Restore session error: $e');
     }
   }
 
@@ -622,7 +657,7 @@ class HisApiService {
     // If 401/403/302 → re-login then retry
     final msg = first.message ?? '';
     if (msg.contains('401') || msg.contains('403') || msg.contains('302')) {
-      debugPrint('🔄 Got $msg → re-login thongke...');
+      print('🔄 Got $msg → re-login thongke...');
       final relogin = await thongkeLogin(username, password);
       if (relogin.success) {
         return await originalCall();
@@ -672,7 +707,7 @@ class HisApiService {
         params['treatment_code'] = treatmentCode;
       }
 
-      debugPrint('🌐 Thongke get-list-emr-treatment: date=$dateStr, dept=$department');
+      print('🌐 Thongke get-list-emr-treatment: date=$dateStr, dept=$department');
 
       final r = await _dio.get(
         '${ConnectionService.instance.acsUrl}/emr/index/get-list-emr-treatment',
@@ -687,7 +722,7 @@ class HisApiService {
         ),
       );
 
-      debugPrint('📡 Response: ${r.statusCode}, content-type: ${r.headers.value("content-type")}');
+      print('📡 Response: ${r.statusCode}, content-type: ${r.headers.value("content-type")}');
 
       // Response có thể là HTML (nếu session hết hạn) hoặc JSON
       if (r.statusCode == 200 && r.data is Map) {
@@ -701,9 +736,9 @@ class HisApiService {
               final dept = p['department_code']?.toString() ?? '';
               return dept == department;
             }).toList();
-            debugPrint('✅ Got ${list.length} BN in dept $department (filtered from ${m["recordsTotal"]} total)');
+            print('✅ Got ${list.length} BN in dept $department (filtered from ${m["recordsTotal"]} total)');
           } else {
-            debugPrint('✅ Got ${list.length} BN (total: ${m["recordsTotal"]})');
+            print('✅ Got ${list.length} BN (total: ${m["recordsTotal"]})');
           }
           return HisResult(success: true, data: list);
         }
@@ -711,7 +746,7 @@ class HisApiService {
       }
       return HisResult(success: false, message: 'HTTP ${r.statusCode}', data: r.data);
     } catch (e) {
-      debugPrint('❌ Get patients error: $e');
+      print('❌ Get patients error: $e');
       return HisResult(success: false, message: _handleError(e));
     }
   }
@@ -737,7 +772,7 @@ class HisApiService {
         'exact': exact.toString(),
       };
 
-      debugPrint('🌐 Dashboard search-patient: name="$searchName" exact=$exact');
+      print('🌐 Dashboard search-patient: name="$searchName" exact=$exact');
 
       final response = await _dio.get(
         '${ConnectionService.instance.acsUrl}/search-patient',
@@ -753,7 +788,7 @@ class HisApiService {
         ),
       );
 
-      debugPrint('📡 Response: status=${response.statusCode}, type=${response.data.runtimeType}');
+      print('📡 Response: status=${response.statusCode}, type=${response.data.runtimeType}');
 
       if (response.statusCode == 200) {
         // Response có thể là array trực tiếp hoặc {data: [...]}
@@ -767,15 +802,15 @@ class HisApiService {
           else if (m['patients'] is List) data = m['patients'];
           else if (m['result'] is List) data = m['result'];
         }
-        debugPrint('✅ Dashboard returned ${data.length} patients');
+        print('✅ Dashboard returned ${data.length} patients');
         if (data.isNotEmpty) {
-          debugPrint('📋 First item keys: ${(data.first as Map).keys.take(10).join(", ")}');
+          print('📋 First item keys: ${(data.first as Map).keys.take(10).join(", ")}');
         }
         return HisResult(success: true, data: List<Map<String, dynamic>>.from(data));
       }
       return HisResult(success: false, message: 'HTTP ${response.statusCode}', data: response.data);
     } catch (e) {
-      debugPrint('❌ Search error: $e');
+      print('❌ Search error: $e');
       return HisResult(success: false, message: _handleError(e));
     }
   }
@@ -1222,7 +1257,7 @@ class HisApiService {
       };
       final param = _encodeParam(apiData, 50);
       final response = await _dio.get(
-        '${ConnectionService.instance.mosUrl}api/HisServiceReq/GetLView',
+        '${ConnectionService.instance.ocrUrl}api/HisServiceReq/GetLView',
         queryParameters: {'param': param},
         options: Options(headers: {'Content-Type': 'application/json'}, receiveTimeout: const Duration(seconds: 30), validateStatus: (s) => s != null && s < 500),
       );
@@ -1258,10 +1293,10 @@ class HisApiService {
         'IS_AUTO_FINISH': true,
       };
       final param = _encodeParam(apiData, 0);
-      debugPrint('📡 MCH FinishWithTime (ID=$serviceReqId): ${ConnectionService.instance.mosUrl}api/HisServiceReq/FinishWithTime');
+      print('📡 MCH FinishWithTime (ID=$serviceReqId): ${ConnectionService.instance.ocrUrl}api/HisServiceReq/FinishWithTime');
 
       final response = await _dio.post(
-        '${ConnectionService.instance.mosUrl}api/HisServiceReq/FinishWithTime',
+        '${ConnectionService.instance.ocrUrl}api/HisServiceReq/FinishWithTime',
         queryParameters: {'param': param},
         options: Options(headers: {'Content-Type': 'application/json'}, receiveTimeout: const Duration(seconds: 60), validateStatus: (s) => s != null && s < 500),
       );
@@ -1290,16 +1325,632 @@ class HisApiService {
         'ORDER_DIRECTION': 'ASC',
       };
       final param = _encodeParam(apiData, limit);
-      debugPrint('📡 MCH GetExecuteRoleUsers: ${ConnectionService.instance.ocrUrl}api/HisExecuteUser/GetView');
+      print('📡 MCH GetExecuteRoleUsers: ${ConnectionService.instance.ocrUrl}api/HisExecuteUser/GetView');
       final response = await _dio.get(
         '${ConnectionService.instance.ocrUrl}api/HisExecuteUser/GetView',
         queryParameters: {'param': param},
         options: Options(headers: {'Content-Type': 'application/json'}, receiveTimeout: const Duration(seconds: 30), validateStatus: (s) => s != null && s < 500),
       );
       if (response.statusCode == 200) {
-        return HisResult(success: true, data: response.data);
+        // v3.0.162: Unwrap String response (HIS Pro text/plain)
+        final unwrapped = _unwrap(response.data);
+        return HisResult(success: true, data: unwrapped);
       }
       return HisResult(success: false, message: 'HTTP ${response.statusCode}', data: response.data);
+    } catch (e) {
+      return HisResult(success: false, message: _handleError(e));
+    }
+  }
+
+  /// v3.0.168: Lấy danh sách users từ AcsUser (port 1401) - cho dropdown PTV/TTV chính
+  /// Returns: [{LOGINNAME, USERNAME (tên đầy đủ), EMAIL, MOBILE, G_CODE, DEPARTMENT_ID, ...}, ...]
+  /// - LOGINNAME: tên đăng nhập (vd "dungntm") - dùng cho backend
+  /// - USERNAME: tên đầy đủ (vd "Nguyễn Thị Mỹ Dung") - hiển thị cho user
+  /// Sort theo USERNAME alphabetical
+  Future<HisResult> getAcsUsers({int? departmentId, String? roleCode, int limit = 200}) async {
+    try {
+      final apiData = <String, dynamic>{
+        'IS_ACTIVE': 1,
+        'IS_DELETE': 0,
+        'ORDER_FIELD': 'USERNAME',
+        'ORDER_DIRECTION': 'ASC',
+        'LIMIT': limit,
+      };
+      if (departmentId != null) apiData['DEPARTMENT_ID'] = departmentId;
+      if (roleCode != null) apiData['G_CODE'] = roleCode;
+      final param = _encodeParam(apiData, limit);
+      final url = '${ConnectionService.instance.acsUrl}api/AcsUser/Get';
+      debugPrint('📡 AcsUser/Get: $url');
+      final response = await _dio.get(
+        url,
+        queryParameters: {'param': param},
+        options: Options(headers: {'Content-Type': 'application/json'}, receiveTimeout: const Duration(seconds: 30), validateStatus: (s) => s != null && s < 500),
+      );
+      if (response.statusCode == 200) {
+        final unwrapped = _unwrap(response.data);
+        return HisResult(success: true, data: unwrapped);
+      }
+      return HisResult(success: false, message: 'HTTP ${response.statusCode}', data: response.data);
+    } catch (e) {
+      return HisResult(success: false, message: _handleError(e));
+    }
+  }
+
+  /// v3.0.162: Lấy thông tin mở rộng của sere_serv (kết quả CLS, Xquang, mô tả, kết luận)
+  /// API: HisSereServExt/Get filter SERE_SERV_ID (1-1 với SereServ)
+  /// Returns: {CONCLUDE, DESCRIPTION, MACHINE_CODE, BEGIN_TIME, END_TIME, NOTE, NUMBER_OF_FILM, ...}
+  Future<HisResult> getSereServExtResult(int sereServId) async {
+    try {
+      final param = _encodeParam({
+        'SERE_SERV_ID': sereServId,
+        'IS_ACTIVE': 1,
+        'IS_DELETE': 0,
+      }, 10);
+      final response = await _dio.get(
+        '$_procedureRoomUrl/api/HisSereServExt/Get',
+        queryParameters: {'param': param},
+        options: Options(
+          headers: {'Content-Type': 'application/json'},
+          receiveTimeout: const Duration(seconds: 30),
+          validateStatus: (s) => s != null && s < 500,
+        ),
+      );
+      if (response.statusCode == 200) {
+        final unwrapped = _unwrap(response.data);
+        return HisResult(success: true, data: unwrapped);
+      }
+      return HisResult(success: false, message: 'HTTP ${response.statusCode}', data: response.data);
+    } catch (e) {
+      return HisResult(success: false, message: _handleError(e));
+    }
+  }
+
+  /// v3.0.162: Lấy kết quả Xquang từ service_req (gọi GetSereServExt với từng sere_serv)
+  Future<HisResult> getServiceReqResult(int serviceReqId) async {
+    try {
+      // Bước 1: Lấy danh sách sere_serv theo service_req
+      final paramList = _encodeParam({
+        'TDL_SERVICE_REQ_ID': serviceReqId,
+        'IS_ACTIVE': 1,
+        'IS_DELETE': 0,
+      }, 50);
+      final response = await _dio.get(
+        '$_procedureRoomUrl/api/HisSereServ/Get',
+        queryParameters: {'param': paramList},
+        options: Options(
+          headers: {'Content-Type': 'application/json'},
+          receiveTimeout: const Duration(seconds: 30),
+          validateStatus: (s) => s != null && s < 500,
+        ),
+      );
+      if (response.statusCode != 200) {
+        return HisResult(success: false, message: 'HTTP ${response.statusCode}', data: response.data);
+      }
+      final unwrapped = _unwrap(response.data);
+      if (unwrapped is! Map || unwrapped['Data'] == null) {
+        return HisResult(success: false, message: 'Invalid response');
+      }
+      // Bước 2: Lấy kết quả Xquang từ SereServExt cho mỗi sere_serv
+      final results = <Map<String, dynamic>>[];
+      for (final s in (unwrapped['Data'] as List)) {
+        final sereServId = s['ID'] ?? s['id'];
+        if (sereServId == null) continue;
+        final extResult = await getSereServExtResult(sereServId as int);
+        if (extResult.success && extResult.data != null) {
+          final data = extResult.data;
+          if (data is Map && data['Data'] is List) {
+            for (final ext in (data['Data'] as List)) {
+              results.add({
+                'SERE_SERV': s,
+                'SERE_SERV_EXT': ext,
+              });
+            }
+          } else if (data is Map && data['Data'] is Map) {
+            results.add({
+              'SERE_SERV': s,
+              'SERE_SERV_EXT': data['Data'],
+            });
+          }
+        }
+      }
+      return HisResult(success: true, data: results);
+    } catch (e) {
+      return HisResult(success: false, message: _handleError(e));
+    }
+  }
+
+  /// v3.0.162: Lấy danh sách ECG/SereServ theo executeRoomId (Phòng tủ thuật)
+  /// Reuses getServiceRequestsByRoom but with focus on service_type_id 4 (thủ thuật) + 3 (XN)
+  Future<HisResult>   getRoomServiceReqsWithToken(
+    int executeRoomId, {
+    int? serviceTypeId,
+    int limit = 50,
+  }) async {
+    return getServiceRequestsByRoom(
+      executeRoomId,
+      limit: limit,
+      serviceReqSttIds: {1, 2, 3},
+    );
+  }
+
+  /// v3.0.163: Lay danh sach may (HIS_MACHINE)
+  /// 144 may (May tao Oxy di dong ID=29, May dien tim 3 kenh ID=12,...)
+  Future<HisResult> getAllMachines({int limit = 200}) async {
+    try {
+      final param = _encodeParam({
+        'IS_ACTIVE': 1,
+        'IS_DELETE': 0,
+        'LIMIT': limit,
+      }, limit);
+      final response = await _dio.get(
+        '$_procedureRoomUrl/api/HisMachine/Get',
+        queryParameters: {'param': param},
+        options: Options(
+          headers: {'Content-Type': 'application/json'},
+          receiveTimeout: const Duration(seconds: 30),
+          validateStatus: (s) => s != null && s < 500,
+        ),
+      );
+      if (response.statusCode == 200) {
+        return HisResult(success: true, data: _unwrap(response.data));
+      }
+      return HisResult(success: false, message: 'HTTP ${response.statusCode}', data: response.data);
+    } catch (e) {
+      return HisResult(success: false, message: _handleError(e));
+    }
+  }
+
+  /// v3.0.163: Lay may theo service_id (HIS_SERVICE_MACHINE)
+  /// Cho ECG (service 3249) tra 3 may: 29 (May tao Oxy di dong), 302, ...
+  Future<HisResult> getMachinesForService(int serviceId, {int limit = 50}) async {
+    try {
+      final param = _encodeParam({
+        'IS_ACTIVE': 1,
+        'IS_DELETE': 0,
+        'SERVICE_ID': serviceId,
+        'LIMIT': limit,
+      }, limit);
+      final response = await _dio.get(
+        '$_procedureRoomUrl/api/HisServiceMachine/Get',
+        queryParameters: {'param': param},
+        options: Options(
+          headers: {'Content-Type': 'application/json'},
+          receiveTimeout: const Duration(seconds: 30),
+          validateStatus: (s) => s != null && s < 500,
+        ),
+      );
+      if (response.statusCode == 200) {
+        return HisResult(success: true, data: _unwrap(response.data));
+      }
+      return HisResult(success: false, message: 'HTTP ${response.statusCode}', data: response.data);
+    } catch (e) {
+      return HisResult(success: false, message: _handleError(e));
+    }
+  }
+
+  /// v3.0.163: Lay chi tiet 1 service_req (MACHINE_NAMES, START_TIME, FINISH_TIME)
+  Future<HisResult> getServiceReqView(int serviceReqId) async {
+    try {
+      final param = _encodeParam({
+        'ID': serviceReqId,
+        'IS_ACTIVE': 1,
+        'IS_DELETE': 0,
+      }, 5);
+      final response = await _dio.get(
+        '$_procedureRoomUrl/api/HisServiceReq/GetView',
+        queryParameters: {'param': param},
+        options: Options(
+          headers: {'Content-Type': 'application/json'},
+          receiveTimeout: const Duration(seconds: 30),
+          validateStatus: (s) => s != null && s < 500,
+        ),
+      );
+      if (response.statusCode == 200) {
+        return HisResult(success: true, data: _unwrap(response.data));
+      }
+      return HisResult(success: false, message: 'HTTP ${response.statusCode}', data: response.data);
+    } catch (e) {
+      return HisResult(success: false, message: _handleError(e));
+    }
+  }
+
+  /// v3.0.163: Update HisSereServExt (luu may + ket qua khi thuc hien DV)
+  Future<HisResult> updateSereServExt(Map<String, dynamic> data) async {
+    try {
+      final param = _encodeParam(data, 1);
+      final response = await _dio.post(
+        '$_procedureRoomUrl/api/HisSereServExt/Update',
+        queryParameters: {'param': param},
+        options: Options(
+          headers: {'Content-Type': 'application/json'},
+          receiveTimeout: const Duration(seconds: 30),
+          validateStatus: (s) => s != null && s < 500,
+        ),
+      );
+      if (response.statusCode == 200) {
+        return HisResult(success: true, data: _unwrap(response.data));
+      }
+      return HisResult(success: false, message: 'HTTP ${response.statusCode}', data: response.data);
+    } catch (e) {
+      return HisResult(success: false, message: _handleError(e));
+    }
+  }
+
+  /// v3.0.163: Update HisServiceReq (set MACHINE_ID + MACHINE_NAMES)
+  Future<HisResult> updateServiceReq(Map<String, dynamic> data) async {
+    try {
+      final param = _encodeParam(data, 1);
+      final response = await _dio.post(
+        '$_procedureRoomUrl/api/HisServiceReq/Update',
+        queryParameters: {'param': param},
+        options: Options(
+          headers: {'Content-Type': 'application/json'},
+          receiveTimeout: const Duration(seconds: 30),
+          validateStatus: (s) => s != null && s < 500,
+        ),
+      );
+      if (response.statusCode == 200) {
+        return HisResult(success: true, data: _unwrap(response.data));
+      }
+      return HisResult(success: false, message: 'HTTP ${response.statusCode}', data: response.data);
+    } catch (e) {
+      return HisResult(success: false, message: _handleError(e));
+    }
+  }
+
+  // ============================================================
+  // v3.0.164: KẾT QUẢ CẬN LÂM SÀNG - Siêu âm, ECG, XN
+  // ============================================================
+
+  /// v3.0.164: Lấy kết quả Siêu âm từ SAR (Subclinical Analyze Report)
+  /// SAR endpoint: `api/SarReport/Get` (port 1409) - chứa kết quả Siêu âm/Xquang
+  /// Filter theo SERVICE_REQ_ID hoặc SERE_SERV_ID
+  /// Trả về list các SAR_PRINT/result với: CONCLUDE, DESCRIPTION, NOTE
+  Future<HisResult> getSarReportResult({
+    int? serviceReqId,
+    int? sereServId,
+    int limit = 20,
+  }) async {
+    try {
+      final sarBase = ConnectionService.instance.sarUrl.replaceAll(RegExp(r'/$'), '');
+      final filterData = <String, dynamic>{
+        'IS_ACTIVE': 1,
+        'IS_DELETE': 0,
+        'LIMIT': limit,
+      };
+      if (serviceReqId != null) filterData['SERVICE_REQ_ID'] = serviceReqId;
+      if (sereServId != null) filterData['SERE_SERV_ID'] = sereServId;
+
+      final param = _encodeParam(filterData, limit);
+      final response = await _dio.get(
+        '$sarBase/api/SarReport/Get',
+        queryParameters: {'param': param},
+        options: Options(
+          headers: {'Content-Type': 'application/json'},
+          receiveTimeout: const Duration(seconds: 30),
+          validateStatus: (s) => s != null && s < 500,
+        ),
+      );
+      if (response.statusCode == 200) {
+        return HisResult(success: true, data: _unwrap(response.data));
+      }
+      return HisResult(success: false, message: 'HTTP ${response.statusCode}', data: response.data);
+    } catch (e) {
+      return HisResult(success: false, message: _handleError(e));
+    }
+  }
+
+  /// v3.0.164: Lấy kết quả Xét nghiệm từ LIS (port 1419)
+  /// LIS endpoint: `api/LisResult/Get` hoặc `api/LisSample/Get`
+  /// Filter theo SERVICE_REQ_ID, có thể trả về nhiều test values
+  Future<HisResult> getLisResult({
+    int? serviceReqId,
+    int? treatmentId,
+    int? patientId,
+    int limit = 50,
+  }) async {
+    try {
+      final lisBase = ConnectionService.instance.lisUrl.replaceAll(RegExp(r'/$'), '');
+      final filterData = <String, dynamic>{
+        'IS_ACTIVE': 1,
+        'IS_DELETE': 0,
+        'LIMIT': limit,
+      };
+      if (serviceReqId != null) filterData['SERVICE_REQ_ID'] = serviceReqId;
+      if (treatmentId != null) filterData['TDL_TREATMENT_ID'] = treatmentId;
+      if (patientId != null) filterData['TDL_PATIENT_ID'] = patientId;
+
+      // Thử nhiều endpoint (server này có thể không có SAR/LIS - 404 expected)
+      final endpoints = [
+        '$lisBase/api/LisResult/Get',
+        '$lisBase/api/LisSample/Get',
+        '$_procedureRoomUrl/api/HisLisSample/Get',
+        '$_procedureRoomUrl/api/HisLisResult/Get',
+      ];
+
+      HisResult? lastResult;
+      for (final url in endpoints) {
+        try {
+          final param = _encodeParam(filterData, limit);
+          final response = await _dio.get(
+            url,
+            queryParameters: {'param': param},
+            options: Options(
+              headers: {'Content-Type': 'application/json'},
+              receiveTimeout: const Duration(seconds: 10),
+              validateStatus: (s) => s != null && s < 500,
+            ),
+          );
+          if (response.statusCode == 200) {
+            return HisResult(success: true, data: _unwrap(response.data));
+          }
+          lastResult = HisResult(success: false, message: 'HTTP ${response.statusCode}', data: response.data);
+        } catch (e) {
+          lastResult = HisResult(success: false, message: _handleError(e));
+        }
+      }
+      return lastResult ?? HisResult(success: false, message: 'LIS không khả dụng');
+    } catch (e) {
+      return HisResult(success: false, message: _handleError(e));
+    }
+  }
+
+  /// v3.0.164: Lấy kết quả CĐHA/Siêu âm từ SubclinicalResult
+  /// Endpoint: `api/SubclinicalResult/Get` - kết quả siêu âm + nội soi + CĐHA khác
+  Future<HisResult> getSubclinicalResult({
+    int? serviceReqId,
+    int? sereServId,
+    int limit = 20,
+  }) async {
+    try {
+      final filterData = <String, dynamic>{
+        'IS_ACTIVE': 1,
+        'IS_DELETE': 0,
+        'LIMIT': limit,
+      };
+      if (serviceReqId != null) filterData['SERVICE_REQ_ID'] = serviceReqId;
+      if (sereServId != null) filterData['SERE_SERV_ID'] = sereServId;
+
+      final param = _encodeParam(filterData, limit);
+      final response = await _dio.get(
+        '$_procedureRoomUrl/api/SubclinicalResult/Get',
+        queryParameters: {'param': param},
+        options: Options(
+          headers: {'Content-Type': 'application/json'},
+          receiveTimeout: const Duration(seconds: 30),
+          validateStatus: (s) => s != null && s < 500,
+        ),
+      );
+      if (response.statusCode == 200) {
+        return HisResult(success: true, data: _unwrap(response.data));
+      }
+      return HisResult(success: false, message: 'HTTP ${response.statusCode}', data: response.data);
+    } catch (e) {
+      return HisResult(success: false, message: _handleError(e));
+    }
+  }
+
+  /// v3.0.166: Lấy kết quả tổng hợp CLS (Siêu âm/Xquang/XN) theo ServiceReq
+  /// Auto-detect service type và gọi endpoint phù hợp.
+  ///
+  /// v3.0.166: REFACTOR - LUÔN thử `getServiceReqResult` (HisSereServExt) TRƯỚC vì:
+  /// - v3.0.162 verified: work cho ECG/Xquang với HisSereServExt
+  /// - SAR/LIS thường return 404 trên server này (chưa có module SAR/LIS)
+  /// - Chỉ thử SAR/LIS khi HisSereServExt fail
+  ///
+  /// Returns: { serviceType, serviceTypeName, source, serviceName, results: List/Map }
+  Future<HisResult> getServiceResultByType({
+    required int serviceReqId,
+    int? sereServId,
+    int? serviceTypeId,
+  }) async {
+    try {
+      // Step 1: Lấy thông tin service_req để biết SERVICE_TYPE_ID + SERVICE_NAME
+      String? serviceName;
+      if (serviceTypeId == null) {
+        final srv = await getServiceReqView(serviceReqId);
+        if (srv.success && srv.data is Map) {
+          final data = srv.data as Map;
+          if (data['Data'] is List && (data['Data'] as List).isNotEmpty) {
+            final first = (data['Data'] as List).first;
+            serviceTypeId = int.tryParse(
+              (first['SERVICE_TYPE_ID'] ?? first['service_type_id'] ?? '0').toString(),
+            );
+            serviceName = (first['SERVICE_NAME'] ?? first['service_name'])?.toString();
+          } else if (data['Data'] is Map) {
+            serviceTypeId = int.tryParse(
+              (data['Data']['SERVICE_TYPE_ID'] ?? data['Data']['service_type_id'] ?? '0').toString(),
+            );
+            serviceName = (data['Data']['SERVICE_NAME'] ?? data['Data']['service_name'])?.toString();
+          }
+        }
+      }
+      serviceTypeId ??= 0;
+      serviceName ??= '';
+
+      // Step 2: Detect service type từ SERVICE_NAME nếu type = 0
+      // (một số CĐHA có type 0 trong GetView trên server này)
+      if (serviceTypeId == 0) {
+        final name = serviceName.toLowerCase();
+        if (name.contains('siêu âm') || name.contains('sieu am') || name.contains('sa ')) {
+          serviceTypeId = 4;
+        } else if (name.contains('xquang') || name.contains('x-quang') || name.contains('xq')) {
+          serviceTypeId = 4;
+        } else if (name.contains('điện tim') || name.contains('dien tim') || name.contains('ecg')) {
+          serviceTypeId = 4;
+        } else if (name.contains('ct ') || name.contains('mri') || name.contains('cộng hưởng')) {
+          serviceTypeId = 4;
+        } else if (name.contains('xét nghiệm') || name.contains('xet nghiem') || name.contains('máu')) {
+          serviceTypeId = 3;
+        }
+      }
+
+      // Step 3: LUÔN thử HisSereServExt TRƯỚC - work cho ECG/Xquang/Siêu âm từ v3.0.162
+      final extR = await getServiceReqResult(serviceReqId);
+      if (extR.success) {
+        final extData = extR.data;
+        bool hasContent = false;
+        if (extData is List) {
+          hasContent = extData.isNotEmpty;
+        } else if (extData is Map) {
+          hasContent = extData['Data'] != null;
+        }
+        if (hasContent) {
+          return HisResult(success: true, data: {
+            'serviceType': serviceTypeId,
+            'serviceTypeName': _serviceTypeName(serviceTypeId),
+            'source': 'HisSereServExt',
+            'serviceName': serviceName,
+            'results': extData,
+          });
+        }
+      }
+
+      // Step 4: HisSereServExt fail → thử SAR (CĐHA) hoặc LIS (XN) làm bổ sung
+      if (serviceTypeId == 3) {
+        // XN - thử LIS
+        final r = await getLisResult(serviceReqId: serviceReqId);
+        if (r.success) {
+          return HisResult(success: true, data: {
+            'serviceType': 3,
+            'serviceTypeName': 'Xét nghiệm',
+            'source': 'LIS',
+            'serviceName': serviceName,
+            'results': r.data,
+          });
+        }
+        // Fallback cuối: empty list, dialog sẽ hiển thị "Chưa có kết quả"
+        return HisResult(success: true, data: {
+          'serviceType': 3,
+          'serviceTypeName': 'Xét nghiệm',
+          'source': 'none',
+          'serviceName': serviceName,
+          'results': [],
+        });
+      } else if (serviceTypeId == 4 || serviceTypeId == 5) {
+        // CĐHA / Thủ thuật - thử SAR
+        final sarR = await getSarReportResult(serviceReqId: serviceReqId);
+        if (sarR.success && sarR.data != null) {
+          final sarData = sarR.data;
+          bool hasContent = sarData is Map && sarData['Data'] is List && (sarData['Data'] as List).isNotEmpty;
+          if (hasContent) {
+            return HisResult(success: true, data: {
+              'serviceType': serviceTypeId,
+              'serviceTypeName': _serviceTypeName(serviceTypeId),
+              'source': 'SAR',
+              'serviceName': serviceName,
+              'results': sarData,
+            });
+          }
+        }
+        // Fallback: SubclinicalResult
+        final subR = await getSubclinicalResult(serviceReqId: serviceReqId);
+        if (subR.success && subR.data != null) {
+          return HisResult(success: true, data: {
+            'serviceType': serviceTypeId,
+            'serviceTypeName': _serviceTypeName(serviceTypeId),
+            'source': 'SubclinicalResult',
+            'serviceName': serviceName,
+            'results': subR.data,
+          });
+        }
+        // v3.0.166: Trước đây return "Không tìm thấy kết quả CĐHA" lỗi đỏ
+        // Giờ return success + empty list → dialog "Chưa có kết quả" thay vì báo lỗi
+        return HisResult(success: true, data: {
+          'serviceType': serviceTypeId,
+          'serviceTypeName': _serviceTypeName(serviceTypeId),
+          'source': 'none',
+          'serviceName': serviceName,
+          'results': [],
+        });
+      } else {
+        // Other types - đã thử getServiceReqResult ở Step 3
+        return HisResult(success: true, data: {
+          'serviceType': serviceTypeId,
+          'serviceTypeName': 'Khác',
+          'source': 'none',
+          'serviceName': serviceName,
+          'results': [],
+        });
+      }
+    } catch (e) {
+      return HisResult(success: false, message: _handleError(e));
+    }
+  }
+
+  /// v3.0.166: Helper - service type name
+  String _serviceTypeName(int? typeId) {
+    switch (typeId) {
+      case 1: return 'Khám';
+      case 2: return 'Ngừng';
+      case 3: return 'Xét nghiệm';
+      case 4: return 'CĐHA';
+      case 5: return 'Thủ thuật';
+      case 6: return 'Thuốc';
+      case 7: return 'Máu';
+      case 8: return 'Vật tư';
+      case 9: return 'Giường';
+      case 10: return 'Phẫu thuật';
+      default: return 'Dịch vụ';
+    }
+  }
+
+  /// v3.0.164: Lấy kết quả tổng hợp tất cả CLS của 1 treatment (theo treatment_id)
+  /// Trả về: {sieuAm: [...], xquang: [...], xn: [...], ecg: [...], other: [...]}
+  Future<HisResult> getAllClsByTreatment(int treatmentId, {int limit = 100}) async {
+    try {
+      // Lấy tất cả service_req theo treatment
+      final param = _encodeParam({
+        'TREATMENT_ID': treatmentId,
+        'IS_ACTIVE': 1,
+        'IS_DELETE': 0,
+        'LIMIT': limit,
+      }, limit);
+      final response = await _dio.get(
+        '$_procedureRoomUrl/api/HisServiceReq/Get',
+        queryParameters: {'param': param},
+        options: Options(
+          headers: {'Content-Type': 'application/json'},
+          receiveTimeout: const Duration(seconds: 30),
+          validateStatus: (s) => s != null && s < 500,
+        ),
+      );
+      if (response.statusCode != 200) {
+        return HisResult(success: false, message: 'HTTP ${response.statusCode}');
+      }
+      final unwrapped = _unwrap(response.data);
+      if (unwrapped is! Map || unwrapped['Data'] is! List) {
+        return HisResult(success: false, message: 'Invalid response');
+      }
+      final services = (unwrapped['Data'] as List).cast<Map<String, dynamic>>();
+      // Group theo SERVICE_TYPE_ID
+      final grouped = <String, List<Map<String, dynamic>>>{
+        'sieuAm': [],
+        'xquang': [],
+        'xn': [],
+        'ecg': [],
+        'khac': [],
+      };
+      for (final s in services) {
+        final typeId = int.tryParse((s['SERVICE_TYPE_ID'] ?? s['service_type_id'] ?? '0').toString()) ?? 0;
+        final serviceName = (s['SERVICE_NAME'] ?? s['TDL_SERVICE_NAME'] ?? '').toString().toLowerCase();
+        if (typeId == 3) {
+          grouped['xn']!.add(s);
+        } else if (typeId == 4) {
+          if (serviceName.contains('siêu âm') || serviceName.contains('sieu am') || serviceName.contains('sa')) {
+            grouped['sieuAm']!.add(s);
+          } else if (serviceName.contains('xquang') || serviceName.contains('x-quang') || serviceName.contains('xq')) {
+            grouped['xquang']!.add(s);
+          } else {
+            grouped['khac']!.add(s);
+          }
+        } else if (typeId == 5 && (serviceName.contains('điện tim') || serviceName.contains('ecg'))) {
+          grouped['ecg']!.add(s);
+        } else {
+          grouped['khac']!.add(s);
+        }
+      }
+      return HisResult(success: true, data: grouped);
     } catch (e) {
       return HisResult(success: false, message: _handleError(e));
     }

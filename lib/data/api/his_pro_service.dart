@@ -9,7 +9,6 @@
 //
 // Yêu cầu: Điện thoại phải kết nối OpenVPN BV trước.
 import 'dart:convert';
-import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:dio/dio.dart';
 import 'package:his_mobile/core/constants/app_constants.dart';
 import 'package:his_mobile/core/services/connection_service.dart';
@@ -110,7 +109,7 @@ class HisProService {
 
     for (final url in candidates) {
       try {
-        debugPrint('🔐 Trying HIS Pro login: $url');
+        print('🔐 Trying HIS Pro login: $url');
         final r = await _dio.get(
           url,
           queryParameters: {'param': param},
@@ -123,7 +122,7 @@ class HisProService {
         );
 
         if (r.statusCode != 200) {
-          debugPrint('   HTTP ${r.statusCode} - try next');
+          print('   HTTP ${r.statusCode} - try next');
           continue;
         }
 
@@ -132,7 +131,7 @@ class HisProService {
           // v2.38.7: HIS Pro không trả Token field - chỉ trả role config
           // Login vẫn OK vì server xác nhận credentials đúng
           // Nhưng cần test thêm API mới biết có truy cập được patient data không
-          debugPrint('   ⚠ Login OK nhưng KHÔNG có Token field - response chỉ có role config');
+          print('   ⚠ Login OK nhưng KHÔNG có Token field - response chỉ có role config');
           _token = 'no-token-needed';  // marker
           _loginName = loginName;
           _password = password; // v2.38.7: lưu để Basic Auth
@@ -147,7 +146,7 @@ class HisProService {
           return (success: false, token: '', message: msg, endpoint: url);
         }
       } catch (e) {
-        debugPrint('   ❌ ${e.toString().split("\n").first}');
+        print('   ❌ ${e.toString().split("\n").first}');
         continue;
       }
     }
@@ -231,7 +230,7 @@ class HisProService {
       }
     }
 
-    debugPrint('✅ Loaded ${deduped.length} BN từ HIS Pro khoa $departmentId (${r1.patients.length} đang ở + ${r2.patients.length} chuyển khoa)');
+    print('✅ Loaded ${deduped.length} BN từ HIS Pro khoa $departmentId (${r1.patients.length} đang ở + ${r2.patients.length} chuyển khoa)');
     return HisProSyncResult(
       success: deduped.isNotEmpty || (r1.success || r2.success),
       message: 'OK ${deduped.length} BN (${r1.patients.length} đang ở + ${r2.patients.length} chuyển khoa)',
@@ -254,7 +253,7 @@ class HisProService {
 
     for (final url in urls) {
       try {
-        debugPrint('📡 HIS Pro GetLView [$label]: $url');
+        print('📡 HIS Pro GetLView [$label]: $url');
         final r = await _dio.get(
           url,
           queryParameters: {'param': param},
@@ -269,7 +268,7 @@ class HisProService {
             validateStatus: (s) => s != null && s < 500,
           ),
         );
-        debugPrint('   Status: ${r.statusCode}');
+        print('   Status: ${r.statusCode}');
         if (r.statusCode == 404) continue;  // endpoint không có → thử URL tiếp
         if (r.statusCode != 200) {
           return HisProSyncResult(success: false, message: 'HTTP ${r.statusCode} từ $url', patients: const [], rawEndpoint: url, httpStatus: r.statusCode);
@@ -289,13 +288,13 @@ class HisProService {
           }
         }
         if (mapped.isEmpty) {
-          debugPrint('   ⚠ API trả 0 BN');
+          print('   ⚠ API trả 0 BN');
           continue;  // thử URL khác
         }
-        debugPrint('   ✅ Got ${mapped.length} BN từ $url');
+        print('   ✅ Got ${mapped.length} BN từ $url');
         return HisProSyncResult(success: true, message: 'OK ${mapped.length} BN từ ${url.split('/').last}', patients: mapped, token: _token, rawEndpoint: url, httpStatus: 200);
       } catch (e) {
-        debugPrint('   ❌ ${e.toString().split("\n").first}');
+        print('   ❌ ${e.toString().split("\n").first}');
         continue;
       }
     }
@@ -381,7 +380,7 @@ class HisProService {
     final param = _encodeParam(apiData, 100);
     final url = '${ConnectionService.instance.ocrUrl}api/HisTreatment/GetView';
     try {
-      debugPrint('📡 HIS Pro GetTreatment: $url?code=$treatmentCode');
+      print('📡 HIS Pro GetTreatment: $url?code=$treatmentCode');
       final r = await _dio.get(
         url,
         queryParameters: {'param': param},
@@ -506,7 +505,7 @@ class HisProService {
     final param = _encodeParam(body, 10);
 
     try {
-      debugPrint('📡 HIS Pro POST: $url');
+      print('📡 HIS Pro POST: $url');
       final r = await _dio.post(
         url,
         queryParameters: {'param': param},

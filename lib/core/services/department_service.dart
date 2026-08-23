@@ -4,7 +4,7 @@
 // Cache SharedPreferences + fallback hardcode 52 khoa từ AppConstants
 import 'dart:convert';
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart' show debugPrint;
+import 'package:flutter/foundation.dart';
 import 'package:his_mobile/core/constants/app_constants.dart';
 import 'package:his_mobile/core/utils/mojibake_fixer.dart';
 import 'package:his_mobile/data/api/his_pro_api_service.dart';
