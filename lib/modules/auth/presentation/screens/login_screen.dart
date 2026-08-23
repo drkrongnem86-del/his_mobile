@@ -508,7 +508,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         const SizedBox(width: 8),
                         const Expanded(
                           child: Text(
-                            'Auto-fetch Token (v3.0.159)',
+                            'Auto-fetch Token',  // v3.0.171: bỏ (v3.0.159) - version sẽ tự update
                             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.blue),
                           ),
                         ),

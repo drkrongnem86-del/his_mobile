@@ -144,7 +144,8 @@ class HisProVpnService {
   /// Response body KHÔNG chứa token (chỉ có Data.ModuleInRoles ~882 entries).
   Future<bool> authorize({
     required String loginName,
-    String appVersion = '2.405.0',
+    // v3.0.171: bump version để khớp với app
+    String appVersion = '3.0.171',
   }) async {
     final ip = await _getLocalIp();
     final dio = _makeDio(ip);

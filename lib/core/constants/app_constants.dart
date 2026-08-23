@@ -11,7 +11,8 @@ class AppConstants {
 
   // App Info
   static const String appName = 'HIS MOBILE';
-  static const String appVersion = '3.0.63';
+  // v3.0.171: bump version cho tất cả chỗ hiển thị (HIS Pro API, AuditInfo, Y tế số form...)
+  static const String appVersion = '3.0.171';
   static const String hospitalFullName = 'Bệnh Viện Đa khoa Ninh Thuận';
 
   // v2.75.0: 2 chế độ kết nối

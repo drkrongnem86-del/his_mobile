@@ -19,6 +19,7 @@ import 'package:his_mobile/data/services/auto_token_service.dart';  // v3.0.164:
 import 'package:his_mobile/data/services/token_sync_service.dart';  // v3.0.165: token hub
 import 'package:his_mobile/data/services/form_draft_service.dart';
 import 'package:his_mobile/presentation/widgets/user_header.dart';
+import 'package:his_mobile/presentation/widgets/user_picker_dialog.dart';  // v3.0.171: shared user picker
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart' as intl;
 import 'package:shared_preferences/shared_preferences.dart';
@@ -40,7 +41,12 @@ class _ECGExecuteScreenState extends State<ECGExecuteScreen> {
   final _ketQuaCtrl = TextEditingController(text: 'NHỊP XOANG ĐỀU');
   final _ketLuanCtrl = TextEditingController();
   final _ghiChuCtrl = TextEditingController();
+  // v3.0.171: 6 kíp thực hiện (sync với Phòng thủ thuật HSCC)
   final _bsChinhCtrl = TextEditingController();
+  final _ptvPhu1Ctrl = TextEditingController();
+  final _ptvPhu2Ctrl = TextEditingController();
+  final _gayMeChinhCtrl = TextEditingController();
+  final _gayMePhuCtrl = TextEditingController();
   final _ddCtrl = TextEditingController();
 
   DateTime _startTime = DateTime.now();
@@ -57,8 +63,12 @@ class _ECGExecuteScreenState extends State<ECGExecuteScreen> {
   // v3.0.168: User list cho PTV/TTV chính (BS, điều dưỡng)
   // Hiển thị tên đầy đủ (USERNAME) như HIS Desktop
   List<Map<String, dynamic>> _userList = [];
-  String? _selectedBsChinhLogin;  // LOGINNAME của BS chính (dùng cho backend)
-  String? _selectedDdLogin;        // LOGINNAME của điều dưỡng
+  String? _selectedBsChinhLogin;   // LOGINNAME BS chính (bắt buộc)
+  String? _selectedPtvPhu1Login;   // LOGINNAME PTV phụ 1 (optional)
+  String? _selectedPtvPhu2Login;   // LOGINNAME PTV phụ 2 (optional)
+  String? _selectedGayMeChinhLogin; // LOGINNAME Gây mê chính (optional)
+  String? _selectedGayMePhuLogin;  // LOGINNAME Gây mê phụ (optional)
+  String? _selectedDdLogin;        // LOGINNAME Điều dưỡng (optional)
   bool _loadingUsers = false;
 
   @override
@@ -138,6 +148,74 @@ class _ECGExecuteScreenState extends State<ECGExecuteScreen> {
     );
     if (found.isEmpty) return loginName; // fallback
     return (found['USERNAME'] ?? loginName).toString();
+  }
+
+  /// v3.0.171: Build 1 row trong Kíp thực hiện (sync với Phòng thủ thuật HSCC)
+  /// - Hiển thị "FullName (LOGINNAME)" hoặc "-- Chọn --"
+  /// - Tap icon search → mở UserPickerDialog với search filter
+  /// - Required: hiển thị * bắt buộc
+  Widget _buildKipField({
+    required String label,
+    required IconData icon,
+    required String? loginName,
+    required TextEditingController displayCtrl,
+    required ValueChanged<String?> onChanged,
+    bool required = false,
+  }) {
+    final hasValue = loginName != null && loginName.isNotEmpty;
+    final displayText = hasValue ? displayCtrl.text : '-- Chọn --';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Row(children: [
+        Expanded(
+          child: InputDecorator(
+            decoration: InputDecoration(
+              labelText: required ? '$label *' : label,
+              labelStyle: const TextStyle(fontSize: 11),
+              prefixIcon: Icon(icon, size: 18),
+              border: const OutlineInputBorder(),
+              filled: true,
+              fillColor: Colors.white,
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+            ),
+            child: Text(
+              displayText,
+              style: TextStyle(
+                fontSize: 12,
+                color: hasValue ? Colors.black87 : Colors.black38,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ),
+        const SizedBox(width: 4),
+        IconButton(
+          icon: const Icon(Icons.person_search, size: 20, color: Color(0xFF6A1B9A)),
+          tooltip: 'Chọn từ HIS Pro (có search)',
+          onPressed: () {
+            showDialog(
+              context: context,
+              builder: (ctx) => UserPickerDialog(
+                api: _api,
+                departmentId: 22, // HSCC
+                title: 'Chọn $label',
+                defaultLoginName: loginName,
+                onSelected: (r) {
+                  setState(() {
+                    onChanged(r.loginName);
+                    displayCtrl.text = '${r.fullName} (${r.loginName})';
+                  });
+                },
+              ),
+            );
+          },
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(),
+        ),
+      ]),
+    );
   }
 
   /// v3.0.165: Auto-load HIS Pro token từ TokenSyncService khi mở screen
@@ -261,6 +339,10 @@ class _ECGExecuteScreenState extends State<ECGExecuteScreen> {
     _ketLuanCtrl.dispose();
     _ghiChuCtrl.dispose();
     _bsChinhCtrl.dispose();
+    _ptvPhu1Ctrl.dispose();
+    _ptvPhu2Ctrl.dispose();
+    _gayMeChinhCtrl.dispose();
+    _gayMePhuCtrl.dispose();
     _ddCtrl.dispose();
     super.dispose();
   }
@@ -361,15 +443,19 @@ class _ECGExecuteScreenState extends State<ECGExecuteScreen> {
         updateData['MACHINE_NAMES'] = machineName;
         setState(() => _debug = '⏳ Đang lưu máy "$machineName"...');
       }
-      // v3.0.168: Ghi kíp thực hiện (BS chính, điều dưỡng)
-      if ((_selectedBsChinhLogin ?? '').isNotEmpty) {
-        updateData['EXECUTE_LOGINNAME'] = _selectedBsChinhLogin;
-        updateData['EXECUTE_USERNAME'] = _getFullName(_selectedBsChinhLogin);
+      // v3.0.171: Ghi 6 kíp thực hiện (sync với Phòng thủ thuật HSCC)
+      void addKip(String? login, String fullNameKey, String loginNameKey) {
+        if ((login ?? '').isNotEmpty) {
+          updateData[loginNameKey] = login;
+          updateData[fullNameKey] = _getFullName(login);
+        }
       }
-      if ((_selectedDdLogin ?? '').isNotEmpty) {
-        updateData['NURSE_LOGINNAME'] = _selectedDdLogin;
-        updateData['NURSE_USERNAME'] = _getFullName(_selectedDdLogin);
-      }
+      addKip(_selectedBsChinhLogin, 'EXECUTE_USERNAME', 'EXECUTE_LOGINNAME');
+      addKip(_selectedPtvPhu1Login, 'PTV_PHU_1_USERNAME', 'PTV_PHU_1_LOGINNAME');
+      addKip(_selectedPtvPhu2Login, 'PTV_PHU_2_USERNAME', 'PTV_PHU_2_LOGINNAME');
+      addKip(_selectedGayMeChinhLogin, 'GAY_ME_CHINH_USERNAME', 'GAY_ME_CHINH_LOGINNAME');
+      addKip(_selectedGayMePhuLogin, 'GAY_ME_PHU_USERNAME', 'GAY_ME_PHU_LOGINNAME');
+      addKip(_selectedDdLogin, 'NURSE_USERNAME', 'NURSE_LOGINNAME');
       if (updateData.length > 1) {
         await _api.updateServiceReq(updateData);
       }
@@ -668,9 +754,8 @@ class _ECGExecuteScreenState extends State<ECGExecuteScreen> {
                 _buildImagePicker(),
                 const SizedBox(height: 12),
 
-                // Kíp thực hiện
+                // Kíp thực hiện (v3.0.171: sync với Phòng thủ thuật HSCC - 6 vị trí)
                 _buildSectionTitle('👥 KÍP THỰC HIỆN', const Color(0xFFE65100)),
-                // v3.0.168: Dropdown Bác sĩ chính/PTV chính - hiển thị tên đầy đủ từ server
                 if (_loadingUsers && _userList.isEmpty)
                   const Padding(
                     padding: EdgeInsets.symmetric(vertical: 12),
@@ -680,76 +765,52 @@ class _ECGExecuteScreenState extends State<ECGExecuteScreen> {
                       Text('Đang tải DS user từ server...', style: TextStyle(fontSize: 10, color: Colors.black54)),
                     ]),
                   )
-                else
-                  DropdownButtonFormField<String>(
-                    value: _userList.any((u) => (u['LOGINNAME'] ?? '') == _selectedBsChinhLogin) ? _selectedBsChinhLogin : null,
-                    decoration: const InputDecoration(
-                      labelText: 'Bác sĩ chính / PTV chính *',
-                      prefixIcon: Icon(Icons.medical_services, size: 18),
-                      border: OutlineInputBorder(),
-                      filled: true,
-                      fillColor: Colors.white,
-                      isDense: true,
-                    ),
-                    items: _userList.map<DropdownMenuItem<String>>((u) {
-                      final login = (u['LOGINNAME'] ?? '').toString();
-                      final name = (u['USERNAME'] ?? login).toString();
-                      return DropdownMenuItem<String>(
-                        value: login,
-                        child: Text(
-                          '$name ($login)',
-                          style: const TextStyle(fontSize: 12),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (v) {
-                      setState(() {
-                        _selectedBsChinhLogin = v;
-                        // Sync backup text controller
-                        _bsChinhCtrl.text = v ?? '';
-                      });
-                    },
-                    validator: (v) => (v == null || v.isEmpty) ? 'Bắt buộc' : null,
+                else ...[
+                  // v3.0.171: 6 kíp thực hiện - đồng bộ với Phòng thủ thuật HSCC
+                  _buildKipField(
+                    label: 'BS / PTV chính',
+                    icon: Icons.medical_services,
+                    loginName: _selectedBsChinhLogin,
+                    displayCtrl: _bsChinhCtrl,
+                    onChanged: (v) => _selectedBsChinhLogin = v,
+                    required: true,
                   ),
-                const SizedBox(height: 8),
-                // v3.0.168: Dropdown Điều dưỡng - optional
-                if (_userList.isNotEmpty)
-                  DropdownButtonFormField<String?>(
-                    value: _userList.any((u) => (u['LOGINNAME'] ?? '') == _selectedDdLogin) ? _selectedDdLogin : null,
-                    decoration: const InputDecoration(
-                      labelText: 'Điều dưỡng (không bắt buộc)',
-                      prefixIcon: Icon(Icons.health_and_safety, size: 18),
-                      border: OutlineInputBorder(),
-                      filled: true,
-                      fillColor: Colors.white,
-                      isDense: true,
-                    ),
-                    items: [
-                      const DropdownMenuItem<String?>(
-                        value: null,
-                        child: Text('-- Không chọn --', style: TextStyle(fontSize: 12, color: Colors.black45)),
-                      ),
-                      ..._userList.map<DropdownMenuItem<String?>>((u) {
-                        final login = (u['LOGINNAME'] ?? '').toString();
-                        final name = (u['USERNAME'] ?? login).toString();
-                        return DropdownMenuItem<String?>(
-                          value: login,
-                          child: Text(
-                            '$name ($login)',
-                            style: const TextStyle(fontSize: 12),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        );
-                      }),
-                    ],
-                    onChanged: (v) {
-                      setState(() {
-                        _selectedDdLogin = v;
-                        _ddCtrl.text = v ?? '';
-                      });
-                    },
+                  _buildKipField(
+                    label: 'PTV phụ 1',
+                    icon: Icons.medical_services_outlined,
+                    loginName: _selectedPtvPhu1Login,
+                    displayCtrl: _ptvPhu1Ctrl,
+                    onChanged: (v) => _selectedPtvPhu1Login = v,
                   ),
+                  _buildKipField(
+                    label: 'PTV phụ 2',
+                    icon: Icons.medical_services_outlined,
+                    loginName: _selectedPtvPhu2Login,
+                    displayCtrl: _ptvPhu2Ctrl,
+                    onChanged: (v) => _selectedPtvPhu2Login = v,
+                  ),
+                  _buildKipField(
+                    label: 'Gây mê chính',
+                    icon: Icons.healing,
+                    loginName: _selectedGayMeChinhLogin,
+                    displayCtrl: _gayMeChinhCtrl,
+                    onChanged: (v) => _selectedGayMeChinhLogin = v,
+                  ),
+                  _buildKipField(
+                    label: 'Gây mê phụ 1',
+                    icon: Icons.healing_outlined,
+                    loginName: _selectedGayMePhuLogin,
+                    displayCtrl: _gayMePhuCtrl,
+                    onChanged: (v) => _selectedGayMePhuLogin = v,
+                  ),
+                  _buildKipField(
+                    label: 'Điều dưỡng',
+                    icon: Icons.health_and_safety,
+                    loginName: _selectedDdLogin,
+                    displayCtrl: _ddCtrl,
+                    onChanged: (v) => _selectedDdLogin = v,
+                  ),
+                ],
                 const SizedBox(height: 12),
 
                 // Debug

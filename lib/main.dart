@@ -4,7 +4,6 @@ import 'package:his_mobile/core/services/app_version_service.dart';
 import 'package:his_mobile/core/services/connection_service.dart';
 import 'package:his_mobile/core/services/department_service.dart';
 import 'package:his_mobile/core/services/his_config_service.dart';
-import 'package:his_mobile/core/services/update_service.dart';
 import 'package:his_mobile/core/theme/app_theme.dart';
 import 'package:his_mobile/core/theme/theme_manager.dart';
 import 'package:his_mobile/data/api/his_api_service.dart';
@@ -155,27 +154,7 @@ class _HisMobileAppState extends State<HisMobileApp> with WidgetsBindingObserver
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // v3.0.144: Auto check update sau 3s khi mở app
-    _autoCheckUpdateOnStart();
-  }
-
-  /// v3.0.144: Tự động check update khi mở app
-  /// Delay 5s để app init xong (VPN, theme, routing) rồi mới check
-  /// Nếu có bản mới → hiện dialog thông báo
-  Future<void> _autoCheckUpdateOnStart() async {
-    final info = await UpdateService.autoCheckUpdate(
-      delay: const Duration(seconds: 5),
-    );
-    if (info != null && mounted) {
-      // v3.0.144: Lấy context từ GoRouter's root navigator (an toàn)
-      final navKey = AppRouter.router.routerDelegate.navigatorKey;
-      final ctx = navKey.currentContext;
-      if (ctx != null) {
-        UpdateService.showUpdateDialog(ctx, info);
-      } else {
-        debugPrint('autoCheckUpdateOnStart: no navigator context');
-      }
-    }
+    // v3.0.171: Bỏ auto check update khi mở app - user tự cài APK thủ công qua file manager
   }
 
   @override
@@ -184,15 +163,21 @@ class _HisMobileAppState extends State<HisMobileApp> with WidgetsBindingObserver
     super.dispose();
   }
 
-  /// v3.0.77: Lifecycle - khi user thoát app / chuyển sang background, auto-disconnect VPN
-  /// để tránh VPN vẫn chạy ngầm (tốn pin + chiếm tunnel)
+  /// v3.0.77: Lifecycle - khi user thoát app / chuyển sang background, đợi 5 phút rồi auto-disconnect VPN
+  /// (v3.0.171: dùng 5-min timer của VpnBenhVienService thay vì ngắt ngay - tránh ngắt nhầm khi user chỉ chuyển tab nhanh)
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
-      // User rời app → đóng VPN (chỉ khi đang connected)
-      final vpn = VpnBenhVienService.instance;
+    final vpn = VpnBenhVienService.instance;
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      debugPrint('HisMobileApp: lifecycle ${state.name} → start 5min auto-disconnect timer');
+      vpn.onAppPaused();
+    } else if (state == AppLifecycleState.resumed) {
+      debugPrint('HisMobileApp: lifecycle ${state.name} → cancel 5min auto-disconnect timer');
+      vpn.onAppResumed();
+    } else if (state == AppLifecycleState.detached) {
+      // App bị kill hoàn toàn → ngắt VPN ngay
       if (vpn.isConnected) {
-        debugPrint('HisMobileApp: lifecycle ${state.name} → auto-disconnect VPN');
+        debugPrint('HisMobileApp: lifecycle detached → immediate disconnect VPN');
         vpn.disconnect();
       }
     }

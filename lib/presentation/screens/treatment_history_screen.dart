@@ -23,6 +23,7 @@ import 'package:his_mobile/data/api/thongke_auth_service.dart';
 import 'package:his_mobile/data/api/treatment_history_service.dart';
 import 'package:his_mobile/data/api/his_api_service.dart';  // v3.0.162: kết quả Xquang
 import 'package:his_mobile/data/services/his_proxy_token_service.dart';
+import 'package:intl/intl.dart';  // v3.0.171: NumberFormat cho tiền tệ
 import 'package:his_mobile/data/services/auto_token_service.dart';  // v3.0.160: tự cập nhật token
 import 'package:his_mobile/data/services/token_sync_service.dart';  // v3.0.165: token hub
 
@@ -774,6 +775,166 @@ class _TreatmentHistoryScreenState extends State<TreatmentHistoryScreen> {
 
   /// v3.0.164: Show kết quả CLS khi user tap 1 service item (Xquang/Siêu âm/XN/ECG)
   /// Auto-detect service type và gọi API phù hợp:
+  /// v3.0.171: Mở full screen chi tiết dịch vụ (tên, code, amount, price, tutorial, ghi chú, status, yêu cầu)
+  /// - Được gọi khi user tap hoặc vuốt từ phải sang trái trên service card
+  /// - Back button tiêu chuẩn (Navigator.pop)
+  Future<void> _showServiceFullScreen(Map<String, dynamic> s) async {
+    final name = (s['SERVICE_NAME'] ?? s['TDL_SERVICE_NAME'] ?? 'DV').toString();
+    final code = (s['SERVICE_CODE'] ?? s['TDL_SERVICE_CODE'] ?? '').toString();
+    final amount = s['AMOUNT'];
+    final price = s['PRICE'];
+    final unit = _g(s, 'SERVICE_UNIT_NAME');
+    final tutorial = _g(s, 'TUTORIAL');
+    final reqDept = _g(s, 'REQUEST_DEPARTMENT_NAME');
+    final reqUser = _g(s, 'REQUEST_USERNAME');
+    final sttId = s['SERVICE_REQ_STT_ID'];
+    final sttText = sttId == null || sttId <= 2
+        ? 'Mới / Chờ'
+        : sttId == 3
+            ? 'Đang làm'
+            : sttId == 4
+                ? 'Đang xử lý'
+                : 'Hoàn thành';
+    final sttColor = sttId == null || sttId <= 2
+        ? const Color(0xFFD32F2F)
+        : sttId == 3
+            ? const Color(0xFFFFA000)
+            : sttId == 4
+                ? const Color(0xFF1976D2)
+                : const Color(0xFF2E7D32);
+    final priceStr = price != null
+        ? NumberFormat.currency(locale: 'vi_VN', symbol: 'đ', decimalDigits: 0).format(price)
+        : '';
+    final totalStr = (amount != null && price != null)
+        ? NumberFormat.currency(locale: 'vi_VN', symbol: 'đ', decimalDigits: 0).format((amount as num) * (price as num))
+        : '';
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (ctx) => Scaffold(
+          backgroundColor: const Color(0xFFFAFAFA),
+          appBar: AppBar(
+            backgroundColor: const Color(0xFF1976D2),
+            foregroundColor: Colors.white,
+            title: const Text('Chi tiết dịch vụ', style: TextStyle(fontSize: 14)),
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () => Navigator.of(ctx).pop(),
+              tooltip: 'Quay lại',
+            ),
+          ),
+          body: ListView(
+            padding: const EdgeInsets.all(12),
+            children: [
+              // Tên + code
+              Card(
+                elevation: 1,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(children: [
+                        const Icon(Icons.medical_services, color: Color(0xFF1976D2), size: 18),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            name,
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(color: sttColor.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(3)),
+                          child: Text(sttText, style: TextStyle(fontSize: 10, color: sttColor, fontWeight: FontWeight.bold)),
+                        ),
+                      ]),
+                      if (code.isNotEmpty) ...[
+                        const SizedBox(height: 6),
+                        Text('Mã: $code', style: const TextStyle(fontSize: 11, color: Colors.black54)),
+                      ],
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              // Số lượng + đơn giá + thành tiền
+              Card(
+                elevation: 1,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Row(children: [
+                    Expanded(child: _detailCol('Số lượng', '${amount ?? '-'} ${unit.isNotEmpty ? unit : ''}')),
+                    Expanded(child: _detailCol('Đơn giá', priceStr.isNotEmpty ? priceStr : '-')),
+                    Expanded(child: _detailCol('Thành tiền', totalStr.isNotEmpty ? totalStr : '-')),
+                  ]),
+                ),
+              ),
+              const SizedBox(height: 8),
+              // Yêu cầu
+              if (reqDept.isNotEmpty || reqUser.isNotEmpty)
+                Card(
+                  elevation: 1,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('YÊU CẦU', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1565C0))),
+                        const SizedBox(height: 6),
+                        if (reqDept.isNotEmpty)
+                          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            const Icon(Icons.local_hospital, size: 14, color: Color(0xFF757575)),
+                            const SizedBox(width: 6),
+                            Expanded(child: Text(reqDept, style: const TextStyle(fontSize: 12))),
+                          ]),
+                        if (reqUser.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            const Icon(Icons.person, size: 14, color: Color(0xFF757575)),
+                            const SizedBox(width: 6),
+                            Expanded(child: Text(reqUser, style: const TextStyle(fontSize: 12))),
+                          ]),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 8),
+              // Ghi chú / Hướng dẫn
+              if (tutorial.isNotEmpty)
+                Card(
+                  elevation: 1,
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('📌 GHI CHÚ / HƯỚNG DẪN', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF1565C0))),
+                        const SizedBox(height: 6),
+                        Text(tutorial, style: const TextStyle(fontSize: 12, height: 1.4)),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _detailCol(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 10, color: Colors.black45, fontWeight: FontWeight.w500)),
+        const SizedBox(height: 4),
+        Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+      ],
+    );
+  }
+
   /// - type 3 (XN) → LIS
   /// - type 4/5 (CĐHA/Thủ thuật) → SAR / SubclinicalResult / HisSereServExt fallback
   Future<void> _showServiceResult(Map<String, dynamic> s) async {
@@ -1246,9 +1407,30 @@ class _TreatmentHistoryScreenState extends State<TreatmentHistoryScreen> {
                         : sttId == 3
                             ? 'Đang làm'
                             : 'Xong';
-                    return InkWell(
-                      onTap: () => _showServiceResult(s),
-                      child: Container(
+                    return Dismissible(
+                      key: ValueKey('service_${code}_${amount}_$reqUser'),
+                      direction: DismissDirection.endToStart,  // vuốt từ phải sang trái
+                      background: Container(
+                        color: const Color(0xFF1976D2),
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.only(right: 24),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            Icon(Icons.open_in_full, color: Colors.white, size: 20),
+                            SizedBox(width: 6),
+                            Text('Mở rộng', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                      confirmDismiss: (direction) async {
+                        // v3.0.171: Mở full screen thay vì dismiss
+                        await _showServiceFullScreen(s);
+                        return false;  // Không dismiss
+                      },
+                      child: InkWell(
+                        onTap: () => _showServiceFullScreen(s),
+                        child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                         decoration: const BoxDecoration(
                           border: Border(bottom: BorderSide(color: Color(0xFFEEEEEE), width: 0.5)),
@@ -1324,6 +1506,7 @@ class _TreatmentHistoryScreenState extends State<TreatmentHistoryScreen> {
                             ),
                           ],
                         ],
+                      ),
                       ),
                     ),
                   );

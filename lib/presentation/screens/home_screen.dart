@@ -638,17 +638,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                   const Divider(height: 24),
 
-                  // v3.0.19: BỎ menu "Y tế số" - đã gộp vào "Thao tác bệnh nhân" ở bottom sheet
-                  _drawerItem(
-                    icon: Icons.refresh,
-                    color: Colors.blue,
-                    title: 'Làm mới dữ liệu',
-                    subtitle: 'Tải lại DS BN khoa hiện tại',
-                    onTap: () {
-                      context.safePop();
-                      setState(() {});
-                    },
-                  ),
+                  // v3.0.171: Bỏ mục 'Làm mới dữ liệu' (không hoạt động - tap chỉ setState)
 
                   const SizedBox(height: 16),
 

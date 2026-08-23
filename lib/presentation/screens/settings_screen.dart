@@ -564,13 +564,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   subtitle: 'Phiên bản $_version',
                   onTap: () => _showAppInfo(context),
                 ),
-                _menuItem(
-                  icon: Icons.cloud_download,
-                  color: Colors.green,
-                  title: 'Kiểm tra cập nhật',
-                  subtitle: 'Phiên bản hiện tại: $_version',
-                  onTap: () => _checkForUpdates(),
-                ),
+                // v3.0.171: Bỏ mục "Kiểm tra cập nhật" - user tự cài APK thủ công qua file manager
                 _menuItem(
                   icon: Icons.bug_report,
                   color: Colors.red,
