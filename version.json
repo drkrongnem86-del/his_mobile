@@ -1,5 +1,5 @@
 {
-  "version": "3.0.171",
-  "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.171/his_mobile_v3.0.171_arm64.apk",
-  "message": "v3.0.171 - 1) ECG kip thuc hien 6 vi tri (BS chinh/PTV phu 1+2/Gay me chinh+phu 1/Dieu duong) + search filter. 2) Treatment history - Dich vu + thuoc: vuot trai hoac tap de mo full screen. 3) VPN: 5-phut auto-disconnect. 4) Bo in-app update. 5) Bo 'Lam moi du lieu' drawer + (v3.0.159) login. 6) Bump AppConstants.appVersion 3.0.63 -> 3.0.171."
+  "version": "3.0.172",
+  "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.172/his_mobile_v3.0.172_arm64.apk",
+  "message": "v3.0.172 - Fix CI build error: thay ndk.abiFilters bang splits.abi block (tuong thich --split-per-abi). Arm64-only APK build thanh cong (27.1MB)."
 }

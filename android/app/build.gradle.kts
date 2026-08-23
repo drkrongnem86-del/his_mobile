@@ -38,10 +38,10 @@ android {
         versionName = flutter.versionName
         multiDexEnabled = true
         // v3.0.164: ARM64 only (Samsung A17) - gọn nhẹ cho máy BS
-        ndk {
-            abiFilters.clear()
-            abiFilters.add("arm64-v8a")
-        }
+        // v3.0.172-fix: Dùng splits.abi (không phải ndk.abiFilters) để tương thích với
+        //   `flutter build apk --target-platform android-arm64 --split-per-abi` trên CI.
+        //   Gradle conflict nếu set cả 2: "Conflicting configuration : 'arm64-v8a' in ndk
+        //   abiFilters cannot be present when splits abi filters are set"
     }
 
     // v3.0.118: Custom signing config cho release (stable keystore - không bị thay đổi như debug.keystore)
@@ -101,6 +101,18 @@ android {
         }
         abi {
             enableSplit = false
+        }
+    }
+
+    // v3.0.172-fix: ABI splits cho APK (chỉ arm64-v8a, dùng cho Samsung A17)
+    // - splits.abi thay vì ndk.abiFilters để tương thích với flag `--split-per-abi` trên CI
+    // - Cùng với --target-platform android-arm64 → chỉ tạo 1 file app-arm64-v8a-release.apk
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a")
+            isUniversalApk = false
         }
     }
 }
