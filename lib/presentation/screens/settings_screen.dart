@@ -10,6 +10,7 @@ import 'package:his_mobile/core/services/his_config_service.dart';
 import 'package:his_mobile/core/services/update_service.dart';
 import 'package:his_mobile/core/theme/theme_manager.dart';
 import 'package:his_mobile/data/services/data_service.dart';
+import 'package:his_mobile/data/services/token_sync_service.dart';  // v3.0.165: Token sync hub
 import 'package:his_mobile/data/api/emr_push_service.dart';
 import 'package:his_mobile/data/api/his_pro_api_service.dart';
 import 'package:his_mobile/data/api/thongke_auth_service.dart';
@@ -112,6 +113,67 @@ class _SettingsScreenState extends State<SettingsScreen> {
   /// App tự động load token từ file (nếu có), chỉ paste khi cần
 
 
+  /// v3.0.165: Auto-update token từ multi-source (proxy → login API → renew → hardcoded)
+  /// Hiển thị dialog loading + kết quả
+  Future<void> _autoUpdateToken() async {
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => const AlertDialog(
+        content: Row(children: [
+          SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+          SizedBox(width: 16),
+          Expanded(child: Text('Đang tự lấy token...', style: TextStyle(fontSize: 12))),
+        ]),
+      ),
+    );
+    try {
+      final event = await TokenSyncService.instance.autoFetchToken(force: true);
+      if (mounted) Navigator.of(context, rootNavigator: true).pop(); // close loading
+      if (!mounted) return;
+      if (event.token != null) {
+        // Thành công
+        await _loadInfo();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(children: [
+                const Icon(Icons.check_circle, color: Colors.white, size: 18),
+                const SizedBox(width: 6),
+                Expanded(child: Text('✅ Đã tự lấy token mới từ: ${event.source}')),
+              ]),
+              backgroundColor: const Color(0xFF2E7D32),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      } else {
+        // Lỗi
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(children: [
+                const Icon(Icons.error, color: Colors.white, size: 18),
+                const SizedBox(width: 6),
+                Expanded(child: Text('❌ Không lấy được token: ${event.message ?? "không rõ"}')),
+              ]),
+              backgroundColor: const Color(0xFFD32F2F),
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('❌ Lỗi: $e'), backgroundColor: const Color(0xFFD32F2F)),
+        );
+      }
+    }
+  }
+
   /// v2.51.0: Dialog paste token đơn giản - 1 lần duy nhất
   Future<void> _showTokenDialog() async {
     final thongke = ThongkeAuthService.instance;
@@ -142,7 +204,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   maxLines: 3,
                   decoration: InputDecoration(
                     border: const OutlineInputBorder(),
-                    hintText: '1ee41ae967caa75e7c2891a3d9612259d70b4645c67852ab0e5f07546c2f3dfb',
+                    hintText: '14fdd85760f797f02c0a80b4ce1a463b20e60b0094ba3b99399060c25babfcbd',
                     suffixIcon: IconButton(
                       icon: Icon(obscure ? Icons.visibility : Icons.visibility_off),
                       onPressed: () => setSt(() => obscure = !obscure),
@@ -190,19 +252,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }),
     );
     if (result != null && result.isNotEmpty) {
+      // v3.0.165: Dùng TokenSyncService - áp dụng cho TẤT CẢ services + broadcast listeners
+      await TokenSyncService.instance.setManualToken(result);
+      // Legacy: giữ setHisProToken cho ThongkeAuthService (nếu còn dùng)
       await thongke.setHisProToken(result);
       // v3.0.137: lưu thời gian update token
       final prefs = await SharedPreferences.getInstance();
       await prefs.setInt('his_pro_token_updated', DateTime.now().millisecondsSinceEpoch);
-      // Apply token immediately
-      await HisProApiService.instance.setCustomBearer(result);
       if (!mounted) return;
       setState(() {
         _tokenCode = result;
         _tokenUpdated = DateTime.now();
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('✅ Đã lưu token - app sẽ tự dùng cho EMR')),
+        const SnackBar(content: Text('✅ Đã lưu token - áp dụng cho Phòng tủ thuật, ECG, Lịch sử ĐT, EMR push')),
       );
     }
   }
@@ -357,8 +420,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   },
                 ),
 
-                // v3.0.137: Token EMR status
-                _section('TOKEN EMR'),
+                // v3.0.165: Token sync hub - 1 nơi quản lý TẤT CẢ token (procedure room, ECG, treatment history, EMR push,...)
+                // - Hiển thị trạng thái: masked token, source, age
+                // - 2 nút: "Tự cập nhật" (auto-fetch) + "Dán thủ công" (paste từ log)
+                _section('TOKEN HIS PRO'),
                 Card(
                   color: Colors.white,
                   margin: const EdgeInsets.only(bottom: 4),
@@ -367,68 +432,105 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     borderRadius: BorderRadius.circular(8),
                     side: const BorderSide(color: Color(0xFFE0E0E0), width: 1),
                   ),
-                  child: InkWell(
-                    onTap: () async {
-                      await _showTokenDialog();
-                      await _loadInfo();
-                    },
-                    borderRadius: BorderRadius.circular(8),
-                    child: Padding(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                width: 40, height: 40,
-                                decoration: BoxDecoration(color: Colors.green.withOpacity(0.12), borderRadius: BorderRadius.circular(8)),
-                                child: const Icon(Icons.vpn_key, color: Colors.green, size: 22),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 40, height: 40,
+                              decoration: BoxDecoration(
+                                color: Colors.green.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(8),
                               ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(_tokenStatusLabel, style: const TextStyle(color: Colors.black, fontSize: 14, fontWeight: FontWeight.w600)),
-                                    Text(_tokenMasked, style: const TextStyle(fontFamily: 'monospace', fontSize: 11, color: Colors.black54)),
-                                    if (_tokenClientIp.isNotEmpty)
-                                      Text('IP: $_tokenClientIp', style: const TextStyle(fontSize: 10, color: Colors.black38)),
-                                  ],
-                                ),
+                              child: const Icon(Icons.cloud_done, color: Colors.green, size: 22),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text('Token đang dùng',
+                                      style: TextStyle(color: Colors.black87, fontSize: 11, fontWeight: FontWeight.w500)),
+                                  Text(
+                                    TokenSyncService.instance.maskedToken,
+                                    style: const TextStyle(color: Colors.black, fontSize: 14, fontWeight: FontWeight.w600, fontFamily: 'monospace'),
+                                  ),
+                                  Row(children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                      decoration: BoxDecoration(
+                                        color: TokenSyncService.instance.hasToken ? Colors.green : Colors.grey,
+                                        borderRadius: BorderRadius.circular(3),
+                                      ),
+                                      child: Text(
+                                        TokenSyncService.instance.currentSource ?? 'none',
+                                        style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      TokenSyncService.instance.lastUpdatedLabel,
+                                      style: const TextStyle(fontSize: 10, color: Colors.black54),
+                                    ),
+                                    if (TokenSyncService.instance.isStale && TokenSyncService.instance.hasToken) ...[
+                                      const SizedBox(width: 4),
+                                      const Icon(Icons.schedule, size: 10, color: Colors.orange),
+                                      const Text(' cũ', style: TextStyle(fontSize: 9, color: Colors.orange)),
+                                    ],
+                                  ]),
+                                ],
                               ),
-                              const Icon(Icons.chevron_right, color: Colors.black45, size: 20),
-                            ],
-                          ),
-                          if (_tokenUpdated != null) ...[
-                            const SizedBox(height: 6),
-                            Text(
-                              'Cập nhật: ${_tokenUpdated!.day.toString().padLeft(2, '0')}/${_tokenUpdated!.month.toString().padLeft(2, '0')}/${_tokenUpdated!.year} lúc ${_tokenUpdated!.hour.toString().padLeft(2, '0')}:${_tokenUpdated!.minute.toString().padLeft(2, '0')}',
-                              style: const TextStyle(fontSize: 10, color: Colors.black38),
                             ),
                           ],
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: OutlinedButton.icon(
-                                  onPressed: () async {
-                                    await _showTokenDialog();
-                                    await _loadInfo();
-                                  },
-                                  icon: const Icon(Icons.refresh, size: 14),
-                                  label: const Text('Cập nhật token', style: TextStyle(fontSize: 12)),
+                        ),
+                        const SizedBox(height: 10),
+                        // v3.0.165: 2 nút - Tự cập nhật + Dán thủ công
+                        Row(
+                          children: [
+                            Expanded(
+                              child: FilledButton.icon(
+                                onPressed: _autoUpdateToken,
+                                style: FilledButton.styleFrom(
+                                  backgroundColor: const Color(0xFF2E7D32),
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
                                 ),
+                                icon: const Icon(Icons.refresh, size: 14),
+                                label: const Text('Tự cập nhật', style: TextStyle(fontSize: 12)),
                               ),
-                              const SizedBox(width: 8),
-                              OutlinedButton(
-                                onPressed: _showTokenHelp,
-                                child: const Icon(Icons.help_outline, size: 16),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: OutlinedButton.icon(
+                                onPressed: () async {
+                                  await _showTokenDialog();
+                                  await _loadInfo();
+                                },
+                                style: OutlinedButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(vertical: 10),
+                                ),
+                                icon: const Icon(Icons.edit, size: 14),
+                                label: const Text('Dán thủ công', style: TextStyle(fontSize: 12)),
                               ),
-                            ],
-                          ),
-                        ],
-                      ),
+                            ),
+                            const SizedBox(width: 6),
+                            OutlinedButton(
+                              onPressed: _showTokenHelp,
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
+                              ),
+                              child: const Icon(Icons.help_outline, size: 16),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          '💡 Token áp dụng cho: Phòng tủ thuật, ECG, Lịch sử ĐT, EMR push, mọi API HIS Pro',
+                          style: TextStyle(fontSize: 9, color: Colors.black54, fontStyle: FontStyle.italic),
+                        ),
+                      ],
                     ),
                   ),
                 ),

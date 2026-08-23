@@ -6,13 +6,17 @@
 // - Save draft: FormDraftService (backup local)
 // - Return true → caller (ProcedureRoom) auto-refresh + BN chuyển sang "Đã thực hiện"
 import 'dart:async';
+import 'dart:convert';  // v3.0.169: jsonDecode/jsonEncode cho AcsUser cache
 import 'dart:io';
-import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:his_mobile/core/utils/mojibake_fixer.dart';
 import 'package:his_mobile/core/utils/patient_name_helper.dart';
 import 'package:his_mobile/data/api/his_api_service.dart';
+import 'package:his_mobile/data/api/his_pro_api_service.dart';  // v3.0.164: sync token EMR push
+import 'package:his_mobile/data/services/auto_token_service.dart';  // v3.0.164: sync token
+import 'package:his_mobile/data/services/token_sync_service.dart';  // v3.0.165: token hub
 import 'package:his_mobile/data/services/form_draft_service.dart';
 import 'package:his_mobile/presentation/widgets/user_header.dart';
 import 'package:image_picker/image_picker.dart';
@@ -45,23 +49,209 @@ class _ECGExecuteScreenState extends State<ECGExecuteScreen> {
   bool _saving = false;
   String _debug = '';
 
+  // v3.0.163: Machine selection (Máy tạo Oxy di động, Máy điện tim 03 kênh,...)
+  Map<String, dynamic>? _selectedMachine;
+  List<Map<String, dynamic>> _availableMachines = [];
+  bool _loadingMachines = false;
+
+  // v3.0.168: User list cho PTV/TTV chính (BS, điều dưỡng)
+  // Hiển thị tên đầy đủ (USERNAME) như HIS Desktop
+  List<Map<String, dynamic>> _userList = [];
+  String? _selectedBsChinhLogin;  // LOGINNAME của BS chính (dùng cho backend)
+  String? _selectedDdLogin;        // LOGINNAME của điều dưỡng
+  bool _loadingUsers = false;
+
   @override
   void initState() {
     super.initState();
     _loadCurrentUser();
+    // v3.0.164: Auto-load token từ SharedPreferences (sync với procedure room)
+    _loadHisProToken();
+    _loadMachines();
+    // v3.0.168: Load user list cho PTV/TTV chính
+    _loadUsers();
+  }
+
+  /// v3.0.168: Load danh sách users từ AcsUser (port 1401)
+  /// - Filter: IS_ACTIVE=1, sắp xếp theo USERNAME
+  /// - Hiển thị tên đầy đủ (USERNAME) trong dropdown
+  /// - Lưu LOGINNAME để gửi cho backend
+  /// - v3.0.169: Cache 2 giờ (SharedPreferences) - tránh gọi API mỗi lần mở ECG
+  static const String _kAcsUserCacheKey = 'acs_user_list_cache';
+  static const String _kAcsUserCacheTimeKey = 'acs_user_list_cache_time';
+  static const Duration _kAcsUserCacheTTL = Duration(hours: 2);
+
+  Future<void> _loadUsers() async {
+    if (_userList.isNotEmpty) return; // đã load
+    setState(() => _loadingUsers = true);
+    try {
+      // v3.0.169: Thử cache trước (< 2h)
+      final prefs = await SharedPreferences.getInstance();
+      final cacheTimeMs = prefs.getInt(_kAcsUserCacheTimeKey);
+      final cacheJson = prefs.getString(_kAcsUserCacheKey);
+      if (cacheJson != null && cacheTimeMs != null) {
+        final age = DateTime.now().difference(DateTime.fromMillisecondsSinceEpoch(cacheTimeMs));
+        if (age < _kAcsUserCacheTTL) {
+          final cached = jsonDecode(cacheJson) as List;
+          _userList = cached.cast<Map<String, dynamic>>();
+          debugPrint('ECG: loaded ${_userList.length} users from cache (age: ${age.inMinutes}min)');
+          if (mounted) setState(() => _loadingUsers = false);
+          return;
+        }
+      }
+
+      // Cache miss hoặc stale → gọi API
+      final r = await _api.getAcsUsers(limit: 200);
+      if (r.success && r.data is Map) {
+        final data = r.data as Map;
+        final raw = data['Data'];
+        if (raw is List) {
+          _userList = raw.cast<Map<String, dynamic>>().where((u) {
+            final username = (u['USERNAME'] ?? '').toString().trim();
+            final loginname = (u['LOGINNAME'] ?? '').toString().trim();
+            return username.isNotEmpty && loginname.isNotEmpty;
+          }).toList();
+          debugPrint('ECG: loaded ${_userList.length} users from API');
+
+          // v3.0.169: Lưu cache
+          await prefs.setString(_kAcsUserCacheKey, jsonEncode(_userList));
+          await prefs.setInt(_kAcsUserCacheTimeKey, DateTime.now().millisecondsSinceEpoch);
+
+          if (mounted) setState(() {});
+        }
+      } else {
+        debugPrint('ECG: getAcsUsers failed: ${r.message}');
+      }
+    } catch (e) {
+      debugPrint('ECG: _loadUsers error: $e');
+    } finally {
+      if (mounted) setState(() => _loadingUsers = false);
+    }
+  }
+
+  /// v3.0.168: Lấy USERNAME (tên đầy đủ) từ LOGINNAME
+  String _getFullName(String? loginName) {
+    if (loginName == null || loginName.isEmpty) return '';
+    final found = _userList.firstWhere(
+      (u) => (u['LOGINNAME'] ?? '').toString() == loginName,
+      orElse: () => <String, dynamic>{},
+    );
+    if (found.isEmpty) return loginName; // fallback
+    return (found['USERNAME'] ?? loginName).toString();
+  }
+
+  /// v3.0.165: Auto-load HIS Pro token từ TokenSyncService khi mở screen
+  /// - Nếu TokenSyncService đã có token → dùng luôn
+  /// - Nếu chưa có → load từ storage hoặc auto-fetch
+  Future<void> _loadHisProToken() async {
+    if (TokenSyncService.instance.hasToken) {
+      // Đã có từ trước - dùng luôn
+      _api.setAuthToken(TokenSyncService.instance.currentToken!);
+      if (kDebugMode) debugPrint('ECG: using cached token');
+      return;
+    }
+    // Chưa có → load từ storage (silent - không hiện loading)
+    await TokenSyncService.instance.loadFromStorage();
+    if (TokenSyncService.instance.hasToken) {
+      _api.setAuthToken(TokenSyncService.instance.currentToken!);
+      if (kDebugMode) debugPrint('ECG: loaded token from storage');
+    }
   }
 
   Future<void> _loadCurrentUser() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final username = prefs.getString('hispro_user') ?? prefs.getString('username') ?? 'nemk';
+      // v3.0.168: Lưu LOGINNAME (key 'hispro_user') thay vì hiển thị USERNAME
+      // Dropdown sẽ dùng LOGINNAME để tìm và hiển thị tên đầy đủ
+      final loginname = prefs.getString('hispro_user') ?? prefs.getString('username') ?? 'nemk';
       if (mounted) {
         setState(() {
-          _bsChinhCtrl.text = username;
+          // Hiển thị LOGINNAME ban đầu (sẽ tự động map sang tên đầy đủ khi user list load)
+          _selectedBsChinhLogin = loginname;
+          _bsChinhCtrl.text = loginname; // backup nếu dropdown fail
         });
       }
     } catch (_) {
+      _selectedBsChinhLogin = 'nemk';
       _bsChinhCtrl.text = 'nemk';
+    }
+  }
+
+  /// v3.0.163: Load danh sách máy phù hợp với service đang thực hiện
+  /// Ưu tiên máy từ HIS_SERVICE_MACHINE (mapping), fallback GetAll
+  Future<void> _loadMachines() async {
+    setState(() => _loadingMachines = true);
+    try {
+      final serviceId = widget.serviceReq['SERVICE_ID'] ?? widget.serviceReq['service_id'];
+      List<Map<String, dynamic>> machineList = [];
+
+      if (serviceId != null) {
+        // Lấy máy từ HIS_SERVICE_MACHINE (mapping với service)
+        final r1 = await _api.getMachinesForService(int.tryParse(serviceId.toString()) ?? 0, limit: 50);
+        if (r1.success && r1.data is Map) {
+          final data = r1.data as Map;
+          if (data['Data'] is List) {
+            final mappings = (data['Data'] as List).where((m) => m['MACHINE_ID'] != null).toList();
+            if (mappings.isNotEmpty) {
+              // Lấy chi tiết từng máy
+              final r2 = await _api.getAllMachines(limit: 200);
+              if (r2.success && r2.data is Map) {
+                final allData = r2.data as Map;
+                if (allData['Data'] is List) {
+                  final allMachines = (allData['Data'] as List).cast<Map<String, dynamic>>();
+                  for (final mapping in mappings) {
+                    final machineId = mapping['MACHINE_ID'];
+                    final found = allMachines.firstWhere(
+                      (m) => m['ID'] == machineId,
+                      orElse: () => <String, dynamic>{},
+                    );
+                    if (found.isNotEmpty) machineList.add(found);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // Fallback: nếu không có mapping, lấy tất cả máy có "điện tim" hoặc "ECG"
+      if (machineList.isEmpty) {
+        final r3 = await _api.getAllMachines(limit: 200);
+        if (r3.success && r3.data is Map) {
+          final allData = r3.data as Map;
+          if (allData['Data'] is List) {
+            final allMachines = (allData['Data'] as List).cast<Map<String, dynamic>>();
+            machineList = allMachines.where((m) {
+              final name = m['MACHINE_NAME']?.toString().toLowerCase() ?? '';
+              return name.contains('điện tim') ||
+                  name.contains('ecg') ||
+                  name.contains('oxy') ||
+                  name.contains('monitor');
+            }).toList();
+            if (machineList.isEmpty) machineList = allMachines;
+          }
+        }
+      }
+
+      if (mounted) {
+        setState(() {
+          _availableMachines = machineList;
+          // Auto-select Máy tạo Oxy di động (ID=29) nếu có
+          _selectedMachine = machineList.firstWhere(
+            (m) => m['MACHINE_NAME']?.toString().contains('Oxy') == true,
+            orElse: () => machineList.isNotEmpty ? machineList.first : <String, dynamic>{},
+          );
+          if (_selectedMachine?.isEmpty ?? true) _selectedMachine = null;
+          _loadingMachines = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loadingMachines = false;
+          _debug = '⚠️ Lỗi load máy: $e';
+        });
+      }
     }
   }
 
@@ -99,9 +289,9 @@ class _ECGExecuteScreenState extends State<ECGExecuteScreen> {
       );
       return false;
     }
-    if (_bsChinhCtrl.text.trim().isEmpty) {
+    if ((_selectedBsChinhLogin ?? '').isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('⚠️ Vui lòng nhập tên Bác sĩ chính')),
+        const SnackBar(content: Text('⚠️ Vui lòng chọn Bác sĩ chính / PTV chính')),
       );
       return false;
     }
@@ -157,6 +347,32 @@ class _ECGExecuteScreenState extends State<ECGExecuteScreen> {
       }
 
       setState(() => _debug = '⏳ Đang đánh dấu hoàn thành (FinishWithTime)...');
+
+      // v3.0.168: Lưu máy + kíp thực hiện (MACHINE_ID, EXECUTE_LOGINNAME, EXECUTE_USERNAME,...)
+      final updateData = <String, dynamic>{
+        'ID': int.tryParse(serviceReqId.toString()) ?? 0,
+      };
+      if (_selectedMachine != null) {
+        final machineId = _selectedMachine!['ID'];
+        final machineName = _selectedMachine!['MACHINE_NAME']?.toString() ?? '';
+        updateData['MACHINE_ID'] = machineId;
+        updateData['MACHINE_IDS'] = machineId.toString();
+        updateData['MACHINE_NAME'] = machineName;
+        updateData['MACHINE_NAMES'] = machineName;
+        setState(() => _debug = '⏳ Đang lưu máy "$machineName"...');
+      }
+      // v3.0.168: Ghi kíp thực hiện (BS chính, điều dưỡng)
+      if ((_selectedBsChinhLogin ?? '').isNotEmpty) {
+        updateData['EXECUTE_LOGINNAME'] = _selectedBsChinhLogin;
+        updateData['EXECUTE_USERNAME'] = _getFullName(_selectedBsChinhLogin);
+      }
+      if ((_selectedDdLogin ?? '').isNotEmpty) {
+        updateData['NURSE_LOGINNAME'] = _selectedDdLogin;
+        updateData['NURSE_USERNAME'] = _getFullName(_selectedDdLogin);
+      }
+      if (updateData.length > 1) {
+        await _api.updateServiceReq(updateData);
+      }
 
       final finishResult = await _api.finishServiceReqWithTime(
         serviceReqId: int.tryParse(serviceReqId.toString()) ?? 0,
@@ -300,6 +516,18 @@ class _ECGExecuteScreenState extends State<ECGExecuteScreen> {
         foregroundColor: Colors.white,
         title: const Text('Thực hiện ECG', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
         actions: [
+          // v3.0.165: NÚT TỰ LẤY TOKEN (multi-source) - ưu tiên hơn paste
+          IconButton(
+            icon: const Icon(Icons.cloud_sync, size: 18),
+            tooltip: 'Tự lấy token tự động',
+            onPressed: _autoFetchToken,
+          ),
+          // v3.0.164: Nút dán token HIS Pro (sync với procedure room + treatment history)
+          IconButton(
+            icon: const Icon(Icons.vpn_key, size: 18),
+            tooltip: 'Dán token HIS Pro',
+            onPressed: _showPasteTokenDialog,
+          ),
           IconButton(
             icon: const Icon(Icons.help_outline),
             tooltip: 'Hướng dẫn',
@@ -328,6 +556,62 @@ class _ECGExecuteScreenState extends State<ECGExecuteScreen> {
                   const SizedBox(width: 8),
                   Expanded(child: _buildDateTimeField('Kết thúc', _endTime, () => _pickDateTime(isStart: false))),
                 ]),
+                const SizedBox(height: 12),
+
+                // v3.0.163: Chọn máy thực hiện
+                _buildSectionTitle('🖥️ MÁY THỰC HIỆN (bắt buộc)', const Color(0xFF7B1FA2)),
+                if (_loadingMachines)
+                  const Padding(
+                    padding: EdgeInsets.all(8),
+                    child: Row(children: [
+                      SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)),
+                      SizedBox(width: 8),
+                      Text('Đang tải danh sách máy...', style: TextStyle(fontSize: 11, color: Colors.black54)),
+                    ]),
+                  )
+                else if (_availableMachines.isEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF3E0),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFFFB74D)),
+                    ),
+                    child: const Row(children: [
+                      Icon(Icons.warning_amber, color: Color(0xFFE65100), size: 18),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Không load được danh sách máy. Bấm Hoàn thành sẽ lưu không kèm máy.',
+                          style: TextStyle(fontSize: 11, color: Color(0xFFE65100)),
+                        ),
+                      ),
+                    ]),
+                  )
+                else
+                  DropdownButtonFormField<Map<String, dynamic>>(
+                    initialValue: _selectedMachine,
+                    isExpanded: true,
+                    decoration: const InputDecoration(
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.medical_services, color: Color(0xFF7B1FA2)),
+                      hintText: 'Chọn máy',
+                    ),
+                    items: _availableMachines.map((m) {
+                      return DropdownMenuItem<Map<String, dynamic>>(
+                        value: m,
+                        child: Text(
+                          '${m['MACHINE_NAME'] ?? 'N/A'} (${m['MACHINE_CODE'] ?? ''})',
+                          style: const TextStyle(fontSize: 13),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (m) {
+                      setState(() => _selectedMachine = m);
+                    },
+                    validator: (v) => v == null ? 'Vui lòng chọn máy' : null,
+                  ),
                 const SizedBox(height: 12),
 
                 // Kết quả
@@ -386,30 +670,86 @@ class _ECGExecuteScreenState extends State<ECGExecuteScreen> {
 
                 // Kíp thực hiện
                 _buildSectionTitle('👥 KÍP THỰC HIỆN', const Color(0xFFE65100)),
-                TextFormField(
-                  controller: _bsChinhCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Bác sĩ chính *',
-                    prefixIcon: Icon(Icons.medical_services, size: 18),
-                    border: OutlineInputBorder(),
-                    filled: true,
-                    fillColor: Colors.white,
-                    isDense: true,
+                // v3.0.168: Dropdown Bác sĩ chính/PTV chính - hiển thị tên đầy đủ từ server
+                if (_loadingUsers && _userList.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Row(children: [
+                      SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)),
+                      SizedBox(width: 8),
+                      Text('Đang tải DS user từ server...', style: TextStyle(fontSize: 10, color: Colors.black54)),
+                    ]),
+                  )
+                else
+                  DropdownButtonFormField<String>(
+                    value: _userList.any((u) => (u['LOGINNAME'] ?? '') == _selectedBsChinhLogin) ? _selectedBsChinhLogin : null,
+                    decoration: const InputDecoration(
+                      labelText: 'Bác sĩ chính / PTV chính *',
+                      prefixIcon: Icon(Icons.medical_services, size: 18),
+                      border: OutlineInputBorder(),
+                      filled: true,
+                      fillColor: Colors.white,
+                      isDense: true,
+                    ),
+                    items: _userList.map<DropdownMenuItem<String>>((u) {
+                      final login = (u['LOGINNAME'] ?? '').toString();
+                      final name = (u['USERNAME'] ?? login).toString();
+                      return DropdownMenuItem<String>(
+                        value: login,
+                        child: Text(
+                          '$name ($login)',
+                          style: const TextStyle(fontSize: 12),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (v) {
+                      setState(() {
+                        _selectedBsChinhLogin = v;
+                        // Sync backup text controller
+                        _bsChinhCtrl.text = v ?? '';
+                      });
+                    },
+                    validator: (v) => (v == null || v.isEmpty) ? 'Bắt buộc' : null,
                   ),
-                  validator: (v) => (v == null || v.trim().isEmpty) ? 'Bắt buộc' : null,
-                ),
                 const SizedBox(height: 8),
-                TextFormField(
-                  controller: _ddCtrl,
-                  decoration: const InputDecoration(
-                    labelText: 'Điều dưỡng (không bắt buộc)',
-                    prefixIcon: Icon(Icons.health_and_safety, size: 18),
-                    border: OutlineInputBorder(),
-                    filled: true,
-                    fillColor: Colors.white,
-                    isDense: true,
+                // v3.0.168: Dropdown Điều dưỡng - optional
+                if (_userList.isNotEmpty)
+                  DropdownButtonFormField<String?>(
+                    value: _userList.any((u) => (u['LOGINNAME'] ?? '') == _selectedDdLogin) ? _selectedDdLogin : null,
+                    decoration: const InputDecoration(
+                      labelText: 'Điều dưỡng (không bắt buộc)',
+                      prefixIcon: Icon(Icons.health_and_safety, size: 18),
+                      border: OutlineInputBorder(),
+                      filled: true,
+                      fillColor: Colors.white,
+                      isDense: true,
+                    ),
+                    items: [
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('-- Không chọn --', style: TextStyle(fontSize: 12, color: Colors.black45)),
+                      ),
+                      ..._userList.map<DropdownMenuItem<String?>>((u) {
+                        final login = (u['LOGINNAME'] ?? '').toString();
+                        final name = (u['USERNAME'] ?? login).toString();
+                        return DropdownMenuItem<String?>(
+                          value: login,
+                          child: Text(
+                            '$name ($login)',
+                            style: const TextStyle(fontSize: 12),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        );
+                      }),
+                    ],
+                    onChanged: (v) {
+                      setState(() {
+                        _selectedDdLogin = v;
+                        _ddCtrl.text = v ?? '';
+                      });
+                    },
                   ),
-                ),
                 const SizedBox(height: 12),
 
                 // Debug
@@ -656,6 +996,131 @@ class _ECGExecuteScreenState extends State<ECGExecuteScreen> {
         ]),
       ),
     );
+  }
+
+  /// v3.0.165: TỰ LẤY TOKEN tự động (multi-source)
+  /// - Proxy → Login API → Renew API → Hardcoded fallback
+  /// - Apply cho cả HisApiService + HisProApiService + broadcast
+  Future<void> _autoFetchToken() async {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Row(children: [
+            SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)),
+            SizedBox(width: 12),
+            Expanded(child: Text('🔄 Đang tự lấy token...', style: TextStyle(fontSize: 12))),
+          ]),
+          backgroundColor: Color(0xFF2E7D32),
+          duration: Duration(seconds: 30),
+        ),
+      );
+    }
+    try {
+      final event = await TokenSyncService.instance.autoFetchToken(force: true);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).removeCurrentSnackBar();
+      if (event.token != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(children: [
+              const Icon(Icons.check_circle, color: Colors.white, size: 18),
+              const SizedBox(width: 6),
+              Expanded(child: Text('✅ Token mới từ: ${event.source}')),
+            ]),
+            backgroundColor: const Color(0xFF2E7D32),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(children: [
+              const Icon(Icons.error, color: Colors.white, size: 18),
+              const SizedBox(width: 6),
+              Expanded(child: Text('❌ Không lấy được token: ${event.message ?? "không rõ"}')),
+            ]),
+            backgroundColor: const Color(0xFFD32F2F),
+            duration: const Duration(seconds: 4),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).removeCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('❌ Lỗi: $e'), backgroundColor: const Color(0xFFD32F2F)),
+        );
+      }
+    }
+  }
+
+  /// v3.0.164: Dialog dán token HIS Pro (sync với procedure room + treatment history)
+  /// - 1 paste → lưu vào SharedPreferences → tất cả API HIS Pro dùng token mới
+  Future<void> _showPasteTokenDialog() async {
+    final prefs = await SharedPreferences.getInstance();
+    final currentToken = prefs.getString('his_pro_token_override') ?? '';
+    final controller = TextEditingController(text: currentToken);
+    final saved = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(children: [
+          Icon(Icons.vpn_key, color: Color(0xFF6A1B9A)),
+          SizedBox(width: 8),
+          Text('Dán token HIS Pro', style: TextStyle(fontSize: 14)),
+        ]),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Token HIS Pro xoay vòng mỗi session. Khi app báo lỗi:', style: TextStyle(fontSize: 11)),
+              const SizedBox(height: 6),
+              const Text('1. Mở HIS Desktop → file log', style: TextStyle(fontSize: 11)),
+              const Text('2. Tìm dòng: dti:"...|...|TOKEN|..."', style: TextStyle(fontSize: 11)),
+              const Text('3. Copy phần TOKEN (64 ký tự hex)', style: TextStyle(fontSize: 11)),
+              const Text('4. Paste vào đây → Lưu', style: TextStyle(fontSize: 11, color: Color(0xFF6A1B9A), fontWeight: FontWeight.w600)),
+              const SizedBox(height: 10),
+              TextField(
+                controller: controller,
+                maxLines: 2,
+                style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
+                decoration: const InputDecoration(
+                  border: OutlineInputBorder(),
+                  hintText: '805953ca1e7f5a67e86a21108b0b921f336041a2829214364d49ab83c724c575',
+                  hintStyle: TextStyle(fontSize: 9, color: Colors.black38, fontFamily: 'monospace'),
+                  isDense: true,
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
+          FilledButton.icon(
+            icon: const Icon(Icons.save, size: 14),
+            label: const Text('Lưu'),
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+          ),
+        ],
+      ),
+    );
+    if (saved != null && saved.isNotEmpty) {
+      // v3.0.165: Dùng TokenSyncService - 1 dòng áp dụng cho tất cả services + broadcast
+      await TokenSyncService.instance.setManualToken(saved);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(children: [
+              const Icon(Icons.check_circle, color: Colors.white, size: 18),
+              const SizedBox(width: 6),
+              Expanded(child: Text('Đã lưu token: ${saved.substring(0, 8)}…${saved.substring(saved.length - 4)} (áp dụng mọi nơi)')),
+            ]),
+            backgroundColor: const Color(0xFF388E3C),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    }
   }
 
   void _showHelp() {

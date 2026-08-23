@@ -85,6 +85,12 @@ class AppConstants {
   static const int DEPARTMENT_ID_HS_TICH_CUC = 24;  // Hồi sức tích cực chống độc
   static const int DEPARTMENT_ID_GAY_ME = 25;  // Gây mê hồi sức
   static const int ROOM_ID_KHAM_CAP_CUU = 36;  // PKCC - v3.0.105: từ log HIS Pro thật 14/08/2026, dùng 36 (KHÔNG phải 39)
+  // v3.0.162: Phòng tủ thuật HSCC (chứa ECG + thủ thuật nhỏ)
+  static const int ROOM_ID_TU_THUAT_HSCC = 36;
+  // v3.0.162: Phòng thử thuật HSCC (procedure chính)
+  static const int ROOM_ID_THU_THUAT_HSCC = 39;
+  // v3.0.162: Phòng tủ thuật HSCC ID đặc biệt 9999
+  static const int ROOM_ID_TU_THUAT_9999 = 9999;
   static const String DEPARTMENT_CODE_CAP_CUU = 'HSCC';
 
   /// Danh sách các khoa trong BV - Mapping từ Y Tế Số mobile (log 2026-07-06)
@@ -150,10 +156,10 @@ class AppConstants {
     {'id': 502, 'code': 'DTTN', 'name': 'Khu Điều Trị Trong Ngày', 'icon': '🏥'},
     // v2.47.0: thêm các khoa phát hiện từ data thật (500 BN từ EMR-Checker)
     {'id': 522, 'code': 'KSKCB', 'name': 'Khoa Khám sức khỏe cán bộ', 'icon': '🩺'},
-    // v3.0.159: Xóa ID 9999 'Phòng thử thuật HSCC' khỏi danh sách khoa (55 → 54 khoa)
-    // Lý do: ID này là FAKE dept (không phải khoa thật từ HIS API), gây nhầm lẫn
-    // với tile 'Phòng TT HSCC' trong tab Tiện ích (đã có sẵn)
-    // Truy cập duy nhất: Tiện ích tab → tile 'Phòng TT HSCC' → ProcedureRoomScreen
+    // v3.0.119: Phòng thử thuật HSCC - id=9999 tránh conflict với HIS dept id 22-71
+    // executeRoomId: 36 (PKCC) - filter tot nhat: HIS Pro 78 BN, Data 3000 70 BN
+    // (36 = phong kham cap cuu noi BN duoc chi dinh thu thuat - match log HIS Desktop thật 14/08)
+    {'id': 9999, 'code': 'PTTHSCC', 'name': 'Phòng thử thuật HSCC', 'icon': '⚡', 'isProcedureRoom': true, 'executeRoomId': 36, 'executeDepartmentId': 22},
   ];
 
   /// Danh sách PHÒNG (buồng) đầy đủ 53 buồng - từ ảnh chụp danh sách BV (2026-07-07)

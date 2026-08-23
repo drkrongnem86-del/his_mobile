@@ -1,25 +1,16 @@
-// v3.0.82: HisProxyTokenService - Auto-fetch Bearer token qua local proxy
+// v3.0.160: HisProxyTokenService - REFACTORED thành wrapper của AutoTokenService
 //
-// Workflow:
-//   - Phone gọi http://{PC_IP}:9999/get-his-token
-//   - Proxy (chạy trên PC) đọc D:\Soft\HISPRO_THAT\Logs\LogSystem.txt
-//   - Extract Bearer token từ dòng ___dti:"...|<TOKEN>|..." mới nhất
-//   - Trả về JSON {token, source_file, found_at, age_seconds}
-//   - Phone tự động lưu token vào SharedPreferences (qua ThongkeAuthService)
+// Trước (v3.0.82-v3.0.159): gọi proxy server http://{PC_IP}:9999/get-his-token
+// Bây giờ (v3.0.160): gọi trực tiếp AutoTokenService (login API → renew → hardcoded)
+// - Bỏ proxy server (BS không cần)
+// - Tự cập nhật token từ nhiều nguồn
 //
-// PC IP candidates (auto-detect):
-//   - 172.16.200.109 (default proxy PC mode - port 9999)
-//   - User có thể tự cấu hình qua Settings
-//
-// Setup:
-//   - Trên PC: chạy python tools/his_proxy_server.py (port 9999)
-//   - Phone cùng WiFi/LAN với PC
+// Interface giữ nguyên để các file cũ (treatment_history_service.dart,
+// treatment_history_screen.dart) không phải sửa nhiều.
 
-import 'dart:convert';
-import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:his_mobile/data/api/thongke_auth_service.dart';
+import 'package:his_mobile/data/services/auto_token_service.dart';
 
 class HisProxyTokenStatus {
   final bool reachable;
@@ -56,129 +47,77 @@ class HisProxyTokenService {
   static final HisProxyTokenService instance = HisProxyTokenService._();
   HisProxyTokenService._();
 
-  static const String _kProxyUrlKey = 'his_proxy_url';
-  static const String _kAutoFetchKey = 'his_proxy_auto_fetch';
-  static const String _kLastFetchKey = 'his_proxy_last_fetch';
-
-  /// PC IP candidates - thử lần lượt
-  static const List<String> defaultPcUrls = [
-    'http://172.16.200.109:9999',  // Default proxy PC mode
-    'http://172.16.1.12:9999',     // LAN server (BV)
-    'http://192.168.1.1:9999',     // Common home router
-  ];
-
-  /// Lấy URL proxy đã lưu hoặc trả về default đầu tiên
-  Future<String> getProxyUrl() async {
-    final prefs = await SharedPreferences.getInstance();
-    final saved = prefs.getString(_kProxyUrlKey);
-    if (saved != null && saved.isNotEmpty) return saved;
-    return defaultPcUrls.first;
-  }
-
-  /// Set URL proxy (lưu vào SharedPreferences)
-  Future<void> setProxyUrl(String url) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_kProxyUrlKey, url);
-  }
-
   /// Auto-fetch on 401? (default true)
   Future<bool> get autoFetchEnabled async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_kAutoFetchKey) ?? true;
+    return await AutoTokenService.instance.isAutoLoginEnabled();
   }
 
   Future<void> setAutoFetchEnabled(bool enabled) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_kAutoFetchKey, enabled);
+    await AutoTokenService.instance.setAutoLoginEnabled(enabled);
   }
 
-  /// Ping proxy - check reachable
+  /// Lấy URL "proxy" (giữ tên cũ cho tương thích) - hiện tại chỉ là nhãn
+  Future<String> getProxyUrl() async {
+    return 'auto://auto-token-service';
+  }
+
+  /// Set URL proxy (no-op v3.0.160)
+  Future<void> setProxyUrl(String url) async {
+    // no-op
+  }
+
+  /// Ping - check if AutoTokenService available (always true)
   Future<HisProxyTokenStatus> ping({String? url}) async {
-    final pcUrl = url ?? await getProxyUrl();
-    try {
-      final dio = Dio(BaseOptions(
-        connectTimeout: const Duration(seconds: 3),
-        receiveTimeout: const Duration(seconds: 5),
-      ));
-      final r = await dio.get('$pcUrl/ping');
-      if (r.statusCode == 200) {
-        debugPrint('✅ Proxy ping OK: $pcUrl');
-        return HisProxyTokenStatus(reachable: true, pcUrl: pcUrl);
-      }
-      return HisProxyTokenStatus.unreachable(pcUrl, 'HTTP ${r.statusCode}');
-    } on DioException catch (e) {
-      debugPrint('❌ Proxy ping fail: $pcUrl (${e.type})');
-      return HisProxyTokenStatus.unreachable(pcUrl, e.message ?? 'Connection failed');
-    }
+    return HisProxyTokenStatus(reachable: true, pcUrl: 'auto://auto-token-service');
   }
 
-  /// Lấy token status (info only, no save)
+  /// Lấy token status từ AutoTokenService
   Future<HisProxyTokenStatus> getStatus({String? url}) async {
-    final pcUrl = url ?? await getProxyUrl();
-    try {
-      final dio = Dio(BaseOptions(
-        connectTimeout: const Duration(seconds: 3),
-        receiveTimeout: const Duration(seconds: 5),
-      ));
-      final r = await dio.get('$pcUrl/get-his-token-status');
-      if (r.statusCode == 200 && r.data is Map) {
-        final m = r.data as Map;
-        return HisProxyTokenStatus(
-          reachable: true,
-          hasToken: m['has_token'] == true,
-          token: m['token']?.toString(),
-          tokenPreview: m['token_preview']?.toString(),
-          tokenLength: m['token_length'] as int?,
-          source: m['source']?.toString(),
-          sourceFile: m['source_file']?.toString(),
-          foundAt: m['found_at']?.toString(),
-          ageSeconds: m['age_seconds'] as int?,
-          pcUrl: pcUrl,
-        );
-      }
-      return HisProxyTokenStatus.unreachable(pcUrl, 'HTTP ${r.statusCode}');
-    } on DioException catch (e) {
-      return HisProxyTokenStatus.unreachable(pcUrl, e.message ?? 'Connection failed');
-    }
+    final token = AutoTokenService.instance.currentToken;
+    final lastFetch = AutoTokenService.instance.lastFetchTime;
+    final ageSec = lastFetch != null
+        ? DateTime.now().difference(lastFetch).inSeconds
+        : null;
+    return HisProxyTokenStatus(
+      reachable: true,
+      hasToken: token != null,
+      token: token,
+      tokenPreview: token != null && token.length >= 12
+          ? '${token.substring(0, 12)}...'
+          : null,
+      tokenLength: token?.length,
+      source: AutoTokenService.instance.currentSource.name,
+      sourceFile: 'auto_token_service',
+      foundAt: lastFetch?.toIso8601String(),
+      ageSeconds: ageSec,
+      pcUrl: 'auto://auto-token-service',
+    );
   }
 
-  /// Lấy token từ proxy và lưu vào ThongkeAuthService
+  /// Lấy token qua AutoTokenService và lưu vào ThongkeAuthService
   /// Returns: token string nếu OK, null nếu fail
   Future<String?> fetchAndSaveToken({String? url}) async {
-    final pcUrl = url ?? await getProxyUrl();
     try {
-      final dio = Dio(BaseOptions(
-        connectTimeout: const Duration(seconds: 5),
-        receiveTimeout: const Duration(seconds: 10),
-      ));
-      final r = await dio.get('$pcUrl/get-his-token');
-      if (r.statusCode == 200 && r.data is Map) {
-        final m = r.data as Map;
-        if (m['success'] == true && m['token'] is String) {
-          final token = m['token'] as String;
-          // Lưu token qua ThongkeAuthService (v3.0.93: đánh dấu source = hisproxy)
-          await ThongkeAuthService.instance.setHisProToken(token, source: 'hisproxy');
-          await ThongkeAuthService.instance.loadHisProToken();
-          // Lưu thời gian fetch
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString(_kLastFetchKey, DateTime.now().toIso8601String());
-          debugPrint('✅ Token fetched & saved (${token.length} chars) from $pcUrl');
-          return token;
-        }
+      final result = await AutoTokenService.instance.fetchToken(forceRefresh: true);
+      if (result.success && result.token != null) {
+        await ThongkeAuthService.instance.setHisProToken(
+          result.token!,
+          source: result.source.name,
+        );
+        await ThongkeAuthService.instance.loadHisProToken();
+        debugPrint('✅ Token fetched & saved (${result.token!.length} chars) from ${result.source.name}');
+        return result.token;
       }
-      debugPrint('❌ fetchAndSaveToken: bad response from $pcUrl');
+      debugPrint('❌ fetchAndSaveToken: ${result.message}');
       return null;
-    } on DioException catch (e) {
-      debugPrint('❌ fetchAndSaveToken: $pcUrl (${e.type}: ${e.message})');
+    } catch (e) {
+      debugPrint('❌ fetchAndSaveToken error: $e');
       return null;
     }
   }
 
   /// Last fetch timestamp
   Future<DateTime?> getLastFetchTime() async {
-    final prefs = await SharedPreferences.getInstance();
-    final s = prefs.getString(_kLastFetchKey);
-    if (s == null) return null;
-    try { return DateTime.parse(s); } catch (_) { return null; }
+    return AutoTokenService.instance.lastFetchTime;
   }
 }

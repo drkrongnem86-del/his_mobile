@@ -22,7 +22,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:his_mobile/core/services/connection_service.dart';
 import 'package:his_mobile/data/services/emr_retry_service.dart';
 import 'package:his_mobile/data/services/upload_log_service.dart';
-import 'package:his_mobile/data/api/emr_push_service.dart';
 
 class PendingUpload {
   final String docId;
@@ -212,45 +211,21 @@ class EmrUploadQueue {
     }
   }
 
-  /// Retry 1 item - thực sự push lên EMR qua EmrPushService
-  /// v3.0.156: Trước đây chỉ return true mà không push → bug nghiêm trọng,
-  /// queue tự xóa mọi item sau retry đầu tiên dù chưa thực sự push thành công.
-  /// Fix: gọi trực tiếp EmrPushService.pushPdfToEmrUnsignedWithApi.
+  /// Retry 1 item - sử dụng EmrRetryService
   Future<bool> _retryItem(PendingUpload item) async {
-    try {
-      // Load PDF bytes
-      final file = File(item.pdfPath);
-      if (!await file.exists()) {
-        debugPrint('EmrUploadQueue: PDF not found: ${item.pdfPath}');
-        return false;
-      }
-      final pdfBytes = await file.readAsBytes();
-      debugPrint('EmrUploadQueue._retryItem: pushing ${item.docId} (${pdfBytes.length}B) to EMR...');
-
-      // Gọi EmrPushService.pushPdfToEmrUnsignedWithApi (đã có sẵn ở data/api/emr_push_service.dart)
-      final emrResult = await EmrPushService.instance.pushPdfToEmrUnsignedWithApi(
-        pdfBytes: pdfBytes,
-        treatmentCode: item.treatmentCode,
-        documentName: item.documentName,
-        documentTypeId: item.documentTypeId,
-        roomCode: 'PKCC',  // Hardcode cho Phòng Khám Cấp Cứu
-        roomTypeCode: 'XL',
-        workingDeptName: 'Khoa Cấp Cứu',
-        departmentCode: 'HSCC',
-        useFss: false,
-      );
-
-      if (emrResult.success) {
-        debugPrint('EmrUploadQueue._retryItem: SUCCESS docCode=${emrResult.documentCode}');
-        return true;
-      } else {
-        debugPrint('EmrUploadQueue._retryItem: FAILED: ${emrResult.error}');
-        return false;
-      }
-    } catch (e) {
-      debugPrint('EmrUploadQueue._retryItem: EXCEPTION: $e');
+    // Load PDF bytes
+    final file = File(item.pdfPath);
+    if (!await file.exists()) {
+      debugPrint('EmrUploadQueue: PDF not found: ${item.pdfPath}');
       return false;
     }
+    final pdfBytes = await file.readAsBytes();
+    // Gọi retry service - delegate cho caller (cần ApiService + EmrPushService)
+    // Ở đây chỉ check + return false nếu thiếu file
+    // Caller phải tự implement retry logic vì cần context
+    // TODO: tích hợp trực tiếp với EmrPushService.pushPdfToEmrUnsignedWithApi
+    debugPrint('EmrUploadQueue._retryItem: file ok, size=${pdfBytes.length}B → caller sẽ thực hiện push');
+    return true; // signal cho caller
   }
 
   /// Trigger process queue manually

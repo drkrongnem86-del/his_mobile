@@ -37,6 +37,11 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         multiDexEnabled = true
+        // v3.0.164: ARM64 only (Samsung A17) - gọn nhẹ cho máy BS
+        ndk {
+            abiFilters.clear()
+            abiFilters.add("arm64-v8a")
+        }
     }
 
     // v3.0.118: Custom signing config cho release (stable keystore - không bị thay đổi như debug.keystore)

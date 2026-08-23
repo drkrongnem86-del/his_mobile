@@ -3,7 +3,6 @@
 // trong WebView của app. BS không cần login lại vì cookie web cached.
 // v3.0.96: Auto-fill credentials từ Credentials (XOR-encoded) - không có plaintext
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:his_mobile/core/security/credentials.dart';
 import 'package:his_mobile/core/utils/vietnamese.dart';
 import 'package:his_mobile/data/local/clinical_notes_service.dart';
@@ -146,7 +145,7 @@ class _HisWebviewScreenState extends State<HisWebviewScreen> {
             });
           },
           onNavigationRequest: (req) {
-            debugPrint('🔗 WebView nav: ${req.url}');
+            print('🔗 WebView nav: ${req.url}');
             return NavigationDecision.navigate;
           },
         ),
@@ -206,7 +205,7 @@ class _HisWebviewScreenState extends State<HisWebviewScreen> {
     ''';
     try {
       final result = await _controller.runJavaScriptReturningResult(js);
-      debugPrint('🔐 Auto-login result: $result');
+      print('🔐 Auto-login result: $result');
       // Nếu chưa có form, thử lại sau 1s
       if (result.toString().contains('NO FORM FOUND')) {
         await Future.delayed(const Duration(milliseconds: 1000));
@@ -214,7 +213,7 @@ class _HisWebviewScreenState extends State<HisWebviewScreen> {
         await _controller.runJavaScript(js);
       }
     } catch (e) {
-      debugPrint('❌ Auto-login error: $e');
+      print('❌ Auto-login error: $e');
     }
   }
 

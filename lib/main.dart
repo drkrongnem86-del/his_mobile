@@ -17,6 +17,9 @@ import 'package:his_mobile/modules/auth/presentation/blocs/auth_bloc.dart';
 import 'package:his_mobile/presentation/navigation/app_router.dart';
 import 'package:his_mobile/core/services/vpn_benh_vien_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:his_mobile/data/services/his_pro_api_service.dart';
+import 'package:his_mobile/data/services/auto_token_service.dart';  // v3.0.159: Auto-token multi-source
+import 'package:his_mobile/data/services/token_sync_service.dart';  // v3.0.165: Token hub
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -44,43 +47,48 @@ void main() async {
   await HisConfigService.instance.load();
   await ConnectionService.instance.load();
 
-  // v3.0.59: FORCE hardcode token mới nhất (bỏ SharedPreferences cache)
-  // - v3.0.57 dùng af89403b... → giờ giữ nguyên (verified work 20/7)
-  // - v3.0.59: IP đổi 171.15.128.5 → 171.15.0.9 (BS thay đổi IP máy BV)
-  // - Lý do: v3.0.47/48 dùng ??= chỉ fallback khi prefs rỗng
-  //   Nếu BS đã từng lưu token cũ vào prefs thì v3.0.49 sẽ KHÔNG override
-  //   → App dùng token cũ → EMR push fail
-  // - Fix: hardcode là source of truth, LUÔN ghi đè SharedPreferences
-  // - Nếu cần test token khác, dùng Settings → "Token HIS Pro (override)"
-  // v3.0.144: CRITICAL - Có 2 class HisProApiService khác nhau!
-  //   1. lib/data/api/his_pro_api_service.dart (class CHÍNH) - dùng cho EMR push
-  //   2. lib/data/services/his_pro_api_service.dart (class PHỤ) - dùng cho service khác
-  // → Fix: set token ở CẢ 2 class + update hardcode HisProHardcoded.tokenCode
+  // v3.0.165: Bootstrap TokenSyncService - áp dụng token cho TẤT CẢ services
+  // - Bước 1: Load từ SharedPreferences (paste trước đó)
+  // - Bước 2: Nếu chưa có → auto-fetch từ multi-source (proxy → login API → renew → hardcoded)
+  // - Bước 3: Apply cho cả HisApiService + HisProApiService (cả 2 class) + ThongkeAuthService
+  // - Cũng giữ hardcode fallback cuối cùng (giống v3.0.159)
   try {
-    const String latestToken = '1ee41ae967caa75e7c2891a3d9612259d70b4645c67852ab0e5f07546c2f3dfb';
-    const String latestIp = '172.16.200.109';  // v3.0.144: IP mới (đổi từ 171.15.0.9)
-    // Check override từ Settings (nếu BS muốn dùng token khác)
-    final String? overrideToken = prefs.getString('his_pro_token_override');
-    final String? overrideIp = prefs.getString('his_pro_ip_override');
-    final String emrToken = (overrideToken != null && overrideToken.isNotEmpty) ? overrideToken : latestToken;
-    final String emrIp = (overrideIp != null && overrideIp.isNotEmpty) ? overrideIp : latestIp;
-    // v3.0.49: LUÔN ghi đè SharedPreferences cache với hardcode mới nhất
-    await prefs.setString('his_pro_token_code', emrToken);
-    await prefs.setString('his_pro_client_ip', emrIp);
-    // v3.0.144: Set token cho HisApiService (procedure room dùng cái này)
-    HisApiService().setAuthToken(emrToken);
-    // v3.0.157: class PHỤ (services/his_pro_api_service.dart) đã merge vào class CHÍNH
-    // v3.0.144: Set token cho class CHÍNH (api/his_pro_api_service.dart) - dùng cho EMR push
-    // Trước tiên xóa cache cũ (tránh token cũ paste trước đó còn trong SecureStorage)
-    try {
-      await his_pro_api.HisProApiService.instance.clearCustomBearer();
-    } catch (e) {
-      print('⚠️ clearCustomBearer: $e');
+    // Bước 1: Load từ SharedPreferences
+    await TokenSyncService.instance.loadFromStorage();
+
+    // Bước 2: Nếu chưa có token → auto-fetch
+    if (!TokenSyncService.instance.hasToken) {
+      debugPrint('🔑 [v3.0.165] No token in storage, auto-fetching from multi-source...');
+      final event = await TokenSyncService.instance.autoFetchToken(force: false);
+      debugPrint('🔑 [v3.0.165] Auto-fetch: success=${event.token != null} source=${event.source} msg=${event.message}');
     }
-    await his_pro_api.HisProApiService.instance.setCustomBearer(emrToken);
-    print('🔑 [v3.0.144] Force EMR Token: ${emrToken.substring(0, 8)}… IP=$emrIp (cả 2 class)');
+
+    // Bước 3: Backward-compat - set cả class PHỤ + Thongke
+    final currentToken = TokenSyncService.instance.currentToken;
+    if (currentToken != null && currentToken.isNotEmpty) {
+      HisProApiService.instance.setTokenCode(token: currentToken, clientIp: '172.16.200.101');
+      try {
+        await ThongkeAuthService.instance.setHisProToken(
+          currentToken,
+          source: TokenSyncService.instance.currentSource ?? 'bootstrap',
+        );
+        await ThongkeAuthService.instance.loadHisProToken();
+      } catch (_) {}
+      debugPrint('🔑 [v3.0.165] TokenSyncService bootstrap OK: ${currentToken.substring(0, 8)}… source=${TokenSyncService.instance.currentSource}');
+    } else {
+      // Hardcode fallback cuối cùng
+      const String hardcodeToken = 'e365259dd4997a1a7235ccb48511044f413b1b63cbd46e26222fa4c6a9ffe8a4';
+      await TokenSyncService.instance.setToken(
+        hardcodeToken,
+        source: 'hardcoded',
+        eventType: TokenEventType.loaded,
+        broadcast: false,
+      );
+      HisProApiService.instance.setTokenCode(token: hardcodeToken, clientIp: '172.16.200.101');
+      debugPrint('🔑 [v3.0.165] Hardcode fallback applied');
+    }
   } catch (e) {
-    print('⚠️ Bootstrap EMR Token failed: $e');
+    debugPrint('⚠️ [v3.0.165] Bootstrap EMR Token failed: $e');
   }
 
   // v3.0.62: FORCE tất cả HIS Pro URLs về 172.16.9.6 (LAN) - port mới theo HIS_ICU v2.35.13

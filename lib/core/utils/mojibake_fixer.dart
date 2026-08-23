@@ -45,14 +45,17 @@ String fixVietnameseMojibake(String input) {
   }
 
   // Step 2: Try CP1252 roundtrip if still has mojibake
+  // v3.0.166: Fix - map CP1252 chars (€ = 0x80, Š = 0x8A, ...) sang byte values
+  // trước khi thử decode UTF-8. Nếu không, các ký tự như '€' (U+20AC) sẽ bị skip.
   if (_hasMojibake(s)) {
     try {
-      // Treat each char code as 1 byte, decode as UTF-8
+      // Map từng rune sang byte value (CP1252 mapping cho > 0x7F)
       final bytes = <int>[];
       var allValid = true;
       for (final r in s.runes) {
-        if (r < 256) {
-          bytes.add(r);
+        final byte = _cp1252Byte(r);
+        if (byte != null) {
+          bytes.add(byte);
         } else {
           allValid = false;
           break;
@@ -68,6 +71,47 @@ String fixVietnameseMojibake(String input) {
   }
 
   return s;
+}
+
+/// v3.0.166: Map Unicode rune sang byte value theo CP1252
+/// - 0x00-0x7F: ASCII, giữ nguyên
+/// - 0xA0-0xFF: Latin-1 supplement, giữ nguyên (CP1252 = Latin-1 ở dải này)
+/// - 0x80-0x9F: CP1252 specific (€, Š, š, Ž, ž, ... - KHÔNG có trong Latin-1/UTF-8 control chars)
+/// Returns null nếu rune không phải CP1252 char
+int? _cp1252Byte(int rune) {
+  if (rune < 0x80) return rune; // ASCII
+  if (rune >= 0xA0 && rune < 0x100) return rune; // Latin-1 supplement (giống CP1252)
+  // CP1252 0x80-0x9F mapping
+  switch (rune) {
+    case 0x20AC: return 0x80; // €
+    case 0x201A: return 0x82; // ‚
+    case 0x0192: return 0x83; // ƒ
+    case 0x201E: return 0x84; // „
+    case 0x2026: return 0x85; // …
+    case 0x2020: return 0x86; // †
+    case 0x2021: return 0x87; // ‡
+    case 0x02C6: return 0x88; // ˆ
+    case 0x2030: return 0x89; // ‰
+    case 0x0160: return 0x8A; // Š
+    case 0x2039: return 0x8B; // ‹
+    case 0x0152: return 0x8C; // Œ
+    case 0x017D: return 0x8E; // Ž
+    case 0x2018: return 0x91; // ‘
+    case 0x2019: return 0x92; // ’
+    case 0x201C: return 0x93; // "
+    case 0x201D: return 0x94; // "
+    case 0x2022: return 0x95; // •
+    case 0x2013: return 0x96; // –
+    case 0x2014: return 0x97; // —
+    case 0x02DC: return 0x98; // ˜
+    case 0x2122: return 0x99; // ™
+    case 0x0161: return 0x9A; // š
+    case 0x203A: return 0x9B; // ›
+    case 0x0153: return 0x9C; // œ
+    case 0x017E: return 0x9E; // ž
+    case 0x0178: return 0x9F; // Ÿ
+    default: return null; // Không phải CP1252 char
+  }
 }
 
 String? _decodeUtf8(List<int> bytes) {

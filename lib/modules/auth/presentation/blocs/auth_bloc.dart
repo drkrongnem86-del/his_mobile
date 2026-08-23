@@ -1,10 +1,9 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:his_mobile/core/constants/app_constants.dart';
 import 'package:his_mobile/core/services/connection_service.dart';
 import 'package:his_mobile/data/api/his_api_service.dart';
-import 'package:his_mobile/data/services/his_pro_tracking_service.dart';
+import 'package:his_mobile/data/services/his_pro_api_service.dart';
 import 'package:his_mobile/data/services/secure_storage_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -106,9 +105,9 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         // Đồng thời login vào Thongke server để có session cookie cho BN
         try {
           final thongkeResult = await _apiService.thongkeLogin(event.loginName, event.password);
-          debugPrint('🌐 Thongke login: ${thongkeResult.success}');
+          print('🌐 Thongke login: ${thongkeResult.success}');
         } catch (e) {
-          debugPrint('⚠️ Thongke login failed (non-fatal): $e');
+          print('⚠️ Thongke login failed (non-fatal): $e');
         }
 
         // Luu session
@@ -143,7 +142,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   /// - Fix: hardcode mới nhất là source of truth, LUÔN ghi đè
   Future<void> _autoSyncEmrToken() async {
     try {
-      const String latestToken = '1ee41ae967caa75e7c2891a3d9612259d70b4645c67852ab0e5f07546c2f3dfb';
+      const String latestToken = 'af89403b7f001cd27ca9defa6c987a4f9e7bbd564525b8bc6287a693bf674c4d';
       const String latestIp = '171.15.0.9';  // v3.0.59: IP mới
       // v3.0.49: Check override từ Settings (nếu BS muốn dùng token khác)
       final String? overrideToken = _prefs.getString('his_pro_token_override');
@@ -151,14 +150,14 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       final String token = (overrideToken != null && overrideToken.isNotEmpty) ? overrideToken : latestToken;
       final String ip = (overrideIp != null && overrideIp.isNotEmpty) ? overrideIp : latestIp;
       // v3.0.49: LUÔN ghi đè cache với hardcode mới nhất
-      HisProTrackingService.instance.setTokenCode(token: token, clientIp: ip);
+      HisProApiService.instance.setTokenCode(token: token, clientIp: ip);
       await SecureStorageService.instance.save('his_pro_token_code', token);
       await SecureStorageService.instance.save('his_pro_client_ip', ip);
       await _prefs.setString('his_pro_token_code', token);
       await _prefs.setString('his_pro_client_ip', ip);
-      debugPrint('🔑 [v3.0.59] Force EMR Token: ${token.substring(0, 8)}… IP=$ip');
+      print('🔑 [v3.0.59] Force EMR Token: ${token.substring(0, 8)}… IP=$ip');
     } catch (e) {
-      debugPrint('⚠️ Auto sync Token EMR failed: $e');
+      print('⚠️ Auto sync Token EMR failed: $e');
     }
   }
 

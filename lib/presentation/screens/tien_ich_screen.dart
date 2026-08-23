@@ -1,4 +1,7 @@
-// TienIchScreen v2.38.9 - Tiện ích (sử dụng PatientSearchField dùng chung)
+// TienIchScreen v3.0.164 - Tiện ích (sử dụng PatientSearchField dùng chung)
+// v3.0.164: GỘP 2 tile phòng thành 1 - "Phòng tủ thuật HSCC (ECG + DSBN)" - room 36
+//          BS yêu cầu: BỎ "Phòng thử thuật HSCC ID 9999" - chỉ giữ 1 tile thống nhất
+//          Phòng 36 chứa ECG + BN chờ thủ thuật nhỏ + DSBN đang chờ
 // v2.38.9: Thêm 6 tile danh mục từ Data Public (Thuốc/CLS/Vật tư/Nhân viên/Khoa-Giường/TB + ICD + DVKT)
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -15,6 +18,7 @@ import 'package:his_mobile/presentation/screens/catalog_browser_screen.dart';
 import 'package:his_mobile/presentation/widgets/local_patient_search_field.dart';
 import 'package:his_mobile/presentation/widgets/user_header.dart';
 import 'package:his_mobile/presentation/screens/procedure_room_screen.dart';
+import 'package:his_mobile/core/constants/app_constants.dart';  // v3.0.162
 
 class TienIchScreen extends StatelessWidget {
   const TienIchScreen({super.key});
@@ -80,9 +84,15 @@ class TienIchScreen extends StatelessWidget {
 
   Widget _buildGrid(BuildContext context) {
     final items = <_TI>[
-      // v3.0.116: Phòng thử thuật HSCC (port từ v3.1.13)
-      _TI('Phòng TT HSCC', Icons.flash_on, const Color(0xFFD32F2F), () {
-        Navigator.push(context, MaterialPageRoute(builder: (_) => const ProcedureRoomScreen()));
+      // v3.0.164: GỘP 2 phòng thành 1 - "Phòng tủ thuật HSCC (ECG + DSBN)" - dùng room 36
+      // BS yêu cầu: BỎ "Phòng thử thuật HSCC ID 9999", chỉ giữ 1 tile thống nhất
+      // - Phòng 36 (Phòng khám cấp cứu / Tủ thuật nhỏ) chứa ECG + BN chờ thủ thuật nhỏ
+      // - Hiển thị: DS BN đang chờ (1 BN có thể có ECG + Khám + Thủ thuật) + ECG screen
+      // - Token sync với procedure room screen (paste 1 nơi → all dùng token đó)
+      _TI('Phòng tủ thuật HSCC\n(ECG + DSBN)', Icons.medical_services, const Color(0xFFD32F2F), () {
+        Navigator.push(context, MaterialPageRoute(builder: (_) => const ProcedureRoomScreen(
+          executeRoomId: AppConstants.ROOM_ID_TU_THUAT_HSCC,
+        )));
       }),
       _TI('QR BN', Icons.qr_code_scanner, const Color(0xFF00838F), () {
         Navigator.push(context, MaterialPageRoute(builder: (_) => const QrScannerScreen()));
