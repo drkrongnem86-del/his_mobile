@@ -564,7 +564,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   subtitle: 'Phiên bản $_version',
                   onTap: () => _showAppInfo(context),
                 ),
-                // v3.0.171: Bỏ mục "Kiểm tra cập nhật" - user tự cài APK thủ công qua file manager
+                // v3.0.173: Restore lại mục "Kiểm tra cập nhật" từ v3.0.169 (user thấy thiếu)
+                _menuItem(
+                  icon: Icons.system_update,
+                  color: Colors.blue,
+                  title: 'Kiểm tra cập nhật',
+                  subtitle: 'Tìm bản mới từ GitHub',
+                  onTap: () => _checkForUpdates(),
+                ),
                 _menuItem(
                   icon: Icons.bug_report,
                   color: Colors.red,

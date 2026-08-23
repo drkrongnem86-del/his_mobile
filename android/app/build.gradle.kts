@@ -107,9 +107,11 @@ android {
     // v3.0.172-fix: ABI splits cho APK (chỉ arm64-v8a, dùng cho Samsung A17)
     // - splits.abi thay vì ndk.abiFilters để tương thích với flag `--split-per-abi` trên CI
     // - Cùng với --target-platform android-arm64 → chỉ tạo 1 file app-arm64-v8a-release.apk
+    // - v3.0.173-fix: Chỉ enable khi build APK (assemble*), KHÔNG enable khi build AAB (bundle*)
+    //   Lý do: AAB mặc định dùng 3 ABIs (armeabi-v7a + arm64-v8a + x86_64) → conflict với splits.abi
     splits {
         abi {
-            isEnable = true
+            isEnable = gradle.startParameter.taskNames.any { it.lowercase().contains("assemble") }
             reset()
             include("arm64-v8a")
             isUniversalApk = false

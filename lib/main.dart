@@ -4,6 +4,7 @@ import 'package:his_mobile/core/services/app_version_service.dart';
 import 'package:his_mobile/core/services/connection_service.dart';
 import 'package:his_mobile/core/services/department_service.dart';
 import 'package:his_mobile/core/services/his_config_service.dart';
+import 'package:his_mobile/core/services/update_service.dart';
 import 'package:his_mobile/core/theme/app_theme.dart';
 import 'package:his_mobile/core/theme/theme_manager.dart';
 import 'package:his_mobile/data/api/his_api_service.dart';
@@ -154,13 +155,33 @@ class _HisMobileAppState extends State<HisMobileApp> with WidgetsBindingObserver
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    // v3.0.171: Bỏ auto check update khi mở app - user tự cài APK thủ công qua file manager
+    // v3.0.144: Auto check update sau 5s khi mở app
+    _autoCheckUpdateOnStart();
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  /// v3.0.144: Tự động check update khi mở app
+  /// Delay 5s để app init xong (VPN, theme, routing) rồi mới check
+  /// Nếu có bản mới → hiện dialog thông báo
+  /// v3.0.173: Restore lại từ v3.0.169 (bỏ v3.0.171 vì user thấy thiếu)
+  Future<void> _autoCheckUpdateOnStart() async {
+    final info = await UpdateService.autoCheckUpdate(
+      delay: const Duration(seconds: 5),
+    );
+    if (info != null && mounted) {
+      final navKey = AppRouter.router.routerDelegate.navigatorKey;
+      final ctx = navKey.currentContext;
+      if (ctx != null) {
+        UpdateService.showUpdateDialog(ctx, info);
+      } else {
+        debugPrint('autoCheckUpdateOnStart: no navigator context');
+      }
+    }
   }
 
   /// v3.0.77: Lifecycle - khi user thoát app / chuyển sang background, đợi 5 phút rồi auto-disconnect VPN
