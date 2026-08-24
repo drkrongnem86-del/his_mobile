@@ -67,20 +67,25 @@ class _UserPickerDialogState extends State<UserPickerDialog> {
     super.dispose();
   }
 
-  /// Load users từ api/HisExecuteRoleUser/Get
+  /// Load users từ api/AcsUser/Get (port 1401) - giống ECG dropdown
+  /// v3.0.175: Chuyển từ getExecuteRoleUsers (port 1425 MCH, trả 0 user) sang getAcsUsers
+  ///   Lý do: getExecuteRoleUsers gọi api/HisExecuteUser/GetView ở OCR port 1425
+  ///   → cho HSCC dept=22 trả 0 user (HIS Pro MCH không có mapping role/execute)
+  ///   → getAcsUsers gọi api/AcsUser/Get ở ACS port 1401
+  ///   → trả đúng 200 user thuộc HSCC (đã verify với ECG dropdown)
   /// Filter theo department (mặc định 22 = HSCC)
   Future<void> _loadUsers() async {
     setState(() => _loading = true);
     try {
-      final res = await widget.api.getExecuteRoleUsers(departmentId: widget.departmentId, limit: 200);
+      final res = await widget.api.getAcsUsers(departmentId: widget.departmentId, limit: 200);
       if (res.success && res.data is List) {
         _users = List<Map<String, dynamic>>.from(res.data);
       } else if (res.success && res.data is Map && (res.data as Map)['Data'] is List) {
         _users = List<Map<String, dynamic>>.from((res.data as Map)['Data']);
       }
-      debugPrint('👥 [UserPicker] loaded ${_users.length} users for dept ${widget.departmentId}');
+      debugPrint('👥 [UserPicker] getAcsUsers loaded ${_users.length} users for dept ${widget.departmentId}');
     } catch (e) {
-      debugPrint('❌ [UserPicker] _loadUsers error: $e');
+      debugPrint('❌ [UserPicker] getAcsUsers _loadUsers error: $e');
     }
     if (mounted) {
       setState(() {

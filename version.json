@@ -1,5 +1,5 @@
 {
-  "version": "3.0.174",
-  "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.174/his_mobile_v3.0.174_arm64.apk",
-  "message": "v3.0.174 - 1) Bo 'Phong thu thuat HSCC' shortcut o Drawer (home_screen.dart) + card noi bat o DeptPickerDialog (dept_picker_dialog.dart). 2) HSCC (service_execute_detail_screen) cung dung shared UserPickerDialog nhu ECG, co search filter o top + USERNAME mapping."
+  "version": "3.0.175",
+  "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.175/his_mobile_v3.0.175_arm64.apk",
+  "message": "v3.0.175 - Fix UserPicker tra 0 user: chuyen tu getExecuteRoleUsers (port 1425 MCH, tra 0 user cho HSCC) sang getAcsUsers (port 1401 ACS, tra 200 user nhu ECG dropdown)."
 }
