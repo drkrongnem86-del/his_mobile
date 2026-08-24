@@ -1,5 +1,5 @@
 {
-  "version": "3.0.173",
-  "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.173/his_mobile_v3.0.173_arm64.apk",
-  "message": "v3.0.173 - Fix AAB build (splits.abi chi enable khi build APK, khong enable khi build AAB) + restore in-app update (auto check 5s sau khi mo app + menu 'Kiem tra cap nhat' trong Settings)."
+  "version": "3.0.174",
+  "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.174/his_mobile_v3.0.174_arm64.apk",
+  "message": "v3.0.174 - 1) Bo 'Phong thu thuat HSCC' shortcut o Drawer (home_screen.dart) + card noi bat o DeptPickerDialog (dept_picker_dialog.dart). 2) HSCC (service_execute_detail_screen) cung dung shared UserPickerDialog nhu ECG, co search filter o top + USERNAME mapping."
 }

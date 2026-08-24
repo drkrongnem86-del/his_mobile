@@ -17,6 +17,7 @@ import 'package:his_mobile/core/utils/patient_name_helper.dart';
 import 'package:his_mobile/data/api/his_api_service.dart';
 import 'package:his_mobile/data/services/form_draft_service.dart';
 import 'package:his_mobile/presentation/widgets/user_header.dart';
+import 'package:his_mobile/presentation/widgets/user_picker_dialog.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart' as intl;
 
@@ -789,16 +790,17 @@ class _ServiceExecuteDetailScreenState extends State<ServiceExecuteDetailScreen>
 
   /// v3.1.05: Picker user từ HIS Pro (api/HisExecuteRoleUser/Get)
   /// Hiển thị danh sách BS/ĐD theo role để chọn nhanh
+  /// v3.0.174: Dùng shared UserPickerDialog (có search filter ở top) thay vì _UserPickerDialog cũ
   Future<void> _pickUser(TextEditingController ctrl, String label) async {
     showDialog(
       context: context,
-      builder: (ctx) => _UserPickerDialog(
+      builder: (ctx) => UserPickerDialog(
         api: _api,
         departmentId: widget.executeDepartmentId ?? 22, // HSCC default
         title: 'Chọn $label',
-        onSelected: (username, fullName) {
+        onSelected: (result) {
           setState(() {
-            ctrl.text = '$fullName ($username)';
+            ctrl.text = '${result.fullName} (${result.loginName})';
           });
         },
       ),
@@ -841,142 +843,6 @@ class _ServiceExecuteDetailScreenState extends State<ServiceExecuteDetailScreen>
                 padding: const EdgeInsets.symmetric(vertical: 12),
               ),
             ),
-          ),
-        ]),
-      ),
-    );
-  }
-}
-
-/// v3.1.05: Dialog chọn user từ HIS Pro (api/HisExecuteRoleUser/Get)
-/// - Load danh sách user theo role + department
-/// - Search by tên/username
-/// - Trả về (username, fullName) cho callback
-class _UserPickerDialog extends StatefulWidget {
-  final HisApiService api;
-  final int departmentId;
-  final String title;
-  final void Function(String username, String fullName) onSelected;
-  const _UserPickerDialog({
-    required this.api,
-    required this.departmentId,
-    required this.title,
-    required this.onSelected,
-  });
-
-  @override
-  State<_UserPickerDialog> createState() => _UserPickerDialogState();
-}
-
-class _UserPickerDialogState extends State<_UserPickerDialog> {
-  List<Map<String, dynamic>> _users = [];
-  bool _loading = true;
-  String _search = '';
-  final _searchCtrl = TextEditingController();
-
-  @override
-  void initState() {
-    super.initState();
-    _loadUsers();
-  }
-
-  @override
-  void dispose() {
-    _searchCtrl.dispose();
-    super.dispose();
-  }
-
-  Future<void> _loadUsers() async {
-    setState(() => _loading = true);
-    try {
-      final res = await widget.api.getExecuteRoleUsers(departmentId: widget.departmentId, limit: 200);
-      if (res.success && res.data is List) {
-        _users = List<Map<String, dynamic>>.from(res.data);
-      } else if (res.success && res.data is Map && (res.data as Map)['Data'] is List) {
-        _users = List<Map<String, dynamic>>.from((res.data as Map)['Data']);
-      }
-    } catch (e) {
-      debugPrint('_loadUsers error: $e');
-    }
-    if (mounted) {
-      setState(() {
-        _loading = false;
-      });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final filtered = _search.isEmpty
-        ? _users
-        : _users.where((u) {
-            final name = (u['USERNAME'] ?? u['LOGINNAME'] ?? u['username'] ?? '').toString().toLowerCase();
-            return name.contains(_search.toLowerCase());
-          }).toList();
-
-    return Dialog(
-      child: Container(
-        width: 400,
-        height: 500,
-        padding: const EdgeInsets.all(12),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            const Icon(Icons.person_search, color: Color(0xFF6A1B9A)),
-            const SizedBox(width: 8),
-            Expanded(child: Text(widget.title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold))),
-            IconButton(
-              icon: const Icon(Icons.close, size: 18),
-              onPressed: () => Navigator.pop(context),
-            ),
-          ]),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _searchCtrl,
-            decoration: const InputDecoration(
-              hintText: 'Tìm theo tên đăng nhập...',
-              prefixIcon: Icon(Icons.search, size: 18),
-              border: OutlineInputBorder(),
-              isDense: true,
-              contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-            ),
-            onChanged: (v) => setState(() => _search = v),
-          ),
-          const SizedBox(height: 8),
-          if (_loading)
-            const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()))
-          else if (filtered.isEmpty)
-            const Center(child: Padding(padding: EdgeInsets.all(16), child: Text('Không tìm thấy user', style: TextStyle(color: Colors.black54))))
-          else
-            Expanded(
-              child: ListView.builder(
-                itemCount: filtered.length,
-                itemBuilder: (ctx, i) {
-                  final u = filtered[i];
-                  final username = (u['LOGINNAME'] ?? u['USERNAME'] ?? u['username'] ?? u['loginname'] ?? '').toString();
-                  final fullName = (u['USERNAME'] ?? u['username'] ?? u['fullName'] ?? username).toString();
-                  final dept = (u['DEPARTMENT_NAME'] ?? u['department_name'] ?? '').toString();
-                  return ListTile(
-                    dense: true,
-                    leading: CircleAvatar(
-                      radius: 14,
-                      backgroundColor: const Color(0xFF6A1B9A).withValues(alpha: 0.1),
-                      child: Text(username.isNotEmpty ? username[0].toUpperCase() : '?',
-                          style: const TextStyle(fontSize: 12, color: Color(0xFF6A1B9A), fontWeight: FontWeight.bold)),
-                    ),
-                    title: Text(fullName, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-                    subtitle: Text('$username${dept.isNotEmpty ? " • $dept" : ""}', style: const TextStyle(fontSize: 11, color: Colors.black54)),
-                    onTap: () {
-                      widget.onSelected(username, fullName);
-                      Navigator.pop(context);
-                    },
-                  );
-                },
-              ),
-            ),
-          const SizedBox(height: 4),
-          Align(
-            alignment: Alignment.centerRight,
-            child: Text('Tổng: ${_users.length} users (HIS Pro)', style: const TextStyle(fontSize: 10, color: Colors.black45)),
           ),
         ]),
       ),
