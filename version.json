@@ -1,5 +1,5 @@
 {
-  "version": "3.0.175",
-  "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.175/his_mobile_v3.0.175_arm64.apk",
-  "message": "v3.0.175 - Fix UserPicker tra 0 user: chuyen tu getExecuteRoleUsers (port 1425 MCH, tra 0 user cho HSCC) sang getAcsUsers (port 1401 ACS, tra 200 user nhu ECG dropdown)."
+  "version": "3.0.176",
+  "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.176/his_mobile_v3.0.176_arm64.apk",
+  "message": "v3.0.176 - Tang UserPicker limit 200 -> 2000 users (load tat ca user active toan BV tu ACS port 1401)."
 }
