@@ -1,5 +1,5 @@
 {
-  "version": "3.0.176",
-  "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.176/his_mobile_v3.0.176_arm64.apk",
-  "message": "v3.0.176 - Tang UserPicker limit 200 -> 2000 users (load tat ca user active toan BV tu ACS port 1401)."
+  "version": "3.0.177",
+  "apk_url": "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.177/his_mobile_v3.0.177_arm64.apk",
+  "message": "v3.0.177 - 1) Fix sort bug procedure_room: ca moi nhat o tren (aTime.compareTo thay bang bTime.compareTo - thuc su DESC). 2) Centralize credentials: them Credentials.defaultNemkLogin/defaultNemkPassword, replace 21 cho hardcode 'nemk' + 1 cho '1027' trong 14 file."
 }

@@ -1,4 +1,4 @@
-import 'dart:convert';
+﻿import 'dart:convert';
 import 'package:cookie_jar/cookie_jar.dart';
 import 'package:dio/dio.dart';
 import 'package:dio_cookie_manager/dio_cookie_manager.dart';
@@ -8,10 +8,11 @@ import 'package:his_mobile/core/constants/app_constants.dart';
 import 'package:his_mobile/core/services/connection_service.dart';
 import 'package:his_mobile/data/services/data_service.dart';
 
+import 'package:his_mobile/core/security/credentials.dart';
 /// HIS Pro API Service - v1.4.1
-/// Server: 117.2.25.67 (qua VPN BV) hoặc 172.16.9.6 (LAN)
-/// v3.0.162: Fix HIS Pro auth - dùng TokenCode headers thay vì Bearer
-/// v3.0.162: Fix response parsing - HIS Pro trả text/plain, cần jsonDecode
+/// Server: 117.2.25.67 (qua VPN BV) hoáº·c 172.16.9.6 (LAN)
+/// v3.0.162: Fix HIS Pro auth - dÃ¹ng TokenCode headers thay vÃ¬ Bearer
+/// v3.0.162: Fix response parsing - HIS Pro tráº£ text/plain, cáº§n jsonDecode
 class HisApiService {
   late final Dio _dio;
 
@@ -22,7 +23,7 @@ class HisApiService {
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        // v3.0.162: HIS Pro dùng TokenCode headers (KHÔNG Bearer)
+        // v3.0.162: HIS Pro dÃ¹ng TokenCode headers (KHÃ”NG Bearer)
         'TokenCode': '',
         'ApplicationCode': 'HIS',
         'ClientIpAddress': '172.16.200.101',
@@ -31,7 +32,7 @@ class HisApiService {
   }
 
   void setAuthToken(String token) {
-    // v3.0.162: Set cả 2 - Bearer (cho tương thích cũ) + TokenCode (HIS Pro chuẩn)
+    // v3.0.162: Set cáº£ 2 - Bearer (cho tÆ°Æ¡ng thÃ­ch cÅ©) + TokenCode (HIS Pro chuáº©n)
     _dio.options.headers['Authorization'] = 'Bearer $token';
     _dio.options.headers['TokenCode'] = token;
   }
@@ -41,9 +42,9 @@ class HisApiService {
     _dio.options.headers.remove('TokenCode');
   }
 
-  /// v3.0.162: Procedure room API thực tế ở port 1408 (MOS)
-  /// (mosUrl = 1429 sai, chỉ dùng cho MCH service)
-  /// ocrUrl = 1425 chỉ cho HisExecuteUser, KHÔNG có GetLView
+  /// v3.0.162: Procedure room API thá»±c táº¿ á»Ÿ port 1408 (MOS)
+  /// (mosUrl = 1429 sai, chá»‰ dÃ¹ng cho MCH service)
+  /// ocrUrl = 1425 chá»‰ cho HisExecuteUser, KHÃ”NG cÃ³ GetLView
   String get _procedureRoomUrl {
     final mos = ConnectionService.instance.mosUrl.replaceAll(RegExp(r'/$'), '');
     final uri = Uri.parse(mos);
@@ -51,8 +52,8 @@ class HisApiService {
   }
 
   /// v3.0.162: Unwrap HIS Pro response
-  /// HIS Pro trả Content-Type: text/plain nên Dio parse thành String
-  /// → cần jsonDecode trước khi dùng
+  /// HIS Pro tráº£ Content-Type: text/plain nÃªn Dio parse thÃ nh String
+  /// â†’ cáº§n jsonDecode trÆ°á»›c khi dÃ¹ng
   dynamic _unwrap(dynamic data) {
     if (data is String && data.isNotEmpty) {
       try {
@@ -64,7 +65,7 @@ class HisApiService {
     return data;
   }
 
-  /// Tạo param base64 theo format HIS Pro
+  /// Táº¡o param base64 theo format HIS Pro
   String _encodeParam(Map<String, dynamic> apiData, [int limit = 100]) {
     final param = jsonEncode({
       'CommonParam': {
@@ -82,7 +83,7 @@ class HisApiService {
     return base64Encode(utf8.encode(param));
   }
 
-  /// Login qua ACS server - thử CẢ HAI server (fallback)
+  /// Login qua ACS server - thá»­ Cáº¢ HAI server (fallback)
   Future<LoginResult> login(String loginName, String password) async {
     final param = _encodeParam({
       'LOGIN_NAME': loginName,
@@ -94,10 +95,10 @@ class HisApiService {
 
     String? lastError;
     
-    // Thử cả 2 server URLs
+    // Thá»­ cáº£ 2 server URLs
     for (final baseUrl in ConnectionService.instance.acsUrlCandidates) {
       try {
-        print('🔐 Trying: $baseUrl');
+        print('ðŸ” Trying: $baseUrl');
 
         final response = await _dio.get(
           '${baseUrl}api/AcsToken/Authorize',
@@ -112,7 +113,7 @@ class HisApiService {
 
         if (response.statusCode != 200) {
           lastError = 'HTTP ${response.statusCode}';
-          print('   HTTP ${response.statusCode} - thử server tiếp');
+          print('   HTTP ${response.statusCode} - thá»­ server tiáº¿p');
           continue;
         }
 
@@ -123,9 +124,9 @@ class HisApiService {
           try { data = jsonDecode(response.data); } catch (e) {}
         }
 
-        // Sai tài khoản → trả về ngay
+        // Sai tÃ i khoáº£n â†’ tráº£ vá» ngay
         if (data['Success'] == false) {
-          String msg = 'Sai tài khoản hoặc mật khẩu';
+          String msg = 'Sai tÃ i khoáº£n hoáº·c máº­t kháº©u';
           if (data['Param'] is Map) {
             final p = data['Param'];
             if (p is Map && p['Messages'] is List && (p['Messages'] as List).isNotEmpty) {
@@ -144,14 +145,14 @@ class HisApiService {
           } else if (tokenData is String) {
             token = tokenData;
           }
-          print('   ✅ Login OK!');
+          print('   âœ… Login OK!');
           return LoginResult(success: true, token: token, userData: tokenData);
         }
 
-        lastError = 'Phản hồi không xác định';
+        lastError = 'Pháº£n há»“i khÃ´ng xÃ¡c Ä‘á»‹nh';
       } catch (e) {
         lastError = '${e.toString().substring(0, 60)}';
-        print('   ❌ Error: $lastError - thử server tiếp');
+        print('   âŒ Error: $lastError - thá»­ server tiáº¿p');
         continue;
       }
     }
@@ -159,12 +160,12 @@ class HisApiService {
     return LoginResult(
       success: false, 
       message: lastError?.contains('Timeout') == true 
-        ? '⏱️ Timeout - Bật VPN?' 
-        : '❌ $lastError'
+        ? 'â±ï¸ Timeout - Báº­t VPN?' 
+        : 'âŒ $lastError'
     );
   }
 
-  /// Lấy danh sách yêu cầu dịch vụ (ExecuteRoom)
+  /// Láº¥y danh sÃ¡ch yÃªu cáº§u dá»‹ch vá»¥ (ExecuteRoom)
   Future<HisResult> getServiceRequests({
     int executeRoomId = AppConstants.ROOM_ID_KHAM_CAP_CUU,
     DateTime? date,
@@ -176,8 +177,8 @@ class HisApiService {
                         d.month * 100000000 +
                         d.day * 1000000;
 
-      // Filter thực tế từ log HIS Pro
-      // v3.1.14: Thêm status 3 (đã thực hiện) giống HIS Desktop - lấy đủ 87 BN
+      // Filter thá»±c táº¿ tá»« log HIS Pro
+      // v3.1.14: ThÃªm status 3 (Ä‘Ã£ thá»±c hiá»‡n) giá»‘ng HIS Desktop - láº¥y Ä‘á»§ 87 BN
       final apiData = {
         'SERVICE_REQ_STT_IDs': [1, 2, 3],
         'NOT_IN_SERVICE_REQ_TYPE_IDs': [6, 16, 15, 14, 7],
@@ -199,7 +200,7 @@ class HisApiService {
 
       final param = _encodeParam(apiData, limit);
 
-      print('📡 MCH GetLView: ${ConnectionService.instance.ocrUrl}api/HisServiceReq/GetLView');
+      print('ðŸ“¡ MCH GetLView: ${ConnectionService.instance.ocrUrl}api/HisServiceReq/GetLView');
 
       final response = await _dio.get(
         '${ConnectionService.instance.ocrUrl}api/HisServiceReq/GetLView',
@@ -220,8 +221,8 @@ class HisApiService {
     }
   }
 
-  /// Lấy danh sách yêu cầu dịch vụ theo EXECUTE_ROOM_ID (phòng khám)
-  /// v3.1.15: thêm serviceReqSttIds param - cho phép lọc theo status (mặc định {1,2,3})
+  /// Láº¥y danh sÃ¡ch yÃªu cáº§u dá»‹ch vá»¥ theo EXECUTE_ROOM_ID (phÃ²ng khÃ¡m)
+  /// v3.1.15: thÃªm serviceReqSttIds param - cho phÃ©p lá»c theo status (máº·c Ä‘á»‹nh {1,2,3})
   Future<HisResult> getServiceRequestsByRoom(int executeRoomId, {int limit = 100, Set<int>? serviceReqSttIds}) async {
     try {
       final d = DateTime.now();
@@ -229,11 +230,11 @@ class HisApiService {
                        d.month * 100000000 +
                        d.day * 1000000;
 
-      // v3.1.15: Dùng filter từ caller, mặc định {1,2,3} nếu không truyền
+      // v3.1.15: DÃ¹ng filter tá»« caller, máº·c Ä‘á»‹nh {1,2,3} náº¿u khÃ´ng truyá»n
       final statuses = serviceReqSttIds?.toList() ?? [1, 2, 3];
 
       final apiData = {
-        // v3.1.15: Status filter động từ UI (3 nút riêng biệt)
+        // v3.1.15: Status filter Ä‘á»™ng tá»« UI (3 nÃºt riÃªng biá»‡t)
         'SERVICE_REQ_STT_IDs': statuses,
         'NOT_IN_SERVICE_REQ_TYPE_IDs': [6, 16, 15, 14, 7],
         'TDL_PATIENT_TYPE_IDs': [206, 1, 210, 202, 262, 182, 162, 2, 45, 102, 204, 205, 203, 44, 122, 242, 222, 142, 143, 209, 208, 207, 42, 43],
@@ -254,8 +255,8 @@ class HisApiService {
 
       final param = _encodeParam(apiData, limit);
 
-      // v3.0.162: Fix port - procedure room API ở port 1408 (MOS), KHÔNG phải 1425 (OCR)
-      print('📡 ProcedureRoom GetLView (RoomID=$executeRoomId): $_procedureRoomUrl/api/HisServiceReq/GetLView');
+      // v3.0.162: Fix port - procedure room API á»Ÿ port 1408 (MOS), KHÃ”NG pháº£i 1425 (OCR)
+      print('ðŸ“¡ ProcedureRoom GetLView (RoomID=$executeRoomId): $_procedureRoomUrl/api/HisServiceReq/GetLView');
 
       final response = await _dio.get(
         '$_procedureRoomUrl/api/HisServiceReq/GetLView',
@@ -278,9 +279,9 @@ class HisApiService {
     }
   }
 
-  /// Lấy danh sách yêu cầu dịch vụ theo DEPARTMENT_ID
-  /// Strategy: filter bằng REQUEST_DEPARTMENT_ID (nếu API hỗ trợ)
-  /// Nếu rỗng → fallback: lấy all + filter client-side bằng mapping room→dept
+  /// Láº¥y danh sÃ¡ch yÃªu cáº§u dá»‹ch vá»¥ theo DEPARTMENT_ID
+  /// Strategy: filter báº±ng REQUEST_DEPARTMENT_ID (náº¿u API há»— trá»£)
+  /// Náº¿u rá»—ng â†’ fallback: láº¥y all + filter client-side báº±ng mapping roomâ†’dept
   Future<HisResult> getServiceRequestsByDepartment(int departmentId, {int limit = 100}) async {
     try {
       final d = DateTime.now();
@@ -289,7 +290,7 @@ class HisApiService {
                        d.day * 1000000;
 
       final apiData = {
-        // v3.1.14: Thêm status 3 (đã thực hiện) giống HIS Desktop
+        // v3.1.14: ThÃªm status 3 (Ä‘Ã£ thá»±c hiá»‡n) giá»‘ng HIS Desktop
         'SERVICE_REQ_STT_IDs': [1, 2, 3],
         'NOT_IN_SERVICE_REQ_TYPE_IDs': [6, 16, 15, 14, 7],
         'TDL_PATIENT_TYPE_IDs': [206, 1, 210, 202, 262, 182, 162, 2, 45, 102, 204, 205, 203, 44, 122, 242, 222, 142, 143, 209, 208, 207, 42, 43],
@@ -310,7 +311,7 @@ class HisApiService {
 
       final param = _encodeParam(apiData, limit);
 
-      print('📡 MCH GetLView (DeptID=$departmentId): ${ConnectionService.instance.ocrUrl}api/HisServiceReq/GetLView');
+      print('ðŸ“¡ MCH GetLView (DeptID=$departmentId): ${ConnectionService.instance.ocrUrl}api/HisServiceReq/GetLView');
 
       final response = await _dio.get(
         '${ConnectionService.instance.ocrUrl}api/HisServiceReq/GetLView',
@@ -323,14 +324,14 @@ class HisApiService {
       );
 
       if (response.statusCode == 200) {
-        // Nếu rỗng → thử fallback: lấy all hôm nay + filter client-side
+        // Náº¿u rá»—ng â†’ thá»­ fallback: láº¥y all hÃ´m nay + filter client-side
         Map<String, dynamic> data = {};
         if (response.data is Map) {
           data = Map<String, dynamic>.from(response.data);
         }
         final innerData = data['Data'];
         if (innerData is List && innerData.isEmpty) {
-          print('⚠️ Dept filter rỗng → fallback lấy all + filter client-side');
+          print('âš ï¸ Dept filter rá»—ng â†’ fallback láº¥y all + filter client-side');
           return await _fallbackFilterByDepartment(departmentId, dateLong, limit);
         }
         return HisResult(success: true, data: response.data);
@@ -341,10 +342,10 @@ class HisApiService {
     }
   }
 
-  /// Fallback: lấy tất cả BN hôm nay, filter client-side theo department
+  /// Fallback: láº¥y táº¥t cáº£ BN hÃ´m nay, filter client-side theo department
   Future<HisResult> _fallbackFilterByDepartment(int departmentId, int dateLong, int limit) async {
     try {
-      // 1. Lấy tất cả phòng
+      // 1. Láº¥y táº¥t cáº£ phÃ²ng
       final roomsRes = await getRooms();
       final allRooms = <int, int>{}; // roomId -> deptId
       if (roomsRes.success && roomsRes.data is Map) {
@@ -362,9 +363,9 @@ class HisApiService {
         }
       }
 
-      // 2. Lấy tất cả service req hôm nay (KHÔNG filter room)
+      // 2. Láº¥y táº¥t cáº£ service req hÃ´m nay (KHÃ”NG filter room)
       final apiData = {
-        // v3.1.14: Thêm status 3 (đã thực hiện) giống HIS Desktop
+        // v3.1.14: ThÃªm status 3 (Ä‘Ã£ thá»±c hiá»‡n) giá»‘ng HIS Desktop
         'SERVICE_REQ_STT_IDs': [1, 2, 3],
         'NOT_IN_SERVICE_REQ_TYPE_IDs': [6, 16, 15, 14, 7],
         'TDL_PATIENT_TYPE_IDs': [206, 1, 210, 202, 262, 182, 162, 2, 45, 102, 204, 205, 203, 44, 122, 242, 222, 142, 143, 209, 208, 207, 42, 43],
@@ -382,7 +383,7 @@ class HisApiService {
         'ORDER_DIRECTION3': 'ASC',
       };
 
-      final param = _encodeParam(apiData, 500); // Lấy nhiều hơn để filter
+      final param = _encodeParam(apiData, 500); // Láº¥y nhiá»u hÆ¡n Ä‘á»ƒ filter
       final response = await _dio.get(
         '${ConnectionService.instance.ocrUrl}api/HisServiceReq/GetLView',
         queryParameters: {'param': param},
@@ -402,7 +403,7 @@ class HisApiService {
       if (data is Map && data['Data'] is List) {
         final filtered = (data['Data'] as List).where((item) {
           if (item is! Map) return false;
-          // Check REQUEST_DEPARTMENT_ID (BS yêu cầu từ khoa nào)
+          // Check REQUEST_DEPARTMENT_ID (BS yÃªu cáº§u tá»« khoa nÃ o)
           if (item['REQUEST_DEPARTMENT_ID'] == departmentId) return true;
           // Fallback: check EXECUTE_ROOM_ID's department
           final execRoom = item['EXECUTE_ROOM_ID'];
@@ -425,7 +426,7 @@ class HisApiService {
     }
   }
 
-  /// Lấy tất cả yêu cầu dịch vụ hôm nay (không filter)
+  /// Láº¥y táº¥t cáº£ yÃªu cáº§u dá»‹ch vá»¥ hÃ´m nay (khÃ´ng filter)
   Future<HisResult> getServiceRequestsToday({int limit = 500}) async {
     try {
       final d = DateTime.now();
@@ -434,7 +435,7 @@ class HisApiService {
                        d.day * 1000000;
 
       final apiData = {
-        // v3.1.14: Thêm status 3 (đã thực hiện) giống HIS Desktop
+        // v3.1.14: ThÃªm status 3 (Ä‘Ã£ thá»±c hiá»‡n) giá»‘ng HIS Desktop
         'SERVICE_REQ_STT_IDs': [1, 2, 3],
         'NOT_IN_SERVICE_REQ_TYPE_IDs': [6, 16, 15, 14, 7],
         'TDL_PATIENT_TYPE_IDs': [206, 1, 210, 202, 262, 182, 162, 2, 45, 102, 204, 205, 203, 44, 122, 242, 222, 142, 143, 209, 208, 207, 42, 43],
@@ -473,7 +474,7 @@ class HisApiService {
     }
   }
 
-  /// Lấy tất cả phòng từ HIS Pro
+  /// Láº¥y táº¥t cáº£ phÃ²ng tá»« HIS Pro
   Future<HisResult> getRooms() async {
     try {
       final param = _encodeParam({});
@@ -502,7 +503,7 @@ class HisApiService {
   }
 
   // ===================================================================
-  // THONGKE SERVER (thongke.benhvienninhthuan.vn:8080) - Data BN thật
+  // THONGKE SERVER (thongke.benhvienninhthuan.vn:8080) - Data BN tháº­t
   // ===================================================================
 
   String? _csrfToken;
@@ -511,14 +512,14 @@ class HisApiService {
   String? _cmdLn;
 
   /// Login to thongke server (cookie-based session)
-  /// Lưu cookies vào SharedPreferences để giữ session khi restart app
-  /// Thực ra dùng HIS Pro API token (LOGIN_NAME only, không cần password)
+  /// LÆ°u cookies vÃ o SharedPreferences Ä‘á»ƒ giá»¯ session khi restart app
+  /// Thá»±c ra dÃ¹ng HIS Pro API token (LOGIN_NAME only, khÃ´ng cáº§n password)
   Future<HisResult> thongkeLogin(String username, String password) async {
     try {
-      print('🔐 HIS Pro token login: $username');
+      print('ðŸ” HIS Pro token login: $username');
 
-      // Bước 1: Gọi api/AcsToken/Authorize với LOGIN_NAME only
-      // Token được cache ở client, không cần password trong API call
+      // BÆ°á»›c 1: Gá»i api/AcsToken/Authorize vá»›i LOGIN_NAME only
+      // Token Ä‘Æ°á»£c cache á»Ÿ client, khÃ´ng cáº§n password trong API call
       final apiData = {
         'LOGIN_NAME': username,
         'APPLICATION_CODE': 'HIS',
@@ -539,7 +540,7 @@ class HisApiService {
         ),
       );
 
-      print('📡 Token response: ${r1.statusCode}');
+      print('ðŸ“¡ Token response: ${r1.statusCode}');
 
       if (r1.statusCode != 200) {
         return HisResult(success: false, message: 'Cannot get token: HTTP ${r1.statusCode}');
@@ -567,7 +568,7 @@ class HisApiService {
         if (tkm != null) tokenCode = tkm.group(1);
       }
 
-      print('🔑 TokenCode: ${tokenCode?.substring(0, tokenCode.length > 20 ? 20 : tokenCode.length)}...');
+      print('ðŸ”‘ TokenCode: ${tokenCode?.substring(0, tokenCode.length > 20 ? 20 : tokenCode.length)}...');
 
       if (tokenCode == null || tokenCode.isEmpty) {
         return HisResult(success: false, message: 'No TokenCode in response');
@@ -585,21 +586,21 @@ class HisApiService {
           '|CacheType|1'
           '|RedisSaveType|0';
 
-      // Lưu token vào SharedPreferences
+      // LÆ°u token vÃ o SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('hispro_user', username);
       await prefs.setString('hispro_token', tokenCode);
       await prefs.setString('hispro_cmdLn', _cmdLn!);
-      print('💾 Saved HIS Pro session to SharedPreferences');
+      print('ðŸ’¾ Saved HIS Pro session to SharedPreferences');
 
       return HisResult(success: true, data: {'tokenCode': tokenCode, 'cmdLn': _cmdLn});
     } catch (e) {
-      print('❌ Login error: $e');
+      print('âŒ Login error: $e');
       return HisResult(success: false, message: _handleError(e));
     }
   }
 
-  /// Restore HIS Pro token từ SharedPreferences
+  /// Restore HIS Pro token tá»« SharedPreferences
   Future<void> thongkeRestoreSession() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -607,10 +608,10 @@ class HisApiService {
       _cmdLn = prefs.getString('hispro_cmdLn');
       if (_tokenCode != null && _cmdLn != null) {
         final len = _tokenCode!.length > 20 ? 20 : _tokenCode!.length;
-        print('🔄 Restored HIS Pro token: ${_tokenCode!.substring(0, len)}...');
+        print('ðŸ”„ Restored HIS Pro token: ${_tokenCode!.substring(0, len)}...');
       }
     } catch (e) {
-      print('❌ Restore error: $e');
+      print('âŒ Restore error: $e');
     }
   }
 
@@ -623,7 +624,7 @@ class HisApiService {
     await prefs.remove('hispro_cmdLn');
   }
 
-  /// Restore cookies từ SharedPreferences (gọi khi app start)
+  /// Restore cookies tá»« SharedPreferences (gá»i khi app start)
   Future<void> thongkeRestoreSessionLegacy() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -637,10 +638,10 @@ class HisApiService {
         }
       }
       if (_sessionCookies.isNotEmpty) {
-        print('🔄 Restored ${_sessionCookies.length} thongke cookies');
+        print('ðŸ”„ Restored ${_sessionCookies.length} thongke cookies');
       }
     } catch (e) {
-      print('❌ Restore session error: $e');
+      print('âŒ Restore session error: $e');
     }
   }
 
@@ -654,10 +655,10 @@ class HisApiService {
     final first = await originalCall();
     if (first.success) return first;
 
-    // If 401/403/302 → re-login then retry
+    // If 401/403/302 â†’ re-login then retry
     final msg = first.message ?? '';
     if (msg.contains('401') || msg.contains('403') || msg.contains('302')) {
-      print('🔄 Got $msg → re-login thongke...');
+      print('ðŸ”„ Got $msg â†’ re-login thongke...');
       final relogin = await thongkeLogin(username, password);
       if (relogin.success) {
         return await originalCall();
@@ -668,7 +669,7 @@ class HisApiService {
 
   /// Get list of EMR treatments (patients with visits today)
   /// URL: /emr/index/get-list-emr-treatment?dateType=in&date_from=YYYY-MM-DD&...
-  /// Dùng Thongke cookies (CookieManager tự gửi). Nếu session hết → trả empty data.
+  /// DÃ¹ng Thongke cookies (CookieManager tá»± gá»­i). Náº¿u session háº¿t â†’ tráº£ empty data.
   Future<HisResult> thongkeGetPatients({
     DateTime? date,
     String? treatmentCode,
@@ -690,16 +691,16 @@ class HisApiService {
       final d = date ?? DateTime.now();
       final dateStr = '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
-      // Gọi Thongke API với COOKIES (CookieManager tự gửi XSRF-TOKEN + qlbv_session)
+      // Gá»i Thongke API vá»›i COOKIES (CookieManager tá»± gá»­i XSRF-TOKEN + qlbv_session)
       // Endpoint: /emr/index/get-list-emr-treatment
       // Response: {draw, recordsTotal, recordsFiltered, data: [...]}
-      // Filter server-side: chỉ filter theo dateType + date_from/to
+      // Filter server-side: chá»‰ filter theo dateType + date_from/to
       // Filter client-side: theo department_code field trong data
       final params = <String, String>{
         'dateType': 'in',
         'date_from': dateStr,
         'date_to': dateStr,
-        'length': '500',  // Lấy tối đa 500 BN để filter
+        'length': '500',  // Láº¥y tá»‘i Ä‘a 500 BN Ä‘á»ƒ filter
         'start': '$start',
       };
 
@@ -707,7 +708,7 @@ class HisApiService {
         params['treatment_code'] = treatmentCode;
       }
 
-      print('🌐 Thongke get-list-emr-treatment: date=$dateStr, dept=$department');
+      print('ðŸŒ Thongke get-list-emr-treatment: date=$dateStr, dept=$department');
 
       final r = await _dio.get(
         '${ConnectionService.instance.acsUrl}/emr/index/get-list-emr-treatment',
@@ -722,9 +723,9 @@ class HisApiService {
         ),
       );
 
-      print('📡 Response: ${r.statusCode}, content-type: ${r.headers.value("content-type")}');
+      print('ðŸ“¡ Response: ${r.statusCode}, content-type: ${r.headers.value("content-type")}');
 
-      // Response có thể là HTML (nếu session hết hạn) hoặc JSON
+      // Response cÃ³ thá»ƒ lÃ  HTML (náº¿u session háº¿t háº¡n) hoáº·c JSON
       if (r.statusCode == 200 && r.data is Map) {
         final m = r.data as Map;
         if (m['data'] is List) {
@@ -736,9 +737,9 @@ class HisApiService {
               final dept = p['department_code']?.toString() ?? '';
               return dept == department;
             }).toList();
-            print('✅ Got ${list.length} BN in dept $department (filtered from ${m["recordsTotal"]} total)');
+            print('âœ… Got ${list.length} BN in dept $department (filtered from ${m["recordsTotal"]} total)');
           } else {
-            print('✅ Got ${list.length} BN (total: ${m["recordsTotal"]})');
+            print('âœ… Got ${list.length} BN (total: ${m["recordsTotal"]})');
           }
           return HisResult(success: true, data: list);
         }
@@ -746,7 +747,7 @@ class HisApiService {
       }
       return HisResult(success: false, message: 'HTTP ${r.statusCode}', data: r.data);
     } catch (e) {
-      print('❌ Get patients error: $e');
+      print('âŒ Get patients error: $e');
       return HisResult(success: false, message: _handleError(e));
     }
   }
@@ -757,22 +758,22 @@ class HisApiService {
   }
 
   // ===================================================================
-  // DASHBOARD SERVER (172.16.212.213:5173) - Data BN thật
+  // DASHBOARD SERVER (172.16.212.213:5173) - Data BN tháº­t
   // ===================================================================
 
-  /// Tìm bệnh nhân từ Dashboard server (BVĐK Ninh Thuận)
+  /// TÃ¬m bá»‡nh nhÃ¢n tá»« Dashboard server (BVÄK Ninh Thuáº­n)
   /// API: GET /api/search-patient?name={query}&exact=0
   /// Dashboard JS: H.get('/api/search-patient', {params: {name: Gm, exact: Ym ? '1' : '0'}})
   Future<HisResult> dashboardSearchPatient({String? name, String? khoa, int exact = 0}) async {
     try {
-      // Endpoint yêu cầu 'name' - nếu rỗng sẽ trả all
+      // Endpoint yÃªu cáº§u 'name' - náº¿u rá»—ng sáº½ tráº£ all
       final searchName = (name != null && name.isNotEmpty) ? name : '';
       final params = <String, dynamic>{
         'name': searchName,
         'exact': exact.toString(),
       };
 
-      print('🌐 Dashboard search-patient: name="$searchName" exact=$exact');
+      print('ðŸŒ Dashboard search-patient: name="$searchName" exact=$exact');
 
       final response = await _dio.get(
         '${ConnectionService.instance.acsUrl}/search-patient',
@@ -788,10 +789,10 @@ class HisApiService {
         ),
       );
 
-      print('📡 Response: status=${response.statusCode}, type=${response.data.runtimeType}');
+      print('ðŸ“¡ Response: status=${response.statusCode}, type=${response.data.runtimeType}');
 
       if (response.statusCode == 200) {
-        // Response có thể là array trực tiếp hoặc {data: [...]}
+        // Response cÃ³ thá»ƒ lÃ  array trá»±c tiáº¿p hoáº·c {data: [...]}
         List<dynamic> data = [];
         if (response.data is List) {
           data = response.data;
@@ -802,22 +803,22 @@ class HisApiService {
           else if (m['patients'] is List) data = m['patients'];
           else if (m['result'] is List) data = m['result'];
         }
-        print('✅ Dashboard returned ${data.length} patients');
+        print('âœ… Dashboard returned ${data.length} patients');
         if (data.isNotEmpty) {
-          print('📋 First item keys: ${(data.first as Map).keys.take(10).join(", ")}');
+          print('ðŸ“‹ First item keys: ${(data.first as Map).keys.take(10).join(", ")}');
         }
         return HisResult(success: true, data: List<Map<String, dynamic>>.from(data));
       }
       return HisResult(success: false, message: 'HTTP ${response.statusCode}', data: response.data);
     } catch (e) {
-      print('❌ Search error: $e');
+      print('âŒ Search error: $e');
       return HisResult(success: false, message: _handleError(e));
     }
   }
 
-  /// Loại bỏ dấu tiếng Việt để search thêm nếu name có dấu
+  /// Loáº¡i bá» dáº¥u tiáº¿ng Viá»‡t Ä‘á»ƒ search thÃªm náº¿u name cÃ³ dáº¥u
   String _removeDiacritics(String str) {
-    const withDiacritics = 'àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđÀÁẠẢÃÂẦẤẬẨẪĂẰẮẶẲẴÈÉẸẺẼÊỀẾỆỂỄÌÍỊỈĨÒÓỌỎÕÔỒỐỘỔỖƠỜỚỢỞỠÙÚỤỦŨƯỪỨỰỬỮỲÝỴỶỸĐ';
+    const withDiacritics = 'Ã Ã¡áº¡áº£Ã£Ã¢áº§áº¥áº­áº©áº«Äƒáº±áº¯áº·áº³áºµÃ¨Ã©áº¹áº»áº½Ãªá»áº¿á»‡á»ƒá»…Ã¬Ã­á»‹á»‰Ä©Ã²Ã³á»á»ÃµÃ´á»“á»‘á»™á»•á»—Æ¡á»á»›á»£á»Ÿá»¡Ã¹Ãºá»¥á»§Å©Æ°á»«á»©á»±á»­á»¯á»³Ã½á»µá»·á»¹Ä‘Ã€Ãáº áº¢ÃƒÃ‚áº¦áº¤áº¬áº¨áºªÄ‚áº°áº®áº¶áº²áº´ÃˆÃ‰áº¸áººáº¼ÃŠá»€áº¾á»†á»‚á»„ÃŒÃá»Šá»ˆÄ¨Ã’Ã“á»Œá»ŽÃ•Ã”á»’á»á»˜á»”á»–Æ á»œá»šá»¢á»žá» Ã™Ãšá»¤á»¦Å¨Æ¯á»ªá»¨á»°á»¬á»®á»²Ãá»´á»¶á»¸Ä';
     const withoutDiacritics = 'aaaaaaaaaaaaaaaaaeeeeeeeeeeeiiiiiooooooooooooooooouuuuuuuuuuuyyyyydAAAAAAAAAAAAAAAAAEEEEEEEEEEIIIIIOOOOOOOOOOOOOOOOOUUUUUUUUUUUYYYYYD';
     String result = str;
     for (int i = 0; i < withDiacritics.length; i++) {
@@ -826,17 +827,17 @@ class HisApiService {
     return result;
   }
 
-  /// Lấy tất cả BN đang điều trị (gọi với name="" - trả về all)
+  /// Láº¥y táº¥t cáº£ BN Ä‘ang Ä‘iá»u trá»‹ (gá»i vá»›i name="" - tráº£ vá» all)
   Future<HisResult> dashboardGetAllPatients() async {
     return dashboardSearchPatient(name: '');
   }
 
-  /// Lấy BN theo khoa từ dashboard
+  /// Láº¥y BN theo khoa tá»« dashboard
   Future<HisResult> dashboardGetPatientsByKhoa(String khoaCode) async {
     return dashboardSearchPatient(khoa: khoaCode);
   }
 
-  /// Lấy BN nguy kịch
+  /// Láº¥y BN nguy ká»‹ch
   Future<HisResult> dashboardGetCriticalPatients() async {
     try {
       final response = await _dio.get(
@@ -856,7 +857,7 @@ class HisApiService {
     }
   }
 
-  /// Lấy kết quả CLS theo khoa (cho Báo cáo)
+  /// Láº¥y káº¿t quáº£ CLS theo khoa (cho BÃ¡o cÃ¡o)
   Future<HisResult> dashboardGetDepartmentResults({String? khoaCode}) async {
     try {
       final params = <String, dynamic>{};
@@ -880,7 +881,7 @@ class HisApiService {
     }
   }
 
-  /// Lấy thông tin lâm sàng (cho Báo cáo)
+  /// Láº¥y thÃ´ng tin lÃ¢m sÃ ng (cho BÃ¡o cÃ¡o)
   Future<HisResult> dashboardGetClinicalInfo() async {
     try {
       final response = await _dio.get(
@@ -900,7 +901,7 @@ class HisApiService {
     }
   }
 
-  /// Lấy sử dụng giường (cho Báo cáo)
+  /// Láº¥y sá»­ dá»¥ng giÆ°á»ng (cho BÃ¡o cÃ¡o)
   Future<HisResult> dashboardGetBedUtilization() async {
     try {
       final response = await _dio.get(
@@ -920,8 +921,8 @@ class HisApiService {
     }
   }
 
-  /// Lấy danh sách phòng user được phân công
-  /// Từ log HIS Pro: api/HisUserRoom/GetView
+  /// Láº¥y danh sÃ¡ch phÃ²ng user Ä‘Æ°á»£c phÃ¢n cÃ´ng
+  /// Tá»« log HIS Pro: api/HisUserRoom/GetView
   Future<HisResult> getUserRooms(String loginName) async {
     try {
       final param = _encodeParam({
@@ -953,7 +954,7 @@ class HisApiService {
     }
   }
 
-  /// Lấy danh sách nhân viên để biết DEPARTMENT_ID (optional)
+  /// Láº¥y danh sÃ¡ch nhÃ¢n viÃªn Ä‘á»ƒ biáº¿t DEPARTMENT_ID (optional)
   Future<HisResult> getEmployee(String loginName) async {
     try {
       final param = _encodeParam({
@@ -985,7 +986,7 @@ class HisApiService {
     }
   }
 
-  /// Test kết nối
+  /// Test káº¿t ná»‘i
   Future<bool> testConnection() async {
     try {
       final response = await _dio.get(
@@ -998,7 +999,7 @@ class HisApiService {
     }
   }
 
-  /// v2.97.0: Test URL cụ thể (cho ReportsScreen check Dashboard)
+  /// v2.97.0: Test URL cá»¥ thá»ƒ (cho ReportsScreen check Dashboard)
   Future<bool> testUrlReachable(String url, {Duration timeout = const Duration(seconds: 5)}) async {
     try {
       final response = await _dio.head(
@@ -1033,45 +1034,45 @@ class HisApiService {
         case DioExceptionType.connectionTimeout:
         case DioExceptionType.sendTimeout:
         case DioExceptionType.receiveTimeout:
-          return '⏱️ Timeout - Kiểm tra VPN';
+          return 'â±ï¸ Timeout - Kiá»ƒm tra VPN';
         case DioExceptionType.connectionError:
-          return '❌ Không kết nối server\n📌 VPN chưa bật?';
+          return 'âŒ KhÃ´ng káº¿t ná»‘i server\nðŸ“Œ VPN chÆ°a báº­t?';
         case DioExceptionType.badResponse:
           final s = e.response?.statusCode;
-          if (s == 401) return '🔐 Sai tài khoản';
-          if (s == 403) return '🚫 Không quyền';
-          if (s == 404) return '🔍 Không tìm thấy';
-          if (s == 500) return '🖥️ Lỗi server HIS';
-          return '❗ HTTP $s';
+          if (s == 401) return 'ðŸ” Sai tÃ i khoáº£n';
+          if (s == 403) return 'ðŸš« KhÃ´ng quyá»n';
+          if (s == 404) return 'ðŸ” KhÃ´ng tÃ¬m tháº¥y';
+          if (s == 500) return 'ðŸ–¥ï¸ Lá»—i server HIS';
+          return 'â— HTTP $s';
         default:
-          return '⚠️ ${e.message}';
+          return 'âš ï¸ ${e.message}';
       }
     }
-    return '⚠️ Lỗi: ${e.toString().substring(0, 80)}';
+    return 'âš ï¸ Lá»—i: ${e.toString().substring(0, 80)}';
   }
 
   // ===================================================================
-  // v3.0.116: Phòng thủ thuật HSCC - 3 API sources
-  // v3.1.13: Port từ v3.1.13 - thêm 3 methods + 1 finish method
+  // v3.0.116: PhÃ²ng thá»§ thuáº­t HSCC - 3 API sources
+  // v3.1.13: Port tá»« v3.1.13 - thÃªm 3 methods + 1 finish method
   // ===================================================================
 
-  /// Lấy danh sách yêu cầu dịch vụ theo room từ Data API 3000
+  /// Láº¥y danh sÃ¡ch yÃªu cáº§u dá»‹ch vá»¥ theo room tá»« Data API 3000
   /// POST http://113.163.187.3:3000/v1/patient/benh-nhan-buong-benh
-  /// v3.1.13: Trả về BN có BED_ROOM_ID trùng với executeRoomId (mapping ngược)
-  /// - deptId: filter thêm theo DEPARTMENT_ID (nếu muốn giới hạn)
-  /// v3.1.15: thêm serviceReqSttIds param - filter client-side theo status
+  /// v3.1.13: Tráº£ vá» BN cÃ³ BED_ROOM_ID trÃ¹ng vá»›i executeRoomId (mapping ngÆ°á»£c)
+  /// - deptId: filter thÃªm theo DEPARTMENT_ID (náº¿u muá»‘n giá»›i háº¡n)
+  /// v3.1.15: thÃªm serviceReqSttIds param - filter client-side theo status
   Future<HisResult> getServiceRequestsByRoomDataApi(int roomId, {int limit = 100, int? departmentId, Set<int>? serviceReqSttIds}) async {
     try {
       // Data 3000 API: POST /v1/patient/benh-nhan-buong-benh
-      // Yêu cầu: Bearer token từ /v1/auth/login
+      // YÃªu cáº§u: Bearer token tá»« /v1/auth/login
       // Body: {USERNAME, BED_ROOM_IDs: [roomId]}
-      // Map field names về chuẩn HIS Pro
+      // Map field names vá» chuáº©n HIS Pro
       final dio = Dio(BaseOptions(
         connectTimeout: const Duration(seconds: 8),
         receiveTimeout: const Duration(seconds: 30),
         headers: {'Accept': 'application/json', 'Content-Type': 'application/json'},
       ));
-      // Lấy token từ DataService (singleton)
+      // Láº¥y token tá»« DataService (singleton)
       final token = DataService.instance.accessToken;
       if (token != null && token.isNotEmpty) {
         dio.options.headers['Authorization'] = 'Bearer $token';
@@ -1079,7 +1080,7 @@ class HisApiService {
       final r = await dio.post(
         'http://113.163.187.3:3000/v1/patient/benh-nhan-buong-benh',
         data: {
-          'USERNAME': DataService.instance.email ?? 'nemk',
+          'USERNAME': DataService.instance.email ?? Credentials.defaultNemkLogin,
           'BED_ROOM_IDs': [roomId],
         },
         options: Options(validateStatus: (s) => s != null && s < 500),
@@ -1087,12 +1088,12 @@ class HisApiService {
       if (r.statusCode != 200 && r.statusCode != 201) {
         return HisResult(success: false, message: 'Data 3000: HTTP ${r.statusCode}', data: r.data);
       }
-      // Map response về chuẩn HIS Pro (giống các API khác)
+      // Map response vá» chuáº©n HIS Pro (giá»‘ng cÃ¡c API khÃ¡c)
       final items = r.data is List ? r.data as List : (r.data is Map ? r.data['data'] as List? : null) ?? [];
       final list = <Map<String, dynamic>>[];
       for (final raw in items) {
         if (raw is Map) {
-          // v3.0.118: Fix tên BN thật từ Data 3000 (trước dùng 'patient_name' sai - thực tế là 'HOTENBN' / 'VIR_PATIENT_NAME' / 'tdl_patient_name')
+          // v3.0.118: Fix tÃªn BN tháº­t tá»« Data 3000 (trÆ°á»›c dÃ¹ng 'patient_name' sai - thá»±c táº¿ lÃ  'HOTENBN' / 'VIR_PATIENT_NAME' / 'tdl_patient_name')
           final patientName = (raw['HOTENBN'] ?? raw['hotenbn'] ?? raw['VIR_PATIENT_NAME'] ?? raw['vir_patient_name']
               ?? raw['TDL_PATIENT_NAME'] ?? raw['tdl_patient_name'] ?? raw['TEN_BENH_NHAN'] ?? raw['ten_benh_nhan'] ?? '').toString();
           final patientNameUnsigned = (raw['HOTENBN'] ?? raw['hotenbn'] ?? raw['TDL_PATIENT_UNSIGNED_NAME'] ?? raw['TEN_BENH_NHAN'] ?? '').toString();
@@ -1138,13 +1139,13 @@ class HisApiService {
     }
   }
 
-  /// Lấy danh sách yêu cầu dịch vụ từ Public API 8080 (113.163.187.3:8080)
+  /// Láº¥y danh sÃ¡ch yÃªu cáº§u dá»‹ch vá»¥ tá»« Public API 8080 (113.163.187.3:8080)
   /// GET /emr-checker/emr-checker-list?department_catalog={id}
   /// v3.1.13: Filter theo department_catalog (HSCC=22)
-  /// v3.1.15: thêm serviceReqSttIds param (no-op for public API - nó không trả status)
+  /// v3.1.15: thÃªm serviceReqSttIds param (no-op for public API - nÃ³ khÃ´ng tráº£ status)
   Future<HisResult> getServiceRequestsByRoomPublic(int roomId, {int limit = 100, int? departmentCatalogId, Set<int>? serviceReqSttIds}) async {
     try {
-      // Public 8080 dùng login session cookie (CSRF) - cần auth trước
+      // Public 8080 dÃ¹ng login session cookie (CSRF) - cáº§n auth trÆ°á»›c
       final dio = Dio(BaseOptions(
         connectTimeout: const Duration(seconds: 8),
         receiveTimeout: const Duration(seconds: 30),
@@ -1153,7 +1154,7 @@ class HisApiService {
       final cookieJar = CookieJar();
       dio.interceptors.add(CookieManager(cookieJar));
 
-      // Step 1: GET /login để lấy CSRF token
+      // Step 1: GET /login Ä‘á»ƒ láº¥y CSRF token
       final r1 = await dio.get('http://113.163.187.3:8080/login');
       String csrf = '';
       final m = RegExp(r'name="_token"\s+value="([^"]+)"').firstMatch(r1.data?.toString() ?? '');
@@ -1163,14 +1164,14 @@ class HisApiService {
         return HisResult(success: false, message: 'Public 8080: no CSRF token');
       }
 
-      // Step 2: POST /login với credentials
+      // Step 2: POST /login vá»›i credentials
       final cookies1 = await cookieJar.loadForRequest(Uri.parse('http://113.163.187.3:8080/login'));
       final xsrf1 = cookies1.firstWhere((c) => c.name == 'XSRF-TOKEN', orElse: () => Cookie('XSRF-TOKEN', '')).value;
 
       final r2 = await dio.post('http://113.163.187.3:8080/login',
         data: {
-          'email': 'nemk',
-          'password': '1027',
+          'email': Credentials.defaultNemkLogin,
+          'password': Credentials.defaultNemkPassword,
           '_token': csrf,
         },
         options: Options(headers: {
@@ -1182,7 +1183,7 @@ class HisApiService {
         return HisResult(success: false, message: 'Public login failed: HTTP ${r2.statusCode}');
       }
 
-      // Step 3: GET /emr-checker-list với filter
+      // Step 3: GET /emr-checker-list vá»›i filter
       final now = DateTime.now();
       String two(int n) => n.toString().padLeft(2, '0');
       String fmtDt(DateTime dt) => '${dt.year}-${two(dt.month)}-${two(dt.day)} ${two(dt.hour)}:${two(dt.minute)}:${two(dt.second)}';
@@ -1242,8 +1243,8 @@ class HisApiService {
     }
   }
 
-  /// Lấy TẤT CẢ service req của 1 BN theo TREATMENT_ID
-  /// v3.1.13: Dùng khi 1 BN có nhiều service req (Khám + CĐHA + Thủ thuật)
+  /// Láº¥y Táº¤T Cáº¢ service req cá»§a 1 BN theo TREATMENT_ID
+  /// v3.1.13: DÃ¹ng khi 1 BN cÃ³ nhiá»u service req (KhÃ¡m + CÄHA + Thá»§ thuáº­t)
   Future<HisResult> getServiceRequestsByTreatment(dynamic treatmentId) async {
     try {
       final d = DateTime.now();
@@ -1270,9 +1271,9 @@ class HisApiService {
     }
   }
 
-  /// Đánh dấu hoàn thành service req với start_time + end_time + note
-  /// v3.1.13: Gọi api/HisServiceReq/FinishWithTime từ ECG form
-  /// Trả về true nếu thành công
+  /// ÄÃ¡nh dáº¥u hoÃ n thÃ nh service req vá»›i start_time + end_time + note
+  /// v3.1.13: Gá»i api/HisServiceReq/FinishWithTime tá»« ECG form
+  /// Tráº£ vá» true náº¿u thÃ nh cÃ´ng
   Future<HisResult> finishServiceReqWithTime({
     required int serviceReqId,
     required DateTime startTime,
@@ -1280,7 +1281,7 @@ class HisApiService {
     String resultNote = '',
   }) async {
     try {
-      // Format DateTime → yyyyMMddHHmmss long
+      // Format DateTime â†’ yyyyMMddHHmmss long
       String fmt(DateTime t) =>
         '${t.year}${t.month.toString().padLeft(2, '0')}${t.day.toString().padLeft(2, '0')}'
         '${t.hour.toString().padLeft(2, '0')}${t.minute.toString().padLeft(2, '0')}${t.second.toString().padLeft(2, '0')}';
@@ -1293,7 +1294,7 @@ class HisApiService {
         'IS_AUTO_FINISH': true,
       };
       final param = _encodeParam(apiData, 0);
-      print('📡 MCH FinishWithTime (ID=$serviceReqId): ${ConnectionService.instance.ocrUrl}api/HisServiceReq/FinishWithTime');
+      print('ðŸ“¡ MCH FinishWithTime (ID=$serviceReqId): ${ConnectionService.instance.ocrUrl}api/HisServiceReq/FinishWithTime');
 
       final response = await _dio.post(
         '${ConnectionService.instance.ocrUrl}api/HisServiceReq/FinishWithTime',
@@ -1314,7 +1315,7 @@ class HisApiService {
     }
   }
 
-  /// v3.0.116: Lấy danh sách user theo role + department (cho ServiceExecuteDetailScreen)
+  /// v3.0.116: Láº¥y danh sÃ¡ch user theo role + department (cho ServiceExecuteDetailScreen)
   /// GET /api/HisExecuteUser/GetView?param=BASE64({DEPARTMENT_ID, IS_ACTIVE, ...})
   Future<HisResult> getExecuteRoleUsers({int? departmentId, int limit = 200}) async {
     try {
@@ -1325,7 +1326,7 @@ class HisApiService {
         'ORDER_DIRECTION': 'ASC',
       };
       final param = _encodeParam(apiData, limit);
-      print('📡 MCH GetExecuteRoleUsers: ${ConnectionService.instance.ocrUrl}api/HisExecuteUser/GetView');
+      print('ðŸ“¡ MCH GetExecuteRoleUsers: ${ConnectionService.instance.ocrUrl}api/HisExecuteUser/GetView');
       final response = await _dio.get(
         '${ConnectionService.instance.ocrUrl}api/HisExecuteUser/GetView',
         queryParameters: {'param': param},
@@ -1342,10 +1343,10 @@ class HisApiService {
     }
   }
 
-  /// v3.0.168: Lấy danh sách users từ AcsUser (port 1401) - cho dropdown PTV/TTV chính
-  /// Returns: [{LOGINNAME, USERNAME (tên đầy đủ), EMAIL, MOBILE, G_CODE, DEPARTMENT_ID, ...}, ...]
-  /// - LOGINNAME: tên đăng nhập (vd "dungntm") - dùng cho backend
-  /// - USERNAME: tên đầy đủ (vd "Nguyễn Thị Mỹ Dung") - hiển thị cho user
+  /// v3.0.168: Láº¥y danh sÃ¡ch users tá»« AcsUser (port 1401) - cho dropdown PTV/TTV chÃ­nh
+  /// Returns: [{LOGINNAME, USERNAME (tÃªn Ä‘áº§y Ä‘á»§), EMAIL, MOBILE, G_CODE, DEPARTMENT_ID, ...}, ...]
+  /// - LOGINNAME: tÃªn Ä‘Äƒng nháº­p (vd "dungntm") - dÃ¹ng cho backend
+  /// - USERNAME: tÃªn Ä‘áº§y Ä‘á»§ (vd "Nguyá»…n Thá»‹ Má»¹ Dung") - hiá»ƒn thá»‹ cho user
   /// Sort theo USERNAME alphabetical
   Future<HisResult> getAcsUsers({int? departmentId, String? roleCode, int limit = 200}) async {
     try {
@@ -1360,7 +1361,7 @@ class HisApiService {
       if (roleCode != null) apiData['G_CODE'] = roleCode;
       final param = _encodeParam(apiData, limit);
       final url = '${ConnectionService.instance.acsUrl}api/AcsUser/Get';
-      debugPrint('📡 AcsUser/Get: $url');
+      debugPrint('ðŸ“¡ AcsUser/Get: $url');
       final response = await _dio.get(
         url,
         queryParameters: {'param': param},
@@ -1376,8 +1377,8 @@ class HisApiService {
     }
   }
 
-  /// v3.0.162: Lấy thông tin mở rộng của sere_serv (kết quả CLS, Xquang, mô tả, kết luận)
-  /// API: HisSereServExt/Get filter SERE_SERV_ID (1-1 với SereServ)
+  /// v3.0.162: Láº¥y thÃ´ng tin má»Ÿ rá»™ng cá»§a sere_serv (káº¿t quáº£ CLS, Xquang, mÃ´ táº£, káº¿t luáº­n)
+  /// API: HisSereServExt/Get filter SERE_SERV_ID (1-1 vá»›i SereServ)
   /// Returns: {CONCLUDE, DESCRIPTION, MACHINE_CODE, BEGIN_TIME, END_TIME, NOTE, NUMBER_OF_FILM, ...}
   Future<HisResult> getSereServExtResult(int sereServId) async {
     try {
@@ -1405,10 +1406,10 @@ class HisApiService {
     }
   }
 
-  /// v3.0.162: Lấy kết quả Xquang từ service_req (gọi GetSereServExt với từng sere_serv)
+  /// v3.0.162: Láº¥y káº¿t quáº£ Xquang tá»« service_req (gá»i GetSereServExt vá»›i tá»«ng sere_serv)
   Future<HisResult> getServiceReqResult(int serviceReqId) async {
     try {
-      // Bước 1: Lấy danh sách sere_serv theo service_req
+      // BÆ°á»›c 1: Láº¥y danh sÃ¡ch sere_serv theo service_req
       final paramList = _encodeParam({
         'TDL_SERVICE_REQ_ID': serviceReqId,
         'IS_ACTIVE': 1,
@@ -1430,7 +1431,7 @@ class HisApiService {
       if (unwrapped is! Map || unwrapped['Data'] == null) {
         return HisResult(success: false, message: 'Invalid response');
       }
-      // Bước 2: Lấy kết quả Xquang từ SereServExt cho mỗi sere_serv
+      // BÆ°á»›c 2: Láº¥y káº¿t quáº£ Xquang tá»« SereServExt cho má»—i sere_serv
       final results = <Map<String, dynamic>>[];
       for (final s in (unwrapped['Data'] as List)) {
         final sereServId = s['ID'] ?? s['id'];
@@ -1459,8 +1460,8 @@ class HisApiService {
     }
   }
 
-  /// v3.0.162: Lấy danh sách ECG/SereServ theo executeRoomId (Phòng tủ thuật)
-  /// Reuses getServiceRequestsByRoom but with focus on service_type_id 4 (thủ thuật) + 3 (XN)
+  /// v3.0.162: Láº¥y danh sÃ¡ch ECG/SereServ theo executeRoomId (PhÃ²ng tá»§ thuáº­t)
+  /// Reuses getServiceRequestsByRoom but with focus on service_type_id 4 (thá»§ thuáº­t) + 3 (XN)
   Future<HisResult>   getRoomServiceReqsWithToken(
     int executeRoomId, {
     int? serviceTypeId,
@@ -1599,13 +1600,13 @@ class HisApiService {
   }
 
   // ============================================================
-  // v3.0.164: KẾT QUẢ CẬN LÂM SÀNG - Siêu âm, ECG, XN
+  // v3.0.164: Káº¾T QUáº¢ Cáº¬N LÃ‚M SÃ€NG - SiÃªu Ã¢m, ECG, XN
   // ============================================================
 
-  /// v3.0.164: Lấy kết quả Siêu âm từ SAR (Subclinical Analyze Report)
-  /// SAR endpoint: `api/SarReport/Get` (port 1409) - chứa kết quả Siêu âm/Xquang
-  /// Filter theo SERVICE_REQ_ID hoặc SERE_SERV_ID
-  /// Trả về list các SAR_PRINT/result với: CONCLUDE, DESCRIPTION, NOTE
+  /// v3.0.164: Láº¥y káº¿t quáº£ SiÃªu Ã¢m tá»« SAR (Subclinical Analyze Report)
+  /// SAR endpoint: `api/SarReport/Get` (port 1409) - chá»©a káº¿t quáº£ SiÃªu Ã¢m/Xquang
+  /// Filter theo SERVICE_REQ_ID hoáº·c SERE_SERV_ID
+  /// Tráº£ vá» list cÃ¡c SAR_PRINT/result vá»›i: CONCLUDE, DESCRIPTION, NOTE
   Future<HisResult> getSarReportResult({
     int? serviceReqId,
     int? sereServId,
@@ -1640,9 +1641,9 @@ class HisApiService {
     }
   }
 
-  /// v3.0.164: Lấy kết quả Xét nghiệm từ LIS (port 1419)
-  /// LIS endpoint: `api/LisResult/Get` hoặc `api/LisSample/Get`
-  /// Filter theo SERVICE_REQ_ID, có thể trả về nhiều test values
+  /// v3.0.164: Láº¥y káº¿t quáº£ XÃ©t nghiá»‡m tá»« LIS (port 1419)
+  /// LIS endpoint: `api/LisResult/Get` hoáº·c `api/LisSample/Get`
+  /// Filter theo SERVICE_REQ_ID, cÃ³ thá»ƒ tráº£ vá» nhiá»u test values
   Future<HisResult> getLisResult({
     int? serviceReqId,
     int? treatmentId,
@@ -1660,7 +1661,7 @@ class HisApiService {
       if (treatmentId != null) filterData['TDL_TREATMENT_ID'] = treatmentId;
       if (patientId != null) filterData['TDL_PATIENT_ID'] = patientId;
 
-      // Thử nhiều endpoint (server này có thể không có SAR/LIS - 404 expected)
+      // Thá»­ nhiá»u endpoint (server nÃ y cÃ³ thá»ƒ khÃ´ng cÃ³ SAR/LIS - 404 expected)
       final endpoints = [
         '$lisBase/api/LisResult/Get',
         '$lisBase/api/LisSample/Get',
@@ -1689,14 +1690,14 @@ class HisApiService {
           lastResult = HisResult(success: false, message: _handleError(e));
         }
       }
-      return lastResult ?? HisResult(success: false, message: 'LIS không khả dụng');
+      return lastResult ?? HisResult(success: false, message: 'LIS khÃ´ng kháº£ dá»¥ng');
     } catch (e) {
       return HisResult(success: false, message: _handleError(e));
     }
   }
 
-  /// v3.0.164: Lấy kết quả CĐHA/Siêu âm từ SubclinicalResult
-  /// Endpoint: `api/SubclinicalResult/Get` - kết quả siêu âm + nội soi + CĐHA khác
+  /// v3.0.164: Láº¥y káº¿t quáº£ CÄHA/SiÃªu Ã¢m tá»« SubclinicalResult
+  /// Endpoint: `api/SubclinicalResult/Get` - káº¿t quáº£ siÃªu Ã¢m + ná»™i soi + CÄHA khÃ¡c
   Future<HisResult> getSubclinicalResult({
     int? serviceReqId,
     int? sereServId,
@@ -1730,13 +1731,13 @@ class HisApiService {
     }
   }
 
-  /// v3.0.166: Lấy kết quả tổng hợp CLS (Siêu âm/Xquang/XN) theo ServiceReq
-  /// Auto-detect service type và gọi endpoint phù hợp.
+  /// v3.0.166: Láº¥y káº¿t quáº£ tá»•ng há»£p CLS (SiÃªu Ã¢m/Xquang/XN) theo ServiceReq
+  /// Auto-detect service type vÃ  gá»i endpoint phÃ¹ há»£p.
   ///
-  /// v3.0.166: REFACTOR - LUÔN thử `getServiceReqResult` (HisSereServExt) TRƯỚC vì:
-  /// - v3.0.162 verified: work cho ECG/Xquang với HisSereServExt
-  /// - SAR/LIS thường return 404 trên server này (chưa có module SAR/LIS)
-  /// - Chỉ thử SAR/LIS khi HisSereServExt fail
+  /// v3.0.166: REFACTOR - LUÃ”N thá»­ `getServiceReqResult` (HisSereServExt) TRÆ¯á»šC vÃ¬:
+  /// - v3.0.162 verified: work cho ECG/Xquang vá»›i HisSereServExt
+  /// - SAR/LIS thÆ°á»ng return 404 trÃªn server nÃ y (chÆ°a cÃ³ module SAR/LIS)
+  /// - Chá»‰ thá»­ SAR/LIS khi HisSereServExt fail
   ///
   /// Returns: { serviceType, serviceTypeName, source, serviceName, results: List/Map }
   Future<HisResult> getServiceResultByType({
@@ -1745,7 +1746,7 @@ class HisApiService {
     int? serviceTypeId,
   }) async {
     try {
-      // Step 1: Lấy thông tin service_req để biết SERVICE_TYPE_ID + SERVICE_NAME
+      // Step 1: Láº¥y thÃ´ng tin service_req Ä‘á»ƒ biáº¿t SERVICE_TYPE_ID + SERVICE_NAME
       String? serviceName;
       if (serviceTypeId == null) {
         final srv = await getServiceReqView(serviceReqId);
@@ -1768,24 +1769,24 @@ class HisApiService {
       serviceTypeId ??= 0;
       serviceName ??= '';
 
-      // Step 2: Detect service type từ SERVICE_NAME nếu type = 0
-      // (một số CĐHA có type 0 trong GetView trên server này)
+      // Step 2: Detect service type tá»« SERVICE_NAME náº¿u type = 0
+      // (má»™t sá»‘ CÄHA cÃ³ type 0 trong GetView trÃªn server nÃ y)
       if (serviceTypeId == 0) {
         final name = serviceName.toLowerCase();
-        if (name.contains('siêu âm') || name.contains('sieu am') || name.contains('sa ')) {
+        if (name.contains('siÃªu Ã¢m') || name.contains('sieu am') || name.contains('sa ')) {
           serviceTypeId = 4;
         } else if (name.contains('xquang') || name.contains('x-quang') || name.contains('xq')) {
           serviceTypeId = 4;
-        } else if (name.contains('điện tim') || name.contains('dien tim') || name.contains('ecg')) {
+        } else if (name.contains('Ä‘iá»‡n tim') || name.contains('dien tim') || name.contains('ecg')) {
           serviceTypeId = 4;
-        } else if (name.contains('ct ') || name.contains('mri') || name.contains('cộng hưởng')) {
+        } else if (name.contains('ct ') || name.contains('mri') || name.contains('cá»™ng hÆ°á»Ÿng')) {
           serviceTypeId = 4;
-        } else if (name.contains('xét nghiệm') || name.contains('xet nghiem') || name.contains('máu')) {
+        } else if (name.contains('xÃ©t nghiá»‡m') || name.contains('xet nghiem') || name.contains('mÃ¡u')) {
           serviceTypeId = 3;
         }
       }
 
-      // Step 3: LUÔN thử HisSereServExt TRƯỚC - work cho ECG/Xquang/Siêu âm từ v3.0.162
+      // Step 3: LUÃ”N thá»­ HisSereServExt TRÆ¯á»šC - work cho ECG/Xquang/SiÃªu Ã¢m tá»« v3.0.162
       final extR = await getServiceReqResult(serviceReqId);
       if (extR.success) {
         final extData = extR.data;
@@ -1806,29 +1807,29 @@ class HisApiService {
         }
       }
 
-      // Step 4: HisSereServExt fail → thử SAR (CĐHA) hoặc LIS (XN) làm bổ sung
+      // Step 4: HisSereServExt fail â†’ thá»­ SAR (CÄHA) hoáº·c LIS (XN) lÃ m bá»• sung
       if (serviceTypeId == 3) {
-        // XN - thử LIS
+        // XN - thá»­ LIS
         final r = await getLisResult(serviceReqId: serviceReqId);
         if (r.success) {
           return HisResult(success: true, data: {
             'serviceType': 3,
-            'serviceTypeName': 'Xét nghiệm',
+            'serviceTypeName': 'XÃ©t nghiá»‡m',
             'source': 'LIS',
             'serviceName': serviceName,
             'results': r.data,
           });
         }
-        // Fallback cuối: empty list, dialog sẽ hiển thị "Chưa có kết quả"
+        // Fallback cuá»‘i: empty list, dialog sáº½ hiá»ƒn thá»‹ "ChÆ°a cÃ³ káº¿t quáº£"
         return HisResult(success: true, data: {
           'serviceType': 3,
-          'serviceTypeName': 'Xét nghiệm',
+          'serviceTypeName': 'XÃ©t nghiá»‡m',
           'source': 'none',
           'serviceName': serviceName,
           'results': [],
         });
       } else if (serviceTypeId == 4 || serviceTypeId == 5) {
-        // CĐHA / Thủ thuật - thử SAR
+        // CÄHA / Thá»§ thuáº­t - thá»­ SAR
         final sarR = await getSarReportResult(serviceReqId: serviceReqId);
         if (sarR.success && sarR.data != null) {
           final sarData = sarR.data;
@@ -1854,8 +1855,8 @@ class HisApiService {
             'results': subR.data,
           });
         }
-        // v3.0.166: Trước đây return "Không tìm thấy kết quả CĐHA" lỗi đỏ
-        // Giờ return success + empty list → dialog "Chưa có kết quả" thay vì báo lỗi
+        // v3.0.166: TrÆ°á»›c Ä‘Ã¢y return "KhÃ´ng tÃ¬m tháº¥y káº¿t quáº£ CÄHA" lá»—i Ä‘á»
+        // Giá» return success + empty list â†’ dialog "ChÆ°a cÃ³ káº¿t quáº£" thay vÃ¬ bÃ¡o lá»—i
         return HisResult(success: true, data: {
           'serviceType': serviceTypeId,
           'serviceTypeName': _serviceTypeName(serviceTypeId),
@@ -1864,10 +1865,10 @@ class HisApiService {
           'results': [],
         });
       } else {
-        // Other types - đã thử getServiceReqResult ở Step 3
+        // Other types - Ä‘Ã£ thá»­ getServiceReqResult á»Ÿ Step 3
         return HisResult(success: true, data: {
           'serviceType': serviceTypeId,
-          'serviceTypeName': 'Khác',
+          'serviceTypeName': 'KhÃ¡c',
           'source': 'none',
           'serviceName': serviceName,
           'results': [],
@@ -1881,25 +1882,25 @@ class HisApiService {
   /// v3.0.166: Helper - service type name
   String _serviceTypeName(int? typeId) {
     switch (typeId) {
-      case 1: return 'Khám';
-      case 2: return 'Ngừng';
-      case 3: return 'Xét nghiệm';
-      case 4: return 'CĐHA';
-      case 5: return 'Thủ thuật';
-      case 6: return 'Thuốc';
-      case 7: return 'Máu';
-      case 8: return 'Vật tư';
-      case 9: return 'Giường';
-      case 10: return 'Phẫu thuật';
-      default: return 'Dịch vụ';
+      case 1: return 'KhÃ¡m';
+      case 2: return 'Ngá»«ng';
+      case 3: return 'XÃ©t nghiá»‡m';
+      case 4: return 'CÄHA';
+      case 5: return 'Thá»§ thuáº­t';
+      case 6: return 'Thuá»‘c';
+      case 7: return 'MÃ¡u';
+      case 8: return 'Váº­t tÆ°';
+      case 9: return 'GiÆ°á»ng';
+      case 10: return 'Pháº«u thuáº­t';
+      default: return 'Dá»‹ch vá»¥';
     }
   }
 
-  /// v3.0.164: Lấy kết quả tổng hợp tất cả CLS của 1 treatment (theo treatment_id)
-  /// Trả về: {sieuAm: [...], xquang: [...], xn: [...], ecg: [...], other: [...]}
+  /// v3.0.164: Láº¥y káº¿t quáº£ tá»•ng há»£p táº¥t cáº£ CLS cá»§a 1 treatment (theo treatment_id)
+  /// Tráº£ vá»: {sieuAm: [...], xquang: [...], xn: [...], ecg: [...], other: [...]}
   Future<HisResult> getAllClsByTreatment(int treatmentId, {int limit = 100}) async {
     try {
-      // Lấy tất cả service_req theo treatment
+      // Láº¥y táº¥t cáº£ service_req theo treatment
       final param = _encodeParam({
         'TREATMENT_ID': treatmentId,
         'IS_ACTIVE': 1,
@@ -1937,14 +1938,14 @@ class HisApiService {
         if (typeId == 3) {
           grouped['xn']!.add(s);
         } else if (typeId == 4) {
-          if (serviceName.contains('siêu âm') || serviceName.contains('sieu am') || serviceName.contains('sa')) {
+          if (serviceName.contains('siÃªu Ã¢m') || serviceName.contains('sieu am') || serviceName.contains('sa')) {
             grouped['sieuAm']!.add(s);
           } else if (serviceName.contains('xquang') || serviceName.contains('x-quang') || serviceName.contains('xq')) {
             grouped['xquang']!.add(s);
           } else {
             grouped['khac']!.add(s);
           }
-        } else if (typeId == 5 && (serviceName.contains('điện tim') || serviceName.contains('ecg'))) {
+        } else if (typeId == 5 && (serviceName.contains('Ä‘iá»‡n tim') || serviceName.contains('ecg'))) {
           grouped['ecg']!.add(s);
         } else {
           grouped['khac']!.add(s);

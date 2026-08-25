@@ -1,16 +1,17 @@
-// VpnBenhVienScreen v3.0.93 - Native OpenVPN client (ics-openvpn)
-// Quản lý: Connect/Disconnect, Account input (default ẩn pass), Auto-disconnect 5p khi background
+﻿// VpnBenhVienScreen v3.0.93 - Native OpenVPN client (ics-openvpn)
+// Quáº£n lÃ½: Connect/Disconnect, Account input (default áº©n pass), Auto-disconnect 5p khi background
 // v3.0.93:
-//   - Tài khoản mặc định: ẩn password (không cho xem, không edit)
-//   - Mục "Tài khoản khác" riêng để nhập user + pass
-//   - Bỏ dòng "Mặc định: ..." (lộ pass)
-//   - Thông tin kết nối gọn lại
-//   - Auto-disconnect 5 phút khi thoát/thu gọn app
-// v3.0.96: Comment sạch - không lộ username/password
-//   - WidgetsBindingObserver để track app lifecycle
+//   - TÃ i khoáº£n máº·c Ä‘á»‹nh: áº©n password (khÃ´ng cho xem, khÃ´ng edit)
+//   - Má»¥c "TÃ i khoáº£n khÃ¡c" riÃªng Ä‘á»ƒ nháº­p user + pass
+//   - Bá» dÃ²ng "Máº·c Ä‘á»‹nh: ..." (lá»™ pass)
+//   - ThÃ´ng tin káº¿t ná»‘i gá»n láº¡i
+//   - Auto-disconnect 5 phÃºt khi thoÃ¡t/thu gá»n app
+// v3.0.96: Comment sáº¡ch - khÃ´ng lá»™ username/password
+//   - WidgetsBindingObserver Ä‘á»ƒ track app lifecycle
 import 'package:flutter/material.dart';
 import 'package:his_mobile/core/services/vpn_benh_vien_service.dart';
 
+import 'package:his_mobile/core/security/credentials.dart';
 class VpnBenhVienScreen extends StatefulWidget {
   const VpnBenhVienScreen({super.key});
 
@@ -42,7 +43,7 @@ class _VpnBenhVienScreenState extends State<VpnBenhVienScreen>
     super.dispose();
   }
 
-  // v3.0.93: App lifecycle - auto-disconnect khi background quá 5 phút
+  // v3.0.93: App lifecycle - auto-disconnect khi background quÃ¡ 5 phÃºt
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final vpn = VpnBenhVienService.instance;
@@ -66,19 +67,19 @@ class _VpnBenhVienScreenState extends State<VpnBenhVienScreen>
   Future<void> _connect() async {
     if (_busy) return;
     final vpn = VpnBenhVienService.instance;
-    // Nếu đang dùng "Tài khoản khác" → set credentials trước
+    // Náº¿u Ä‘ang dÃ¹ng "TÃ i khoáº£n khÃ¡c" â†’ set credentials trÆ°á»›c
     if (!vpn.isUsingDefaultAccount) {
       final user = _otherUserCtrl.text.trim();
       final pass = _otherPassCtrl.text;
       if (user.isEmpty || pass.isEmpty) {
-        _snack('Nhập tài khoản + mật khẩu', ok: false);
+        _snack('Nháº­p tÃ i khoáº£n + máº­t kháº©u', ok: false);
         return;
       }
       await vpn.setCredentials(user, pass);
     } else {
-      // Reset về default nếu cached credentials khác default
-      // (an toàn: nếu user đã thử setCredentials với user khác)
-      // Cờ: nếu currentUser là rỗng (do toggleAccount setCredentials('', ''))
+      // Reset vá» default náº¿u cached credentials khÃ¡c default
+      // (an toÃ n: náº¿u user Ä‘Ã£ thá»­ setCredentials vá»›i user khÃ¡c)
+      // Cá»: náº¿u currentUser lÃ  rá»—ng (do toggleAccount setCredentials('', ''))
       if (vpn.currentUser.isEmpty) {
         await vpn.resetToDefault();
       }
@@ -88,9 +89,9 @@ class _VpnBenhVienScreenState extends State<VpnBenhVienScreen>
     if (!mounted) return;
     setState(() => _busy = false);
     if (ok) {
-      _snack('🔐 Đang yêu cầu kết nối VPN...');
+      _snack('ðŸ” Äang yÃªu cáº§u káº¿t ná»‘i VPN...');
     } else {
-      _snack('❌ ${vpn.lastError ?? "Lỗi không xác định"}', ok: false);
+      _snack('âŒ ${vpn.lastError ?? "Lá»—i khÃ´ng xÃ¡c Ä‘á»‹nh"}', ok: false);
     }
   }
 
@@ -100,7 +101,7 @@ class _VpnBenhVienScreenState extends State<VpnBenhVienScreen>
     VpnBenhVienService.instance.disconnect();
     if (!mounted) return;
     setState(() => _busy = false);
-    _snack('⚠️ Đã ngắt kết nối VPN');
+    _snack('âš ï¸ ÄÃ£ ngáº¯t káº¿t ná»‘i VPN');
   }
 
   void _snack(String msg, {bool ok = true}) {
@@ -128,7 +129,7 @@ class _VpnBenhVienScreenState extends State<VpnBenhVienScreen>
           children: [
             Icon(Icons.vpn_lock, color: Colors.white, size: 22),
             SizedBox(width: 8),
-            Text('VPN Bệnh viện', style: TextStyle(fontSize: 16)),
+            Text('VPN Bá»‡nh viá»‡n', style: TextStyle(fontSize: 16)),
           ],
         ),
       ),
@@ -137,7 +138,7 @@ class _VpnBenhVienScreenState extends State<VpnBenhVienScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Banner auto-disconnect (nếu đang đếm)
+            // Banner auto-disconnect (náº¿u Ä‘ang Ä‘áº¿m)
             if (remaining != null) _buildAutoDisconnectBanner(remaining),
             if (remaining != null) const SizedBox(height: 12),
 
@@ -150,7 +151,7 @@ class _VpnBenhVienScreenState extends State<VpnBenhVienScreen>
             // Action buttons
             _buildActionButtons(vpn),
             const SizedBox(height: 16),
-            // Config info (gọn)
+            // Config info (gá»n)
             _buildConfigInfo(),
           ],
         ),
@@ -177,12 +178,12 @@ class _VpnBenhVienScreenState extends State<VpnBenhVienScreen>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  '⏳ Sẽ tự ngắt VPN sau khi thoát app',
+                  'â³ Sáº½ tá»± ngáº¯t VPN sau khi thoÃ¡t app',
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFFE65100)),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Mở lại app trong $mins:$secs để hủy',
+                  'Má»Ÿ láº¡i app trong $mins:$secs Ä‘á»ƒ há»§y',
                   style: const TextStyle(fontSize: 12, color: Color(0xFF6D4C41)),
                 ),
               ],
@@ -200,19 +201,19 @@ class _VpnBenhVienScreenState extends State<VpnBenhVienScreen>
     if (vpn.isConnected) {
       color = Colors.green;
       icon = Icons.verified;
-      statusText = 'Đã kết nối VPN';
+      statusText = 'ÄÃ£ káº¿t ná»‘i VPN';
     } else if (vpn.isConnecting) {
       color = Colors.orange;
       icon = Icons.sync;
-      statusText = 'Đang kết nối...';
+      statusText = 'Äang káº¿t ná»‘i...';
     } else if (vpn.isError) {
       color = Colors.red;
       icon = Icons.error_outline;
-      statusText = 'Lỗi VPN';
+      statusText = 'Lá»—i VPN';
     } else {
       color = Colors.grey;
       icon = Icons.vpn_lock_outlined;
-      statusText = 'Chưa kết nối';
+      statusText = 'ChÆ°a káº¿t ná»‘i';
     }
 
     return Card(
@@ -238,16 +239,16 @@ class _VpnBenhVienScreenState extends State<VpnBenhVienScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Trạng thái VPN',
+                  Text('Tráº¡ng thÃ¡i VPN',
                     style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 4),
                   Text(statusText,
                     style: TextStyle(color: color, fontSize: 20, fontWeight: FontWeight.bold)),
                   if (vpn.isConnected)
-                    const Text('Tới 113.176.81.193:8443 (qua internet)',
+                    const Text('Tá»›i 113.176.81.193:8443 (qua internet)',
                       style: TextStyle(color: Colors.black54, fontSize: 11)),
                   if (vpn.lastError != null && vpn.isError)
-                    Text('Lỗi: ${vpn.lastError}',
+                    Text('Lá»—i: ${vpn.lastError}',
                       style: const TextStyle(color: Colors.red, fontSize: 11),
                       maxLines: 2, overflow: TextOverflow.ellipsis),
                 ],
@@ -264,9 +265,9 @@ class _VpnBenhVienScreenState extends State<VpnBenhVienScreen>
     );
   }
 
-  /// v3.0.93: Form tài khoản
-  /// - Nếu dùng default nemk: hiển thị username, ẩn password (không cho xem)
-  /// - Nếu dùng "Tài khoản khác": hiển thị form riêng để nhập
+  /// v3.0.93: Form tÃ i khoáº£n
+  /// - Náº¿u dÃ¹ng default nemk: hiá»ƒn thá»‹ username, áº©n password (khÃ´ng cho xem)
+  /// - Náº¿u dÃ¹ng "TÃ i khoáº£n khÃ¡c": hiá»ƒn thá»‹ form riÃªng Ä‘á»ƒ nháº­p
   Widget _buildAccountForm(VpnBenhVienService vpn) {
     final isDefault = vpn.isUsingDefaultAccount;
     return Card(
@@ -279,7 +280,7 @@ class _VpnBenhVienScreenState extends State<VpnBenhVienScreen>
               children: [
                 Icon(Icons.account_circle, size: 18, color: Color(0xFF0D47A1)),
                 SizedBox(width: 6),
-                Text('Tài khoản VPN',
+                Text('TÃ i khoáº£n VPN',
                     style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
               ],
             ),
@@ -291,7 +292,7 @@ class _VpnBenhVienScreenState extends State<VpnBenhVienScreen>
                 isDefault ? Icons.person_add : Icons.refresh,
                 size: 16,
               ),
-              label: Text(isDefault ? 'Dùng tài khoản khác' : 'Quay lại tài khoản mặc định'),
+              label: Text(isDefault ? 'DÃ¹ng tÃ i khoáº£n khÃ¡c' : 'Quay láº¡i tÃ i khoáº£n máº·c Ä‘á»‹nh'),
               style: TextButton.styleFrom(
                 foregroundColor: const Color(0xFF0D47A1),
                 padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -304,7 +305,7 @@ class _VpnBenhVienScreenState extends State<VpnBenhVienScreen>
     );
   }
 
-  /// Row tài khoản mặc định: hiện username, ẩn password hoàn toàn
+  /// Row tÃ i khoáº£n máº·c Ä‘á»‹nh: hiá»‡n username, áº©n password hoÃ n toÃ n
   Widget _buildDefaultAccountRow() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -321,10 +322,10 @@ class _VpnBenhVienScreenState extends State<VpnBenhVienScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('nemk',
+                const Text(Credentials.defaultNemkLogin,
                     style: TextStyle(
                         fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF0D47A1))),
-                Text('Tài khoản BS mặc định (pass đã lưu sẵn)',
+                Text('TÃ i khoáº£n BS máº·c Ä‘á»‹nh (pass Ä‘Ã£ lÆ°u sáºµn)',
                     style: TextStyle(fontSize: 11, color: Colors.grey.shade700)),
               ],
             ),
@@ -335,7 +336,7 @@ class _VpnBenhVienScreenState extends State<VpnBenhVienScreen>
               color: const Color(0xFF0D47A1),
               borderRadius: BorderRadius.circular(4),
             ),
-            child: const Text('Mặc định',
+            child: const Text('Máº·c Ä‘á»‹nh',
                 style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
           ),
         ],
@@ -343,7 +344,7 @@ class _VpnBenhVienScreenState extends State<VpnBenhVienScreen>
     );
   }
 
-  /// Form nhập tài khoản khác
+  /// Form nháº­p tÃ i khoáº£n khÃ¡c
   Widget _buildOtherAccountRow() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -351,7 +352,7 @@ class _VpnBenhVienScreenState extends State<VpnBenhVienScreen>
         TextField(
           controller: _otherUserCtrl,
           decoration: const InputDecoration(
-            labelText: 'Tên đăng nhập',
+            labelText: 'TÃªn Ä‘Äƒng nháº­p',
             prefixIcon: Icon(Icons.person),
             border: OutlineInputBorder(),
             isDense: true,
@@ -362,7 +363,7 @@ class _VpnBenhVienScreenState extends State<VpnBenhVienScreen>
           controller: _otherPassCtrl,
           obscureText: !_showOtherPass,
           decoration: InputDecoration(
-            labelText: 'Mật khẩu',
+            labelText: 'Máº­t kháº©u',
             prefixIcon: const Icon(Icons.lock),
             suffixIcon: IconButton(
               icon: Icon(_showOtherPass ? Icons.visibility_off : Icons.visibility),
@@ -379,16 +380,16 @@ class _VpnBenhVienScreenState extends State<VpnBenhVienScreen>
   Future<void> _toggleAccount(VpnBenhVienService vpn) async {
     final wantOther = vpn.isUsingDefaultAccount;
     if (wantOther) {
-      // Chuyển sang "Tài khoản khác"
+      // Chuyá»ƒn sang "TÃ i khoáº£n khÃ¡c"
       setState(() {
         _otherUserCtrl.text = '';
         _otherPassCtrl.text = '';
         _showOtherPass = false;
       });
-      // Đánh dấu: bằng cách lưu user rỗng
+      // ÄÃ¡nh dáº¥u: báº±ng cÃ¡ch lÆ°u user rá»—ng
       await vpn.setCredentials('', '');
     } else {
-      // Quay lại default
+      // Quay láº¡i default
       await vpn.resetToDefault();
       _otherUserCtrl.clear();
       _otherPassCtrl.clear();
@@ -404,7 +405,7 @@ class _VpnBenhVienScreenState extends State<VpnBenhVienScreen>
           child: ElevatedButton.icon(
             onPressed: (_busy || isOn) ? null : _connect,
             icon: const Icon(Icons.power_settings_new),
-            label: const Text('KẾT NỐI'),
+            label: const Text('Káº¾T Ná»I'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.green,
               foregroundColor: Colors.white,
@@ -418,7 +419,7 @@ class _VpnBenhVienScreenState extends State<VpnBenhVienScreen>
           child: ElevatedButton.icon(
             onPressed: (_busy || !vpn.isConnected) ? null : _disconnect,
             icon: const Icon(Icons.power_off),
-            label: const Text('NGẮT'),
+            label: const Text('NGáº®T'),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.red,
               foregroundColor: Colors.white,
@@ -431,7 +432,7 @@ class _VpnBenhVienScreenState extends State<VpnBenhVienScreen>
     );
   }
 
-  /// v3.0.93: Thông tin kết nối gọn
+  /// v3.0.93: ThÃ´ng tin káº¿t ná»‘i gá»n
   Widget _buildConfigInfo() {
     return Card(
       child: Padding(
@@ -443,16 +444,16 @@ class _VpnBenhVienScreenState extends State<VpnBenhVienScreen>
               children: const [
                 Icon(Icons.info_outline, color: Color(0xFF0D47A1), size: 18),
                 SizedBox(width: 6),
-                Text('Thông tin kết nối',
+                Text('ThÃ´ng tin káº¿t ná»‘i',
                     style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
               ],
             ),
             const SizedBox(height: 10),
             const Text(
-              '• VPN tới máy chủ BV Ninh Thuận (qua internet)\n'
-              '• Sau khi kết nối: truy cập HIS Pro 172.16.9.6 nội bộ\n'
-              '• Auto-disconnect 5 phút khi thoát/thu gọn app\n'
-              '• Tích hợp sẵn (openvpn_flutter), không cần OpenVPN Connect',
+              'â€¢ VPN tá»›i mÃ¡y chá»§ BV Ninh Thuáº­n (qua internet)\n'
+              'â€¢ Sau khi káº¿t ná»‘i: truy cáº­p HIS Pro 172.16.9.6 ná»™i bá»™\n'
+              'â€¢ Auto-disconnect 5 phÃºt khi thoÃ¡t/thu gá»n app\n'
+              'â€¢ TÃ­ch há»£p sáºµn (openvpn_flutter), khÃ´ng cáº§n OpenVPN Connect',
               style: TextStyle(fontSize: 12, color: Colors.black87, height: 1.5),
             ),
           ],

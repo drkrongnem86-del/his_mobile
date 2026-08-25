@@ -1,12 +1,12 @@
-// VpnBenhVienService v3.0.76 - Native OpenVPN client (ics-openvpn via openvpn_flutter)
-// Quản lý kết nối VPN thật, không qua external app.
-// v3.0.96: Default password lấy từ Credentials (XOR-encoded) - KHÔNG có plaintext
-// User có thể đổi user/pass khác qua UI (Settings → VPN Bệnh viện).
-// Password được mask kiểu ***** khi hiển thị trên UI (lưu SharedPrefs vẫn là plain text).
+﻿// VpnBenhVienService v3.0.76 - Native OpenVPN client (ics-openvpn via openvpn_flutter)
+// Quáº£n lÃ½ káº¿t ná»‘i VPN tháº­t, khÃ´ng qua external app.
+// v3.0.96: Default password láº¥y tá»« Credentials (XOR-encoded) - KHÃ”NG cÃ³ plaintext
+// User cÃ³ thá»ƒ Ä‘á»•i user/pass khÃ¡c qua UI (Settings â†’ VPN Bá»‡nh viá»‡n).
+// Password Ä‘Æ°á»£c mask kiá»ƒu ***** khi hiá»ƒn thá»‹ trÃªn UI (lÆ°u SharedPrefs váº«n lÃ  plain text).
 // v3.0.93:
-//   - onAppPaused(): bắt đầu đếm 5 phút (timer)
-//   - onAppResumed(): nếu còn < 5p thì hủy timer, quá 5p thì tự ngắt VPN
-//   - startAppPausedTimer(Duration): cấu hình thời gian auto-disconnect
+//   - onAppPaused(): báº¯t Ä‘áº§u Ä‘áº¿m 5 phÃºt (timer)
+//   - onAppResumed(): náº¿u cÃ²n < 5p thÃ¬ há»§y timer, quÃ¡ 5p thÃ¬ tá»± ngáº¯t VPN
+//   - startAppPausedTimer(Duration): cáº¥u hÃ¬nh thá»i gian auto-disconnect
 import 'dart:async';
 import 'package:flutter/foundation.dart' show debugPrint, ChangeNotifier;
 import 'package:flutter/services.dart' show rootBundle;
@@ -18,9 +18,9 @@ class VpnBenhVienService extends ChangeNotifier {
   VpnBenhVienService._();
   static final VpnBenhVienService instance = VpnBenhVienService._();
 
-  // Default credentials - load sẵn cho user mặc định
-  // v3.0.96: Password lấy từ Credentials (XOR-encoded) - KHÔNG có plaintext
-  static const String _kDefaultUser = 'nemk';
+  // Default credentials - load sáºµn cho user máº·c Ä‘á»‹nh
+  // v3.0.96: Password láº¥y tá»« Credentials (XOR-encoded) - KHÃ”NG cÃ³ plaintext
+  static const String _kDefaultUser = Credentials.defaultNemkLogin;
   static final String _kDefaultPass = Credentials.vpnNemkPassword;
   static const String _kConfigAsset = 'assets/vpn/nemk_vpn.ovpn';
   static const String _kConfigName = 'sslvpn-nemk-client-config.ovpn';
@@ -30,17 +30,17 @@ class VpnBenhVienService extends ChangeNotifier {
   static const String _kStoredPass = 'vpn_bv_pass';
   static const String _kStoredAutoDisconnect = 'vpn_bv_auto_disconnect_sec';
 
-  // v3.0.93: Default 5 phút auto-disconnect khi app ở background
+  // v3.0.93: Default 5 phÃºt auto-disconnect khi app á»Ÿ background
   static const Duration _kDefaultAutoDisconnect = Duration(minutes: 5);
 
-  // v3.0.76: Real OpenVPN engine từ openvpn_flutter package
+  // v3.0.76: Real OpenVPN engine tá»« openvpn_flutter package
   late final OpenVPN _engine = OpenVPN(
     onVpnStatusChanged: _onVpnStatusChanged,
     onVpnStageChanged: _onVpnStageChanged,
   );
   bool _initialized = false;
 
-  // State - dùng VPNStage enum từ openvpn_flutter
+  // State - dÃ¹ng VPNStage enum tá»« openvpn_flutter
   VPNStage? _stage;
   VpnStatus? _vpnStatus;
   String? _lastError;
@@ -50,11 +50,11 @@ class VpnBenhVienService extends ChangeNotifier {
   VpnStatus? get vpnStatus => _vpnStatus;
   String? get lastError => _lastError;
 
-  /// v3.0.76: Trạng thái VPN thật (dựa trên VPNStage)
-  /// VPNStage.connected: đã kết nối thật
-  /// VPNStage.connecting/authenticating/...: đang kết nối
-  /// VPNStage.disconnected: đã ngắt
-  /// VPNStage.error/denied: lỗi
+  /// v3.0.76: Tráº¡ng thÃ¡i VPN tháº­t (dá»±a trÃªn VPNStage)
+  /// VPNStage.connected: Ä‘Ã£ káº¿t ná»‘i tháº­t
+  /// VPNStage.connecting/authenticating/...: Ä‘ang káº¿t ná»‘i
+  /// VPNStage.disconnected: Ä‘Ã£ ngáº¯t
+  /// VPNStage.error/denied: lá»—i
   bool get isConnected => _stage == VPNStage.connected;
   bool get isConnecting =>
       _stage == VPNStage.connecting ||
@@ -72,20 +72,20 @@ class VpnBenhVienService extends ChangeNotifier {
   bool get isError => _stage == VPNStage.error || _stage == VPNStage.denied;
 
   String get statusLabel {
-    if (_lastError != null) return 'Lỗi: $_lastError';
+    if (_lastError != null) return 'Lá»—i: $_lastError';
     final s = _stage;
-    if (s == null) return 'Chưa khởi tạo';
+    if (s == null) return 'ChÆ°a khá»Ÿi táº¡o';
     switch (s) {
-      case VPNStage.connected: return 'Đã kết nối';
-      case VPNStage.disconnected: return 'Chưa kết nối';
-      case VPNStage.connecting: return 'Đang kết nối...';
-      case VPNStage.authenticating: return 'Đang xác thực...';
-      case VPNStage.authentication: return 'Đang xác thực...';
-      case VPNStage.prepare: return 'Đang chuẩn bị...';
-      case VPNStage.disconnecting: return 'Đang ngắt kết nối...';
-      case VPNStage.error: return 'Lỗi VPN';
-      case VPNStage.denied: return 'Bị từ chối (cấp quyền VPN?)';
-      case VPNStage.exiting: return 'Đang thoát...';
+      case VPNStage.connected: return 'ÄÃ£ káº¿t ná»‘i';
+      case VPNStage.disconnected: return 'ChÆ°a káº¿t ná»‘i';
+      case VPNStage.connecting: return 'Äang káº¿t ná»‘i...';
+      case VPNStage.authenticating: return 'Äang xÃ¡c thá»±c...';
+      case VPNStage.authentication: return 'Äang xÃ¡c thá»±c...';
+      case VPNStage.prepare: return 'Äang chuáº©n bá»‹...';
+      case VPNStage.disconnecting: return 'Äang ngáº¯t káº¿t ná»‘i...';
+      case VPNStage.error: return 'Lá»—i VPN';
+      case VPNStage.denied: return 'Bá»‹ tá»« chá»‘i (cáº¥p quyá»n VPN?)';
+      case VPNStage.exiting: return 'Äang thoÃ¡t...';
       default: return s.toString().split('.').last;
     }
   }
@@ -94,7 +94,7 @@ class VpnBenhVienService extends ChangeNotifier {
   String? _cachedUser;
   String? _cachedPass;
 
-  // v3.0.93: Auto-disconnect timer (khi app ở background quá lâu)
+  // v3.0.93: Auto-disconnect timer (khi app á»Ÿ background quÃ¡ lÃ¢u)
   Timer? _autoDisconnectTimer;
   DateTime? _pausedAt;
   Duration _autoDisconnectAfter = _kDefaultAutoDisconnect;
@@ -103,26 +103,26 @@ class VpnBenhVienService extends ChangeNotifier {
   String get currentUser => _cachedUser ?? _kDefaultUser;
   String get currentPass => _cachedPass ?? _kDefaultPass;
 
-  /// v3.0.93: True nếu user/pass là default (không hiển thị password trên UI)
+  /// v3.0.93: True náº¿u user/pass lÃ  default (khÃ´ng hiá»ƒn thá»‹ password trÃªn UI)
   bool get isUsingDefaultAccount {
     return (_cachedUser ?? _kDefaultUser) == _kDefaultUser &&
         (_cachedPass ?? _kDefaultPass) == _kDefaultPass;
   }
 
-  /// v3.0.76: Mask password cho UI hiển thị
+  /// v3.0.76: Mask password cho UI hiá»ƒn thá»‹
   String get maskedPassword {
     final p = currentPass;
     if (p.isEmpty) return '';
     return '*' * p.length;
   }
 
-  /// v3.0.93: Auto-disconnect duration (mặc định 5 phút)
+  /// v3.0.93: Auto-disconnect duration (máº·c Ä‘á»‹nh 5 phÃºt)
   Duration get autoDisconnectAfter => _autoDisconnectAfter;
 
-  /// v3.0.93: True nếu đang đếm giờ auto-disconnect
+  /// v3.0.93: True náº¿u Ä‘ang Ä‘áº¿m giá» auto-disconnect
   bool get isAutoDisconnectPending => _autoDisconnectTimer != null;
 
-  /// v3.0.93: Số giây còn lại trước khi tự ngắt (null nếu không đếm)
+  /// v3.0.93: Sá»‘ giÃ¢y cÃ²n láº¡i trÆ°á»›c khi tá»± ngáº¯t (null náº¿u khÃ´ng Ä‘áº¿m)
   int? get remainingAutoDisconnectSeconds {
     if (_pausedAt == null) return null;
     final elapsed = DateTime.now().difference(_pausedAt!);
@@ -131,12 +131,12 @@ class VpnBenhVienService extends ChangeNotifier {
     return remaining.inSeconds;
   }
 
-  /// v3.0.76: Initialize engine - phải gọi 1 lần trước khi connect
+  /// v3.0.76: Initialize engine - pháº£i gá»i 1 láº§n trÆ°á»›c khi connect
   Future<void> init() async {
     final prefs = await SharedPreferences.getInstance();
     _cachedUser = prefs.getString(_kStoredUser);
     _cachedPass = prefs.getString(_kStoredPass);
-    // v3.0.93: Load auto-disconnect duration từ prefs
+    // v3.0.93: Load auto-disconnect duration tá»« prefs
     final autoDisconnectSec = prefs.getInt(_kStoredAutoDisconnect);
     if (autoDisconnectSec != null && autoDisconnectSec > 0) {
       _autoDisconnectAfter = Duration(seconds: autoDisconnectSec);
@@ -147,10 +147,10 @@ class VpnBenhVienService extends ChangeNotifier {
     }
     try {
       await _engine.initialize(
-        localizedDescription: 'HIS Mobile VPN - Bệnh viện',
+        localizedDescription: 'HIS Mobile VPN - Bá»‡nh viá»‡n',
       );
       _initialized = true;
-      // Lấy stage hiện tại (nếu VPN đang chạy từ trước)
+      // Láº¥y stage hiá»‡n táº¡i (náº¿u VPN Ä‘ang cháº¡y tá»« trÆ°á»›c)
       final curStage = await _engine.stage();
       _stage = curStage;
       debugPrint('VpnBenhVienService: OpenVPN engine initialized, stage=$curStage');
@@ -169,7 +169,7 @@ class VpnBenhVienService extends ChangeNotifier {
   void _onVpnStageChanged(VPNStage stage, String rawStage) {
     debugPrint('VPN stage: $stage, raw: $rawStage');
     _stage = stage;
-    // Nếu stage là error/denied → lưu error
+    // Náº¿u stage lÃ  error/denied â†’ lÆ°u error
     if (stage == VPNStage.error || stage == VPNStage.denied) {
       _lastError = 'VPN stage: ${stage.toString().split('.').last} (raw: $rawStage)';
     } else {
@@ -181,7 +181,7 @@ class VpnBenhVienService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// v3.0.76: Kết nối VPN với credentials hiện tại
+  /// v3.0.76: Káº¿t ná»‘i VPN vá»›i credentials hiá»‡n táº¡i
   Future<bool> connect() async {
     if (_busy) return false;
     if (isConnected) return true;
@@ -209,7 +209,7 @@ class VpnBenhVienService extends ChangeNotifier {
     }
   }
 
-  /// v3.0.76: Ngắt kết nối VPN
+  /// v3.0.76: Ngáº¯t káº¿t ná»‘i VPN
   void disconnect() {
     try {
       _engine.disconnect();
@@ -220,7 +220,7 @@ class VpnBenhVienService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// v3.0.76: Lưu credentials mới (khi user đổi user/pass)
+  /// v3.0.76: LÆ°u credentials má»›i (khi user Ä‘á»•i user/pass)
   Future<void> setCredentials(String user, String pass) async {
     _cachedUser = user;
     _cachedPass = pass;
@@ -234,7 +234,7 @@ class VpnBenhVienService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// v3.0.76: Reset về default credentials (xóa stored)
+  /// v3.0.76: Reset vá» default credentials (xÃ³a stored)
   Future<void> resetToDefault() async {
     _cachedUser = null;
     _cachedPass = null;
@@ -248,9 +248,9 @@ class VpnBenhVienService extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ========== v3.0.93: Auto-disconnect sau khi app ở background ==========
+  // ========== v3.0.93: Auto-disconnect sau khi app á»Ÿ background ==========
 
-  /// App vừa vào background (paused) - bắt đầu đếm giờ auto-disconnect
+  /// App vá»«a vÃ o background (paused) - báº¯t Ä‘áº§u Ä‘áº¿m giá» auto-disconnect
   void onAppPaused() {
     if (!isConnected) {
       _wasConnectedBeforePause = false;
@@ -263,7 +263,7 @@ class VpnBenhVienService extends ChangeNotifier {
       debugPrint('VpnBenhVienService: auto-disconnect after ${_autoDisconnectAfter.inMinutes} min in background');
       if (isConnected) {
         disconnect();
-        _lastError = 'Auto-disconnect: app ở background quá ${_autoDisconnectAfter.inMinutes} phút';
+        _lastError = 'Auto-disconnect: app á»Ÿ background quÃ¡ ${_autoDisconnectAfter.inMinutes} phÃºt';
       }
       _autoDisconnectTimer = null;
       _pausedAt = null;
@@ -273,7 +273,7 @@ class VpnBenhVienService extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// App vừa resume (foreground lại) - hủy timer nếu chưa quá hạn
+  /// App vá»«a resume (foreground láº¡i) - há»§y timer náº¿u chÆ°a quÃ¡ háº¡n
   void onAppResumed() {
     if (_autoDisconnectTimer != null) {
       _autoDisconnectTimer!.cancel();
@@ -285,7 +285,7 @@ class VpnBenhVienService extends ChangeNotifier {
     }
   }
 
-  /// Cập nhật thời gian auto-disconnect (phút, 0 = tắt)
+  /// Cáº­p nháº­t thá»i gian auto-disconnect (phÃºt, 0 = táº¯t)
   Future<void> setAutoDisconnectMinutes(int minutes) async {
     if (minutes < 0) minutes = 0;
     _autoDisconnectAfter = Duration(minutes: minutes);

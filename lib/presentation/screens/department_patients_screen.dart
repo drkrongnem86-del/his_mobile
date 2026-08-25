@@ -1,9 +1,9 @@
-// DepartmentPatientsScreen v2.98.0
-// - Sửa mojibake: "ngĂ y" → "ngày", "phĂ²ng" → "phòng", "rá»™ng" → "rộng"
-// - ĐỔI Autocomplete → TextField filter LOCAL (như workspace cũ) - đơn giản hơn
-// - Tự cập nhật tên khoa + chips Hôm nay/7/30/90 ngày khi load
-// v2.40.2: Xem BN của 1 khoa với TYPE-AHEAD SEARCH
-// v2.96.0: Thêm API selector (←/→)
+﻿// DepartmentPatientsScreen v2.98.0
+// - Sá»­a mojibake: "ngÄ‚ y" â†’ "ngÃ y", "phÄ‚Â²ng" â†’ "phÃ²ng", "rÃ¡Â»â„¢ng" â†’ "rá»™ng"
+// - Äá»”I Autocomplete â†’ TextField filter LOCAL (nhÆ° workspace cÅ©) - Ä‘Æ¡n giáº£n hÆ¡n
+// - Tá»± cáº­p nháº­t tÃªn khoa + chips HÃ´m nay/7/30/90 ngÃ y khi load
+// v2.40.2: Xem BN cá»§a 1 khoa vá»›i TYPE-AHEAD SEARCH
+// v2.96.0: ThÃªm API selector (â†/â†’)
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
@@ -16,26 +16,27 @@ import 'package:his_mobile/core/services/his_config_service.dart';
 import 'package:his_mobile/data/services/data_service.dart';
 import 'package:go_router/go_router.dart';
 
-// v2.96.0: Enum API source (đồng bộ với Home screen)
+import 'package:his_mobile/core/security/credentials.dart';
+// v2.96.0: Enum API source (Ä‘á»“ng bá»™ vá»›i Home screen)
 enum DeptPatientApiSource {
-  public,    // Data public 8080 (mặc định)
-  dataRoom,  // Data 3000 buồng
-  dataDept,  // Data 3000 toàn khoa (v3.0.60: thêm)
+  public,    // Data public 8080 (máº·c Ä‘á»‹nh)
+  dataRoom,  // Data 3000 buá»“ng
+  dataDept,  // Data 3000 toÃ n khoa (v3.0.60: thÃªm)
   hisPro,    // HIS Pro 1408
 }
 
-/// v3.0.60: Phân quyền hiển thị API source
-/// - User `nemk` (admin) → thấy 4 options: dataRoom + dataDept + hisPro + public
-/// - User khác → chỉ thấy 2 options: hisPro + public
+/// v3.0.60: PhÃ¢n quyá»n hiá»ƒn thá»‹ API source
+/// - User `nemk` (admin) â†’ tháº¥y 4 options: dataRoom + dataDept + hisPro + public
+/// - User khÃ¡c â†’ chá»‰ tháº¥y 2 options: hisPro + public
 List<DeptPatientApiSource> _visibleDeptPatientApiSources() {
   final username = _getCurrentUsernameStatic();
-  if (username.toLowerCase().trim() == 'nemk') {
+  if (username.toLowerCase().trim() == Credentials.defaultNemkLogin) {
     return DeptPatientApiSource.values.toList();
   }
   return [DeptPatientApiSource.hisPro, DeptPatientApiSource.public];
 }
 
-/// Helper static - lấy username hiện tại
+/// Helper static - láº¥y username hiá»‡n táº¡i
 String _getCurrentUsernameStatic() {
   try {
     return ThongkeAuthService().currentUsername ?? '';
@@ -46,7 +47,7 @@ String _getCurrentUsernameStatic() {
 
 class DepartmentPatientsScreen extends StatefulWidget {
   final int departmentId;        // e.g., 22 = HSCC
-  final String departmentName;    // e.g., "Khoa Cấp Cứu"
+  final String departmentName;    // e.g., "Khoa Cáº¥p Cá»©u"
   final String? departmentCode;   // e.g., "HSCC"
 
   const DepartmentPatientsScreen({
@@ -70,7 +71,7 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
   bool _loaded = false;
   String? _error;
   List<Map<String, dynamic>> _patients = [];
-  String? _selectedRoom; // v2.75.6: filter phòng
+  String? _selectedRoom; // v2.75.6: filter phÃ²ng
   List<Map<String, dynamic>> _suggestions = [];  // type-ahead results
   String _query = '';
   Timer? _debounce;
@@ -78,27 +79,27 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
   // Filter state
   String _dateFilterType = '30days';
 
-  /// v3.0.85: chỉ giữ date filter + search. Bỏ treatment type, type name, room.
-  /// Filter giống "Hồ sơ điều trị" (Treatment History) - đơn giản, chỉ theo ngày.
+  /// v3.0.85: chá»‰ giá»¯ date filter + search. Bá» treatment type, type name, room.
+  /// Filter giá»‘ng "Há»“ sÆ¡ Ä‘iá»u trá»‹" (Treatment History) - Ä‘Æ¡n giáº£n, chá»‰ theo ngÃ y.
   DateTime _dateFrom = DateTime.now().subtract(const Duration(days: 30));
   DateTime _dateTo = DateTime.now();
-  /// v3.0.86: Bỏ date filter, thay bằng status filter (Tất cả / Đang điều trị / Đã xuất viện)
+  /// v3.0.86: Bá» date filter, thay báº±ng status filter (Táº¥t cáº£ / Äang Ä‘iá»u trá»‹ / ÄÃ£ xuáº¥t viá»‡n)
   String _statusFilter = 'all';
   bool _showSuggestions = false;
 
   // v2.96.0: API source
-  // v2.98.2: Default = API 1 (HIS Pro) theo yêu cầu BS
+  // v2.98.2: Default = API 1 (HIS Pro) theo yÃªu cáº§u BS
   DeptPatientApiSource _apiSource = DeptPatientApiSource.hisPro;
 
   @override
   void initState() {
     super.initState();
     _searchCtrl.addListener(_onSearchChanged);
-    // v2.98.0: Tự refresh tên khoa (nếu DepartmentService đã load) - đảm bảo tên có dấu
+    // v2.98.0: Tá»± refresh tÃªn khoa (náº¿u DepartmentService Ä‘Ã£ load) - Ä‘áº£m báº£o tÃªn cÃ³ dáº¥u
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        setState(() {});  // Trigger rebuild với departmentName mới nhất
-        _load();  // Auto-load BN lần đầu
+        setState(() {});  // Trigger rebuild vá»›i departmentName má»›i nháº¥t
+        _load();  // Auto-load BN láº§n Ä‘áº§u
       }
     });
   }
@@ -144,9 +145,9 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
         return d.contains(deptLower.split(' ').last) ||
             deptLower.contains(d) ||
             d == deptLower ||
-            widget.departmentCode == 'HSCC' && d.contains('cấp cứu') && !d.contains('lưu') ||
-            widget.departmentCode == 'CCS' && d.contains('phụ sản') ||
-            widget.departmentCode == 'NTK' && d.contains('thần kinh');
+            widget.departmentCode == 'HSCC' && d.contains('cáº¥p cá»©u') && !d.contains('lÆ°u') ||
+            widget.departmentCode == 'CCS' && d.contains('phá»¥ sáº£n') ||
+            widget.departmentCode == 'NTK' && d.contains('tháº§n kinh');
       }).toList();
       if (!mounted) return;
       setState(() {
@@ -189,8 +190,8 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
         return d.contains(deptLower.split(' ').last) ||
             deptLower.contains(d) ||
             d == deptLower ||
-            widget.departmentCode == 'HSCC' && d.contains('cấp cứu') && !d.contains('lưu') ||
-            widget.departmentCode == 'CCS' && d.contains('phụ sản');
+            widget.departmentCode == 'HSCC' && d.contains('cáº¥p cá»©u') && !d.contains('lÆ°u') ||
+            widget.departmentCode == 'CCS' && d.contains('phá»¥ sáº£n');
       }).toList();
       if (!mounted) return;
       setState(() {
@@ -215,7 +216,7 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
     });
     try {
       List<Map<String, dynamic>>? list;
-      // v2.96.0: Chọn API source
+      // v2.96.0: Chá»n API source
       switch (_apiSource) {
         case DeptPatientApiSource.public:
           list = await _thongke.fetchPatientsPublic(
@@ -227,8 +228,8 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
           );
           break;
         case DeptPatientApiSource.dataRoom:
-          // v2.96.0: Data 3000 - getPatientsInRooms (cần BED_ROOM_IDs)
-          // Lấy buồng theo khoa trước
+          // v2.96.0: Data 3000 - getPatientsInRooms (cáº§n BED_ROOM_IDs)
+          // Láº¥y buá»“ng theo khoa trÆ°á»›c
           final rooms = await _data.getRoomsByDepartment(widget.departmentId.toString());
           final bedRoomIds = rooms.map((r) => r.id).toList();
           if (bedRoomIds.isNotEmpty) {
@@ -276,7 +277,7 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
       'TDL_PATIENT_NAME': p.patientName,
       'TDL_PATIENT_CODE': p.patientCode,
       'TDL_TREATMENT_CODE': p.treatmentCode,
-      'TDL_PATIENT_GENDER_NAME': p.gender == 1 ? 'Nam' : (p.gender == 2 ? 'Nữ' : ''),
+      'TDL_PATIENT_GENDER_NAME': p.gender == 1 ? 'Nam' : (p.gender == 2 ? 'Ná»¯' : ''),
       'TDL_PATIENT_DOB': p.yearOfBirth != null ? '${p.yearOfBirth}00000000' : null,
       'ICD_CODE': p.icdCode,
       'ICD_NAME': p.icdName,
@@ -331,10 +332,10 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF2E7D32),
         foregroundColor: Colors.white,
-        // v2.58.0: Explicit back button với WillPopScope để chắc chắn back work
+        // v2.58.0: Explicit back button vá»›i WillPopScope Ä‘á»ƒ cháº¯c cháº¯n back work
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
-          tooltip: 'Quay lại danh sách khoa',
+          tooltip: 'Quay láº¡i danh sÃ¡ch khoa',
           onPressed: () {
             if (Navigator.canPop(context)) {
               context.safePop();
@@ -353,9 +354,9 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
             ),
             Text(
               'ID: ${widget.departmentId}'
-              '${widget.departmentCode != null ? ' • ${widget.departmentCode}' : ''}'
-              ' • ${_patients.length} BN'
-              '${_suggestions.isNotEmpty ? ' • ${_suggestions.length} gợi ý' : ''}',
+              '${widget.departmentCode != null ? ' â€¢ ${widget.departmentCode}' : ''}'
+              ' â€¢ ${_patients.length} BN'
+              '${_suggestions.isNotEmpty ? ' â€¢ ${_suggestions.length} gá»£i Ã½' : ''}',
               style: const TextStyle(fontSize: 11, fontWeight: FontWeight.normal),
             ),
           ],
@@ -363,13 +364,13 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            tooltip: 'Tải lại',
+            tooltip: 'Táº£i láº¡i',
             onPressed: _loading ? null : _load,
           ),
         ],
       ),
       body: GestureDetector(
-        // v2.40.2: Vuốt sang trái trên body -> refresh (mở rá»™ng search)
+        // v2.40.2: Vuá»‘t sang trÃ¡i trÃªn body -> refresh (má»Ÿ rÃ¡Â»â„¢ng search)
         onHorizontalDragEnd: (details) {
           if ((details.primaryVelocity ?? 0) < -300 && _showSuggestions) {
             setState(() => _showSuggestions = false);
@@ -378,21 +379,21 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
         },
         child: Column(
           children: [
-            // v2.96.0: API selector (←/→) - đặt trên cùng
+            // v2.96.0: API selector (â†/â†’) - Ä‘áº·t trÃªn cÃ¹ng
             _buildApiSelector(),
-            // v3.0.89: Time filter chips - bỏ Trạng thái filter
+            // v3.0.89: Time filter chips - bá» Tráº¡ng thÃ¡i filter
             Container(
               color: Colors.white,
               padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // v3.0.87: Time filter chips (giống Hồ sơ điều trị)
+                  // v3.0.87: Time filter chips (giá»‘ng Há»“ sÆ¡ Ä‘iá»u trá»‹)
                   Row(
                     children: [
                       const Icon(Icons.access_time, size: 13, color: Color(0xFF2E7D32)),
                       const SizedBox(width: 4),
-                      const Text('Thời gian:',
+                      const Text('Thá»i gian:',
                           style: TextStyle(
                               fontSize: 11,
                               color: Color(0xFF2E7D32),
@@ -403,13 +404,13 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
                           scrollDirection: Axis.horizontal,
                           child: Row(
                             children: [
-                              _dateChip('today', 'Hôm nay'),
+                              _dateChip('today', 'HÃ´m nay'),
                               const SizedBox(width: 4),
-                              _dateChip('7days', '7 ngày'),
+                              _dateChip('7days', '7 ngÃ y'),
                               const SizedBox(width: 4),
-                              _dateChip('30days', '30 ngày'),
+                              _dateChip('30days', '30 ngÃ y'),
                               const SizedBox(width: 4),
-                              _dateChip('90days', '90 ngày'),
+                              _dateChip('90days', '90 ngÃ y'),
                             ],
                           ),
                         ),
@@ -423,20 +424,20 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
                     ],
                   ),
                   const SizedBox(height: 6),
-                  // v2.42.0: BN thật từ Data cell - hiển thị tên khoa + số BN
+                  // v2.42.0: BN tháº­t tá»« Data cell - hiá»ƒn thá»‹ tÃªn khoa + sá»‘ BN
                   Row(
                     children: [
                       const Icon(Icons.cloud_done, size: 14, color: Color(0xFF2E7D32)),
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(
-                          'BN thật từ Data: ${widget.departmentName} (${_patients.length} BN)',
+                          'BN tháº­t tá»« Data: ${widget.departmentName} (${_patients.length} BN)',
                           style: const TextStyle(fontSize: 11, color: Color(0xFF2E7D32), fontWeight: FontWeight.w600),
                           maxLines: 1, overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       Text(
-                        _fmtDate(_dateFrom) + ' → ' + _fmtDate(_dateTo),
+                        _fmtDate(_dateFrom) + ' â†’ ' + _fmtDate(_dateTo),
                         style: TextStyle(fontSize: 10, color: Colors.grey.shade700),
                       ),
                     ],
@@ -444,8 +445,8 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
                 ],
               ),
             ),
-            // v2.98.0: Search bar - TextField filter LOCAL đơn giản (như workspace cũ)
-            // BỎ Autocomplete - filter trực tiếp trên list đã load (không popup gợi ý)
+            // v2.98.0: Search bar - TextField filter LOCAL Ä‘Æ¡n giáº£n (nhÆ° workspace cÅ©)
+            // Bá»Ž Autocomplete - filter trá»±c tiáº¿p trÃªn list Ä‘Ã£ load (khÃ´ng popup gá»£i Ã½)
             Container(
               color: Colors.white,
               padding: const EdgeInsets.fromLTRB(8, 0, 8, 4),
@@ -453,7 +454,7 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
                 controller: _searchCtrl,
                 decoration: InputDecoration(
                   isDense: true,
-                  hintText: 'Gõ tên / mã ĐT / mã BN để lọc...',
+                  hintText: 'GÃµ tÃªn / mÃ£ ÄT / mÃ£ BN Ä‘á»ƒ lá»c...',
                   prefixIcon: const Icon(Icons.search, size: 18),
                   border: const OutlineInputBorder(),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -471,8 +472,8 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
                 textInputAction: TextInputAction.search,
               ),
             ),
-            // v3.0.85: Bỏ filter TREATMENT_TYPE_NAME + room - giống Hồ sơ điều trị
-            // (chỉ giữ date filter + search)
+            // v3.0.85: Bá» filter TREATMENT_TYPE_NAME + room - giá»‘ng Há»“ sÆ¡ Ä‘iá»u trá»‹
+            // (chá»‰ giá»¯ date filter + search)
             // Suggestions (type-ahead)
             if (_showSuggestions && _suggestions.isNotEmpty)
               Container(
@@ -492,7 +493,7 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
                             _doSearch();
                           },
                           icon: const Icon(Icons.search, size: 16),
-                          label: Text('Tìm tất cả "${_query}"'),
+                          label: Text('TÃ¬m táº¥t cáº£ "${_query}"'),
                         ),
                       );
                     }
@@ -527,7 +528,7 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
       ),
       title: Text(name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
       subtitle: Text(
-        '$code • $dept',
+        '$code â€¢ $dept',
         style: const TextStyle(fontSize: 11),
         maxLines: 1, overflow: TextOverflow.ellipsis,
       ),
@@ -553,7 +554,7 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
     );
   }
 
-  /// v3.0.86: Status chip (Tất cả / Đang ĐT / Đã xuất viện)
+  /// v3.0.86: Status chip (Táº¥t cáº£ / Äang ÄT / ÄÃ£ xuáº¥t viá»‡n)
   Widget _statusChip(String value, String label, IconData icon) {
     final selected = _statusFilter == value;
     return ChoiceChip(
@@ -575,21 +576,21 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
     );
   }
 
-  // v2.96.0: API selector với ←/→ - đặt trên cùng
+  // v2.96.0: API selector vá»›i â†/â†’ - Ä‘áº·t trÃªn cÃ¹ng
   Widget _buildApiSelector() {
     final currentIdx = DeptPatientApiSource.values.indexOf(_apiSource);
     return Container(
-      color: const Color(0xFFE8EAF6),  // nền xanh nhạt indigo
+      color: const Color(0xFFE8EAF6),  // ná»n xanh nháº¡t indigo
       padding: const EdgeInsets.fromLTRB(8, 6, 8, 6),
       child: Row(
         children: [
           const Icon(Icons.cloud_outlined, size: 16, color: Colors.indigo),
           const SizedBox(width: 6),
           const Text('API:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.indigo)),
-          // ←
+          // â†
           IconButton(
             icon: const Icon(Icons.chevron_left, size: 20, color: Colors.indigo),
-            tooltip: 'API trước',
+            tooltip: 'API trÆ°á»›c',
             visualDensity: VisualDensity.compact,
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
@@ -600,7 +601,7 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
               _setApiSource(DeptPatientApiSource.values[prevIdx]);
             },
           ),
-          // Tên API hiện tại
+          // TÃªn API hiá»‡n táº¡i
           Expanded(
             child: GestureDetector(
               onTap: () => _showApiMenu(),
@@ -623,7 +624,7 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
               ),
             ),
           ),
-          // →
+          // â†’
           IconButton(
             icon: const Icon(Icons.chevron_right, size: 20, color: Colors.indigo),
             tooltip: 'API sau',
@@ -642,17 +643,17 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
     );
   }
 
-  // v2.96.0: Helper - label API ngắn
+  // v2.96.0: Helper - label API ngáº¯n
   static String _apiSourceLabel(DeptPatientApiSource src) {
     switch (src) {
-      case DeptPatientApiSource.dataRoom: return '🌐 API 2';
-      case DeptPatientApiSource.dataDept: return '🌐 API';  // v3.0.60
-      case DeptPatientApiSource.hisPro: return '🏥 API 1';
-      case DeptPatientApiSource.public: return '🌍 Public';
+      case DeptPatientApiSource.dataRoom: return 'ðŸŒ API 2';
+      case DeptPatientApiSource.dataDept: return 'ðŸŒ API';  // v3.0.60
+      case DeptPatientApiSource.hisPro: return 'ðŸ¥ API 1';
+      case DeptPatientApiSource.public: return 'ðŸŒ Public';
     }
   }
 
-  // v2.96.0: Helper - màu API
+  // v2.96.0: Helper - mÃ u API
   static Color _apiSourceColor(DeptPatientApiSource src) {
     switch (src) {
       case DeptPatientApiSource.dataRoom: return Colors.teal.shade700;
@@ -662,8 +663,8 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
     }
   }
 
-  // v2.96.0: Menu chọn API (khi tap tên API)
-  // v3.0.60: Phân quyền - chỉ user `nemk` thấy 4 options
+  // v2.96.0: Menu chá»n API (khi tap tÃªn API)
+  // v3.0.60: PhÃ¢n quyá»n - chá»‰ user `nemk` tháº¥y 4 options
   void _showApiMenu() {
     showModalBottomSheet(
       context: context,
@@ -675,7 +676,7 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
           children: [
             Container(
               padding: const EdgeInsets.all(12),
-              child: const Text('Chọn nguồn API lấy BN', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+              child: const Text('Chá»n nguá»“n API láº¥y BN', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
             ),
             const Divider(height: 1),
             ..._visibleDeptPatientApiSources().map((src) {
@@ -684,11 +685,11 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
               String url;
               switch (src) {
                 case DeptPatientApiSource.dataRoom:
-                  label = 'API 2 - Data 3000 (buồng bệnh)';
+                  label = 'API 2 - Data 3000 (buá»“ng bá»‡nh)';
                   url = 'POST /v1/patient/benh-nhan-buong-benh';
                   break;
                 case DeptPatientApiSource.dataDept:
-                  label = 'API - Data 3000 (toàn khoa)';
+                  label = 'API - Data 3000 (toÃ n khoa)';
                   url = 'POST /v1/patient/benh-nhan-khoa';
                   break;
                 case DeptPatientApiSource.hisPro:
@@ -741,7 +742,7 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
               Text(_error!, textAlign: TextAlign.center,
                 style: const TextStyle(color: Colors.red, fontSize: 12)),
               const SizedBox(height: 12),
-              FilledButton(onPressed: _load, child: const Text('Thử lại')),
+              FilledButton(onPressed: _load, child: const Text('Thá»­ láº¡i')),
             ],
           ),
         ),
@@ -758,8 +759,8 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
               const SizedBox(height: 12),
               Text(
                 _query.isEmpty
-                    ? 'Khoa không có BN trong khoảng ${_fmtDate(_dateFrom)} → ${_fmtDate(_dateTo)}'
-                    : 'Không tìm thấy "$_query"',
+                    ? 'Khoa khÃ´ng cÃ³ BN trong khoáº£ng ${_fmtDate(_dateFrom)} â†’ ${_fmtDate(_dateTo)}'
+                    : 'KhÃ´ng tÃ¬m tháº¥y "$_query"',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: Colors.grey.shade700, fontSize: 13),
               ),
@@ -768,7 +769,7 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
                 FilledButton.icon(
                   onPressed: () => _onDateFilterChanged('90days'),
                   icon: const Icon(Icons.calendar_today, size: 16),
-                  label: const Text('Mở rộng 90 ngày'),
+                  label: const Text('Má»Ÿ rá»™ng 90 ngÃ y'),
                 ),
               ],
             ],
@@ -781,7 +782,7 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
       child: ListView.separated(
         controller: _scrollCtrl,
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        // v2.75.6: Filter theo phòng nếu có chọn
+        // v2.75.6: Filter theo phÃ²ng náº¿u cÃ³ chá»n
         itemCount: _filteredPatients().length,
         separatorBuilder: (_, __) => const SizedBox(height: 4),
         itemBuilder: (_, i) => _buildPatientCard(_filteredPatients()[i]),
@@ -789,11 +790,11 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
     );
   }
 
-  /// v3.0.86: Filter LOCAL đơn giản - search + status
-  /// v3.0.89: Sort ca mới nhất lên đầu (IN_TIME desc)
+  /// v3.0.86: Filter LOCAL Ä‘Æ¡n giáº£n - search + status
+  /// v3.0.89: Sort ca má»›i nháº¥t lÃªn Ä‘áº§u (IN_TIME desc)
   List<Map<String, dynamic>> _filteredPatients() {
     var list = _patients;
-    // v3.0.86: Status filter (Tất cả / Đang ĐT / Đã xuất viện) - giữ logic nhưng ẩn UI
+    // v3.0.86: Status filter (Táº¥t cáº£ / Äang ÄT / ÄÃ£ xuáº¥t viá»‡n) - giá»¯ logic nhÆ°ng áº©n UI
     if (_statusFilter != 'all') {
       list = list.where((p) {
         final outTime = (p['out_time'] ?? p['OUT_TIME'] ?? '').toString().trim();
@@ -803,7 +804,7 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
         return true;
       }).toList();
     }
-    // v2.98.0: Filter LOCAL theo search query (giống workspace cũ)
+    // v2.98.0: Filter LOCAL theo search query (giá»‘ng workspace cÅ©)
     if (_query.trim().isNotEmpty) {
       final q = _query.trim().toLowerCase();
       list = list.where((p) {
@@ -813,7 +814,7 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
         return name.contains(q) || code.contains(q) || reqCode.contains(q);
       }).toList();
     }
-    // v3.0.89: Sort ca mới nhất lên đầu (IN_TIME desc)
+    // v3.0.89: Sort ca má»›i nháº¥t lÃªn Ä‘áº§u (IN_TIME desc)
     list = List<Map<String, dynamic>>.from(list);
     list.sort((a, b) {
       final aIn = (a['IN_TIME'] ?? a['in_time'] ?? '').toString();
@@ -823,8 +824,8 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
     return list;
   }
 
-  /// v3.0.85: Bỏ các filter cũ (_buildTreatmentTypeChips, _buildRoomChips, ...)
-  /// Chỉ giữ date filter + search (giống Hồ sơ điều trị)
+  /// v3.0.85: Bá» cÃ¡c filter cÅ© (_buildTreatmentTypeChips, _buildRoomChips, ...)
+  /// Chá»‰ giá»¯ date filter + search (giá»‘ng Há»“ sÆ¡ Ä‘iá»u trá»‹)
   Widget _buildPatientCard(Map<String, dynamic> p) {
     final name = fixVietnameseMojibake(
       (p['TDL_PATIENT_UNSIGNED_NAME'] ?? p['TDL_PATIENT_NAME'] ?? p['tdl_patient_name'] ?? 'BN').toString());
@@ -841,13 +842,13 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
       elevation: 0.5,
       child: InkWell(
         borderRadius: BorderRadius.circular(4),
-        // v2.64.0: 1 tap = mở thao tác (giống app Y tế số)
+        // v2.64.0: 1 tap = má»Ÿ thao tÃ¡c (giá»‘ng app Y táº¿ sá»‘)
         onTap: () {
           HapticFeedback.lightImpact();
           _openPatientActions(p);
         },
         onLongPress: () {
-          // Long-press → mở chi tiết (data dump) để debug/xem raw data
+          // Long-press â†’ má»Ÿ chi tiáº¿t (data dump) Ä‘á»ƒ debug/xem raw data
           HapticFeedback.mediumImpact();
           showModalBottomSheet(
             context: context,
@@ -908,7 +909,7 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
               ),
               const SizedBox(height: 2),
               Text(
-                'Bấm 1 lần → Thao tác • Giữ để xem chi tiết',
+                'Báº¥m 1 láº§n â†’ Thao tÃ¡c â€¢ Giá»¯ Ä‘á»ƒ xem chi tiáº¿t',
                 style: TextStyle(fontSize: 9, color: Colors.grey.shade500, fontStyle: FontStyle.italic),
               ),
               const SizedBox(height: 4),
@@ -917,16 +918,16 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
                 runSpacing: 2,
                 children: [
                   if (code.isNotEmpty)
-                    Text('Mã ĐT: $code',
+                    Text('MÃ£ ÄT: $code',
                         style: const TextStyle(fontSize: 11, color: Colors.black87)),
                   if (patientCode.isNotEmpty)
-                    Text('Mã BN: $patientCode',
+                    Text('MÃ£ BN: $patientCode',
                         style: const TextStyle(fontSize: 11, color: Colors.black54)),
                   if (dob.isNotEmpty)
                     Text('NS: $dob',
                         style: const TextStyle(fontSize: 11, color: Colors.black54)),
                   if (phone.isNotEmpty)
-                    Text('SĐT: $phone',
+                    Text('SÄT: $phone',
                         style: const TextStyle(fontSize: 11, color: Colors.black54)),
                 ],
               ),
@@ -937,8 +938,8 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
     );
   }
 
-  /// v2.42.0 + v2.56.0: Mở PatientActionsSheet cho 1 BN - dùng showModalBottomSheet thay MaterialPage
-  /// (tránh mĂ n hình xám, fix dark barrier)
+  /// v2.42.0 + v2.56.0: Má»Ÿ PatientActionsSheet cho 1 BN - dÃ¹ng showModalBottomSheet thay MaterialPage
+  /// (trÃ¡nh mÄ‚Â n hÃ¬nh xÃ¡m, fix dark barrier)
   void _openPatientActions(Map<String, dynamic> p) {
     showModalBottomSheet(
       context: context,
@@ -990,7 +991,7 @@ class _DepartmentPatientsScreenState extends State<DepartmentPatientsScreen> {
                 children: [
                   const Icon(Icons.person, color: Color(0xFF2E7D32)),
                   const SizedBox(width: 8),
-                  Text('Chi tiết BN',
+                  Text('Chi tiáº¿t BN',
                       style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                 ],
               ),

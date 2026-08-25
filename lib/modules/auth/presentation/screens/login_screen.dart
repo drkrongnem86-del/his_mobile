@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:his_mobile/core/constants/app_constants.dart';
+import 'package:his_mobile/core/security/credentials.dart';
 import 'package:his_mobile/core/services/connection_service.dart';
 import 'package:his_mobile/core/theme/app_theme.dart';
 import 'package:his_mobile/data/api/his_pro_api_service.dart' as his_pro_api;  // v3.0.159: class CHÍNH (EMR push)
@@ -56,6 +57,10 @@ class _LoginScreenState extends State<LoginScreen> {
     final email = _loginNameController.text.trim();
     final pass = _passwordController.text;
     if (email.isEmpty || pass.isEmpty) return;
+
+    // v3.0.177: Sync credentials tới tất cả services (không hardcode 'nemk/1027')
+    // Sau khi gọi, mọi chỗ dùng Credentials.currentNemkLogin sẽ thấy giá trị user vừa nhập
+    Credentials.setActiveNemkCredentials(login: email, password: pass);
 
     setState(() => _loading = true);
 

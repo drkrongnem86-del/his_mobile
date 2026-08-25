@@ -1,8 +1,8 @@
-// TienIchScreen v3.0.164 - Tiện ích (sử dụng PatientSearchField dùng chung)
-// v3.0.164: GỘP 2 tile phòng thành 1 - "Phòng tủ thuật HSCC (ECG + DSBN)" - room 36
-//          BS yêu cầu: BỎ "Phòng thử thuật HSCC ID 9999" - chỉ giữ 1 tile thống nhất
-//          Phòng 36 chứa ECG + BN chờ thủ thuật nhỏ + DSBN đang chờ
-// v2.38.9: Thêm 6 tile danh mục từ Data Public (Thuốc/CLS/Vật tư/Nhân viên/Khoa-Giường/TB + ICD + DVKT)
+﻿// TienIchScreen v3.0.164 - Tiá»‡n Ã­ch (sá»­ dá»¥ng PatientSearchField dÃ¹ng chung)
+// v3.0.164: Gá»˜P 2 tile phÃ²ng thÃ nh 1 - "PhÃ²ng tá»§ thuáº­t HSCC (ECG + DSBN)" - room 36
+//          BS yÃªu cáº§u: Bá»Ž "PhÃ²ng thá»­ thuáº­t HSCC ID 9999" - chá»‰ giá»¯ 1 tile thá»‘ng nháº¥t
+//          PhÃ²ng 36 chá»©a ECG + BN chá» thá»§ thuáº­t nhá» + DSBN Ä‘ang chá»
+// v2.38.9: ThÃªm 6 tile danh má»¥c tá»« Data Public (Thuá»‘c/CLS/Váº­t tÆ°/NhÃ¢n viÃªn/Khoa-GiÆ°á»ng/TB + ICD + DVKT)
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -18,6 +18,7 @@ import 'package:his_mobile/presentation/screens/catalog_browser_screen.dart';
 import 'package:his_mobile/presentation/widgets/local_patient_search_field.dart';
 import 'package:his_mobile/presentation/widgets/user_header.dart';
 import 'package:his_mobile/presentation/screens/procedure_room_screen.dart';
+import 'package:his_mobile/core/security/credentials.dart';
 import 'package:his_mobile/core/constants/app_constants.dart';  // v3.0.162
 
 class TienIchScreen extends StatelessWidget {
@@ -32,11 +33,11 @@ class TienIchScreen extends StatelessWidget {
         foregroundColor: Colors.white,
         automaticallyImplyLeading: false,
         leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.go('/home')),
-        title: const Text('Tiện ích', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        title: const Text('Tiá»‡n Ã­ch', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
             icon: const Icon(Icons.qr_code_scanner),
-            tooltip: 'Quét QR BN',
+            tooltip: 'QuÃ©t QR BN',
             onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const QrScannerScreen())),
           ),
         ],
@@ -44,13 +45,13 @@ class TienIchScreen extends StatelessWidget {
       body: Column(
         children: [
           UserHeader.fromAuth(compact: true),
-          // v2.98.6: Dùng LocalPatientSearchField - filter LOCAL (giống DepartmentPatientsScreen)
-          // Bỏ dropdown gợi ý → chỉ filter đơn giản
+          // v2.98.6: DÃ¹ng LocalPatientSearchField - filter LOCAL (giá»‘ng DepartmentPatientsScreen)
+          // Bá» dropdown gá»£i Ã½ â†’ chá»‰ filter Ä‘Æ¡n giáº£n
           Container(
             color: Colors.white,
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
             child: LocalPatientSearchField(
-              hintText: 'Tìm BN (gõ để lọc, bấm dòng để mở chi tiết)',
+              hintText: 'TÃ¬m BN (gÃµ Ä‘á»ƒ lá»c, báº¥m dÃ²ng Ä‘á»ƒ má»Ÿ chi tiáº¿t)',
               onPatientTap: (p) => _openPatientDetail(context, p),
             ),
           ),
@@ -59,7 +60,7 @@ class TienIchScreen extends StatelessWidget {
             child: const Row(children: [
               Icon(Icons.apps, size: 16, color: Colors.indigo),
               SizedBox(width: 4),
-              Text('TIỆN ÍCH THAO TÁC NHANH',
+              Text('TIá»†N ÃCH THAO TÃC NHANH',
                   style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.indigo, letterSpacing: 0.8)),
             ]),
           ),
@@ -70,7 +71,7 @@ class TienIchScreen extends StatelessWidget {
   }
 
   void _openPatientDetail(BuildContext context, Map<String, dynamic> p) {
-    final username = DataService.instance.user?.userName ?? 'nemk';
+    final username = DataService.instance.user?.userName ?? Credentials.defaultNemkLogin;
     context.push('/patient-detail', extra: {
       'patient': p,
       'department': {
@@ -84,12 +85,12 @@ class TienIchScreen extends StatelessWidget {
 
   Widget _buildGrid(BuildContext context) {
     final items = <_TI>[
-      // v3.0.164: GỘP 2 phòng thành 1 - "Phòng tủ thuật HSCC (ECG + DSBN)" - dùng room 36
-      // BS yêu cầu: BỎ "Phòng thử thuật HSCC ID 9999", chỉ giữ 1 tile thống nhất
-      // - Phòng 36 (Phòng khám cấp cứu / Tủ thuật nhỏ) chứa ECG + BN chờ thủ thuật nhỏ
-      // - Hiển thị: DS BN đang chờ (1 BN có thể có ECG + Khám + Thủ thuật) + ECG screen
-      // - Token sync với procedure room screen (paste 1 nơi → all dùng token đó)
-      _TI('Phòng tủ thuật HSCC\n(ECG + DSBN)', Icons.medical_services, const Color(0xFFD32F2F), () {
+      // v3.0.164: Gá»˜P 2 phÃ²ng thÃ nh 1 - "PhÃ²ng tá»§ thuáº­t HSCC (ECG + DSBN)" - dÃ¹ng room 36
+      // BS yÃªu cáº§u: Bá»Ž "PhÃ²ng thá»­ thuáº­t HSCC ID 9999", chá»‰ giá»¯ 1 tile thá»‘ng nháº¥t
+      // - PhÃ²ng 36 (PhÃ²ng khÃ¡m cáº¥p cá»©u / Tá»§ thuáº­t nhá») chá»©a ECG + BN chá» thá»§ thuáº­t nhá»
+      // - Hiá»ƒn thá»‹: DS BN Ä‘ang chá» (1 BN cÃ³ thá»ƒ cÃ³ ECG + KhÃ¡m + Thá»§ thuáº­t) + ECG screen
+      // - Token sync vá»›i procedure room screen (paste 1 nÆ¡i â†’ all dÃ¹ng token Ä‘Ã³)
+      _TI('PhÃ²ng tá»§ thuáº­t HSCC\n(ECG + DSBN)', Icons.medical_services, const Color(0xFFD32F2F), () {
         Navigator.push(context, MaterialPageRoute(builder: (_) => const ProcedureRoomScreen(
           executeRoomId: AppConstants.ROOM_ID_TU_THUAT_HSCC,
         )));
@@ -97,13 +98,13 @@ class TienIchScreen extends StatelessWidget {
       _TI('QR BN', Icons.qr_code_scanner, const Color(0xFF00838F), () {
         Navigator.push(context, MaterialPageRoute(builder: (_) => const QrScannerScreen()));
       }),
-      _TI('Kiểm tra BHYT', Icons.credit_card, const Color(0xFF00838F), () {
+      _TI('Kiá»ƒm tra BHYT', Icons.credit_card, const Color(0xFF00838F), () {
         Navigator.push(context, MaterialPageRoute(builder: (_) => const BHYTCheckScreen()));
       }),
-      _TI('Tra cứu thuốc', Icons.medication, const Color(0xFF7B1FA2), () {
+      _TI('Tra cá»©u thuá»‘c', Icons.medication, const Color(0xFF7B1FA2), () {
         Navigator.push(context, MaterialPageRoute(builder: (_) => const TraThuocScreen()));
       }),
-      _TI('Bệnh án cũ', Icons.history, const Color(0xFF5D4037), () {
+      _TI('Bá»‡nh Ã¡n cÅ©', Icons.history, const Color(0xFF5D4037), () {
         Navigator.push(context, MaterialPageRoute(builder: (_) => const BenhAnCuScreen()));
       }),
       _TI('GCS', Icons.psychology, const Color(0xFF1976D2), () {
@@ -121,45 +122,45 @@ class TienIchScreen extends StatelessWidget {
       _TI('CrCl (C-G)', Icons.water_drop, const Color(0xFF0288D1), () {
         Navigator.push(context, MaterialPageRoute(builder: (_) => const CrClCalculator()));
       }),
-      _TI('Truyền dịch', Icons.local_drink, const Color(0xFF00ACC1), () {
+      _TI('Truyá»n dá»‹ch', Icons.local_drink, const Color(0xFF00ACC1), () {
         Navigator.push(context, MaterialPageRoute(builder: (_) => const FluidCalculator()));
       }),
-      _TI('Bỏng (Parkland)', Icons.local_fire_department, const Color(0xFFE65100), () {
+      _TI('Bá»ng (Parkland)', Icons.local_fire_department, const Color(0xFFE65100), () {
         Navigator.push(context, MaterialPageRoute(builder: (_) => const BurnCalculator()));
       }),
       _TI('Sedation/Anesthesia', Icons.airline_seat_individual_suite, const Color(0xFF7B1FA2), () {
         Navigator.push(context, MaterialPageRoute(builder: (_) => const SedationCalculator()));
       }),
-      // v2.38.9: Danh mục từ Data Public (113.163.187.3:8080)
-      _TI('DM Thuốc', Icons.medication_liquid, const Color(0xFFAD1457), () {
+      // v2.38.9: Danh má»¥c tá»« Data Public (113.163.187.3:8080)
+      _TI('DM Thuá»‘c', Icons.medication_liquid, const Color(0xFFAD1457), () {
         Navigator.push(context, MaterialPageRoute(builder: (_) => const CatalogBrowserScreen(type: CatalogType.medicine)));
       }),
       _TI('DM CLS', Icons.medical_services, const Color(0xFF00695C), () {
         Navigator.push(context, MaterialPageRoute(builder: (_) => const CatalogBrowserScreen(type: CatalogType.cls)));
       }),
-      _TI('DM Vật tư', Icons.inventory_2, const Color(0xFFE65100), () {
+      _TI('DM Váº­t tÆ°', Icons.inventory_2, const Color(0xFFE65100), () {
         Navigator.push(context, MaterialPageRoute(builder: (_) => const CatalogBrowserScreen(type: CatalogType.supply)));
       }),
-      _TI('DM Nhân viên', Icons.badge, const Color(0xFF1565C0), () {
+      _TI('DM NhÃ¢n viÃªn', Icons.badge, const Color(0xFF1565C0), () {
         Navigator.push(context, MaterialPageRoute(builder: (_) => const CatalogBrowserScreen(type: CatalogType.staff)));
       }),
-      _TI('DM Khoa-Giường', Icons.hotel, const Color(0xFF2E7D32), () {
+      _TI('DM Khoa-GiÆ°á»ng', Icons.hotel, const Color(0xFF2E7D32), () {
         Navigator.push(context, MaterialPageRoute(builder: (_) => const CatalogBrowserScreen(type: CatalogType.deptBed)));
       }),
-      _TI('DM Thiết bị', Icons.precision_manufacturing, const Color(0xFF6A1B9A), () {
+      _TI('DM Thiáº¿t bá»‹', Icons.precision_manufacturing, const Color(0xFF6A1B9A), () {
         Navigator.push(context, MaterialPageRoute(builder: (_) => const CatalogBrowserScreen(type: CatalogType.equipment)));
       }),
       _TI('ICD-10', Icons.assignment, const Color(0xFF455A64), () {
         Navigator.push(context, MaterialPageRoute(builder: (_) => const CatalogBrowserScreen(type: CatalogType.icd)));
       }),
-      _TI('DVKT 30 ngày', Icons.medical_information, const Color(0xFFC62828), () {
+      _TI('DVKT 30 ngÃ y', Icons.medical_information, const Color(0xFFC62828), () {
         Navigator.push(context, MaterialPageRoute(builder: (_) => const CatalogBrowserScreen(type: CatalogType.dvkt)));
       }),
-      // v3.0.98: Điều trị tăng/hạ Kali máu
-      _TI('Tăng K+ máu', Icons.arrow_upward, const Color(0xFFB71C1C), () {
+      // v3.0.98: Äiá»u trá»‹ tÄƒng/háº¡ Kali mÃ¡u
+      _TI('TÄƒng K+ mÃ¡u', Icons.arrow_upward, const Color(0xFFB71C1C), () {
         Navigator.push(context, MaterialPageRoute(builder: (_) => const TangKaiMauScreen()));
       }),
-      _TI('Hạ K+ máu', Icons.arrow_downward, const Color(0xFF1565C0), () {
+      _TI('Háº¡ K+ mÃ¡u', Icons.arrow_downward, const Color(0xFF1565C0), () {
         Navigator.push(context, MaterialPageRoute(builder: (_) => const HaKaiMauScreen()));
       }),
     ];
@@ -223,9 +224,9 @@ class _GCSCalculatorState extends State<GCSCalculator> {
   int eye = 4, verbal = 5, motor = 6;
   int get total => eye + verbal + motor;
   String get severity {
-    if (total >= 13) return 'Nhẹ';
-    if (total >= 9) return 'Trung bình';
-    if (total >= 3) return 'Nặng';
+    if (total >= 13) return 'Nháº¹';
+    if (total >= 9) return 'Trung bÃ¬nh';
+    if (total >= 3) return 'Náº·ng';
     return '';
   }
 
@@ -253,7 +254,7 @@ class _GCSCalculatorState extends State<GCSCalculator> {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      appBar: AppBar(backgroundColor: const Color(0xFF1976D2), foregroundColor: Colors.white, title: const Text('Máy tính GCS')),
+      appBar: AppBar(backgroundColor: const Color(0xFF1976D2), foregroundColor: Colors.white, title: const Text('MÃ¡y tÃ­nh GCS')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -269,7 +270,7 @@ class _GCSCalculatorState extends State<GCSCalculator> {
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('Tổng điểm GCS', style: TextStyle(color: Colors.indigo.shade700, fontSize: 12)),
+                      Text('Tá»•ng Ä‘iá»ƒm GCS', style: TextStyle(color: Colors.indigo.shade700, fontSize: 12)),
                       Text('$total/15', style: TextStyle(color: Colors.indigo.shade700, fontSize: 32, fontWeight: FontWeight.bold)),
                       Text(severity, style: const TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
                     ],
@@ -278,13 +279,13 @@ class _GCSCalculatorState extends State<GCSCalculator> {
               ),
             ),
             const SizedBox(height: 16),
-            scale('Mắt (E) - max 4', eye, 4, (v) => setState(() => eye = v)),
+            scale('Máº¯t (E) - max 4', eye, 4, (v) => setState(() => eye = v)),
             const SizedBox(height: 12),
-            scale('Lời nói (V) - max 5', verbal, 5, (v) => setState(() => verbal = v)),
+            scale('Lá»i nÃ³i (V) - max 5', verbal, 5, (v) => setState(() => verbal = v)),
             const SizedBox(height: 12),
-            scale('Vận động (M) - max 6', motor, 6, (v) => setState(() => motor = v)),
+            scale('Váº­n Ä‘á»™ng (M) - max 6', motor, 6, (v) => setState(() => motor = v)),
             const SizedBox(height: 24),
-            const Text('Thang đánh giá: 13-15 nhẹ, 9-12 trung bình, 3-8 nặng', style: TextStyle(fontSize: 11, color: Colors.black54)),
+            const Text('Thang Ä‘Ã¡nh giÃ¡: 13-15 nháº¹, 9-12 trung bÃ¬nh, 3-8 náº·ng', style: TextStyle(fontSize: 11, color: Colors.black54)),
           ],
         ),
       ),
@@ -292,7 +293,7 @@ class _GCSCalculatorState extends State<GCSCalculator> {
   }
 }
 
-// === v3.0.98: Điều trị tăng Kali máu (Hyperkalemia) ===
+// === v3.0.98: Äiá»u trá»‹ tÄƒng Kali mÃ¡u (Hyperkalemia) ===
 class TangKaiMauScreen extends StatelessWidget {
   const TangKaiMauScreen({super.key});
 
@@ -303,7 +304,7 @@ class TangKaiMauScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: const Color(0xFFB71C1C),
         foregroundColor: Colors.white,
-        title: const Text('Điều trị tăng Kali máu'),
+        title: const Text('Äiá»u trá»‹ tÄƒng Kali mÃ¡u'),
       ),
       body: ListView(
         padding: const EdgeInsets.all(12),
@@ -319,55 +320,55 @@ class TangKaiMauScreen extends StatelessWidget {
                     Icon(Icons.warning, color: Color(0xFFB71C1C), size: 24),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: const Text('Mức K+ máu & biểu hiện',
+                      child: const Text('Má»©c K+ mÃ¡u & biá»ƒu hiá»‡n',
                           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFFB71C1C))),
                     ),
                   ]),
                   const SizedBox(height: 8),
-                  _kLevel('5.0 - 5.5 mEq/L', 'Nhẹ', Colors.orange),
-                  _kLevel('5.5 - 6.5 mEq/L', 'Trung bình - có thể có triệu chứng cơ', Colors.deepOrange),
-                  _kLevel('6.5 - 7.0 mEq/L', 'Nặng - EKG thay đổi (sóng T cao nhọn)', Colors.red),
-                  _kLevel('> 7.0 mEq/L', 'RẤT NẶNG - nguy cơ rung thất, ngừng tim', const Color(0xFFB71C1C)),
+                  _kLevel('5.0 - 5.5 mEq/L', 'Nháº¹', Colors.orange),
+                  _kLevel('5.5 - 6.5 mEq/L', 'Trung bÃ¬nh - cÃ³ thá»ƒ cÃ³ triá»‡u chá»©ng cÆ¡', Colors.deepOrange),
+                  _kLevel('6.5 - 7.0 mEq/L', 'Náº·ng - EKG thay Ä‘á»•i (sÃ³ng T cao nhá»n)', Colors.red),
+                  _kLevel('> 7.0 mEq/L', 'Ráº¤T Náº¶NG - nguy cÆ¡ rung tháº¥t, ngá»«ng tim', const Color(0xFFB71C1C)),
                 ],
               ),
             ),
           ),
           const SizedBox(height: 8),
           _kStep(
-            '1️⃣ ỔN ĐỊNH TIM MẠCH (nếu có thay đổi EKG)',
-            'Calcium gluconate 10% - 10-20ml (1-2 ống 10ml) pha trong NaCl 0.9%, truyền TM trong 2-5 phút',
+            '1ï¸âƒ£ á»”N Äá»ŠNH TIM Máº CH (náº¿u cÃ³ thay Ä‘á»•i EKG)',
+            'Calcium gluconate 10% - 10-20ml (1-2 á»‘ng 10ml) pha trong NaCl 0.9%, truyá»n TM trong 2-5 phÃºt',
             const [
-              '⚡ Tác dụng trong 1-3 phút, kéo dài 30-60 phút',
-              '⚠️ KHÔNG trộn với bicarbonate (kết tủa CaCO3)',
-              '⚠️ Thận trọng nếu đang dùng digoxin (gây ngừng tim)',
-              '🔄 Có thể lặp lại sau 5-10 phút nếu EKG không cải thiện',
+              'âš¡ TÃ¡c dá»¥ng trong 1-3 phÃºt, kÃ©o dÃ i 30-60 phÃºt',
+              'âš ï¸ KHÃ”NG trá»™n vá»›i bicarbonate (káº¿t tá»§a CaCO3)',
+              'âš ï¸ Tháº­n trá»ng náº¿u Ä‘ang dÃ¹ng digoxin (gÃ¢y ngá»«ng tim)',
+              'ðŸ”„ CÃ³ thá»ƒ láº·p láº¡i sau 5-10 phÃºt náº¿u EKG khÃ´ng cáº£i thiá»‡n',
             ],
             const Color(0xFFB71C1C),
           ),
           const SizedBox(height: 8),
           _kStep(
-            '2️⃣ ĐẨY K+ VÀO TRONG TẾ BÀO (30-60 phút)',
-            'Insulin Regular + Glucose (truyền TM 30 phút):',
+            '2ï¸âƒ£ Äáº¨Y K+ VÃ€O TRONG Táº¾ BÃ€O (30-60 phÃºt)',
+            'Insulin Regular + Glucose (truyá»n TM 30 phÃºt):',
             const [
-              '💉 Insulin Regular: 10 UI pha trong 50ml Glucose 50%',
-              '🩸 Nếu đường huyết < 250 mg/dL: truyền thêm Glucose 50% 50ml trước/sau',
-              '⏱️ Tác dụng trong 10-20 phút, đỉnh 30-60 phút, kéo dài 4-6 giờ',
-              '📉 Hạ K+ được 0.6-1.0 mEq/L',
-              '🔍 Theo dõi đường huyết mỗi 1 giờ trong 6 giờ đầu (nguy cơ hạ đường huyết)',
+              'ðŸ’‰ Insulin Regular: 10 UI pha trong 50ml Glucose 50%',
+              'ðŸ©¸ Náº¿u Ä‘Æ°á»ng huyáº¿t < 250 mg/dL: truyá»n thÃªm Glucose 50% 50ml trÆ°á»›c/sau',
+              'â±ï¸ TÃ¡c dá»¥ng trong 10-20 phÃºt, Ä‘á»‰nh 30-60 phÃºt, kÃ©o dÃ i 4-6 giá»',
+              'ðŸ“‰ Háº¡ K+ Ä‘Æ°á»£c 0.6-1.0 mEq/L',
+              'ðŸ” Theo dÃµi Ä‘Æ°á»ng huyáº¿t má»—i 1 giá» trong 6 giá» Ä‘áº§u (nguy cÆ¡ háº¡ Ä‘Æ°á»ng huyáº¿t)',
             ],
             const Color(0xFFE65100),
           ),
           const SizedBox(height: 8),
           _kStep(
-            '3️⃣ TĂNG THẢI K+ RA NGOÀI (kéo dài hơn)',
-            'Các biện pháp thải trừ:',
+            '3ï¸âƒ£ TÄ‚NG THáº¢I K+ RA NGOÃ€I (kÃ©o dÃ i hÆ¡n)',
+            'CÃ¡c biá»‡n phÃ¡p tháº£i trá»«:',
             const [
-              '💊 Kayexalate (Polystyrene sulfonate) 15-30g uống + sorbitol 20g',
-              '   → Tác dụng 1-2 giờ, có thể dùng qua sonde dạ dày (rectal cũng OK)',
-              '   ⚠️ Cẩn thận nguy cơ hoại tử ruột, tránh dùng sau phẫu thuật ruột',
-              '💧 Lợi tiểu: Furosemide 40-80mg TM (nếu chức năng thận còn)',
-              '🏥 LỌC MÁU cấp cứu nếu: K+ > 6.5 dai dẳng, EKG không cải thiện, suy thận, toan chuyển hóa nặng',
-              '🧪 Sodium bicarbonate 50-100 mEq TM (CHỈ khi pH < 7.2, toan chuyển hóa)',
+              'ðŸ’Š Kayexalate (Polystyrene sulfonate) 15-30g uá»‘ng + sorbitol 20g',
+              '   â†’ TÃ¡c dá»¥ng 1-2 giá», cÃ³ thá»ƒ dÃ¹ng qua sonde dáº¡ dÃ y (rectal cÅ©ng OK)',
+              '   âš ï¸ Cáº©n tháº­n nguy cÆ¡ hoáº¡i tá»­ ruá»™t, trÃ¡nh dÃ¹ng sau pháº«u thuáº­t ruá»™t',
+              'ðŸ’§ Lá»£i tiá»ƒu: Furosemide 40-80mg TM (náº¿u chá»©c nÄƒng tháº­n cÃ²n)',
+              'ðŸ¥ Lá»ŒC MÃU cáº¥p cá»©u náº¿u: K+ > 6.5 dai dáº³ng, EKG khÃ´ng cáº£i thiá»‡n, suy tháº­n, toan chuyá»ƒn hÃ³a náº·ng',
+              'ðŸ§ª Sodium bicarbonate 50-100 mEq TM (CHá»ˆ khi pH < 7.2, toan chuyá»ƒn hÃ³a)',
             ],
             const Color(0xFF1565C0),
           ),
@@ -382,14 +383,14 @@ class TangKaiMauScreen extends StatelessWidget {
                   Row(children: [
                     Icon(Icons.monitor_heart, color: Color(0xFFE65100)),
                     SizedBox(width: 8),
-                    Text('Theo dõi', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    Text('Theo dÃµi', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                   ]),
                   SizedBox(height: 6),
-                  Text('• EKG liên tục cho đến khi K+ < 6.0 và ổn định', style: TextStyle(fontSize: 12)),
-                  Text('• K+ máu mỗi 1-2 giờ trong 6 giờ đầu, sau đó mỗi 4-6 giờ', style: TextStyle(fontSize: 12)),
-                  Text('• Đường huyết mỗi 1 giờ (sau dùng insulin) trong 6 giờ', style: TextStyle(fontSize: 12)),
-                  Text('• Ngưng thuốc tăng K+: ACEi, ARB, K-sparing diuretic, NSAIDs, TMP-SMX, heparin', style: TextStyle(fontSize: 12)),
-                  Text('• Chế độ ăn GIẢM K+ (tránh chuối, cam, cà chua, khoai, rau lá xanh)', style: TextStyle(fontSize: 12)),
+                  Text('â€¢ EKG liÃªn tá»¥c cho Ä‘áº¿n khi K+ < 6.0 vÃ  á»•n Ä‘á»‹nh', style: TextStyle(fontSize: 12)),
+                  Text('â€¢ K+ mÃ¡u má»—i 1-2 giá» trong 6 giá» Ä‘áº§u, sau Ä‘Ã³ má»—i 4-6 giá»', style: TextStyle(fontSize: 12)),
+                  Text('â€¢ ÄÆ°á»ng huyáº¿t má»—i 1 giá» (sau dÃ¹ng insulin) trong 6 giá»', style: TextStyle(fontSize: 12)),
+                  Text('â€¢ NgÆ°ng thuá»‘c tÄƒng K+: ACEi, ARB, K-sparing diuretic, NSAIDs, TMP-SMX, heparin', style: TextStyle(fontSize: 12)),
+                  Text('â€¢ Cháº¿ Ä‘á»™ Äƒn GIáº¢M K+ (trÃ¡nh chuá»‘i, cam, cÃ  chua, khoai, rau lÃ¡ xanh)', style: TextStyle(fontSize: 12)),
                 ],
               ),
             ),
@@ -400,8 +401,8 @@ class TangKaiMauScreen extends StatelessWidget {
             child: const Padding(
               padding: EdgeInsets.all(10),
               child: Text(
-                '⚠️ Ghi chú: Liều Insulin/Glucose ở trên dành cho người lớn. Trẻ em dùng liều 0.1 UI/kg insulin + 2 ml/kg glucose 25%. Luôn tham khảo BS Nhi khoa.\n\n'
-                '📚 Tham khảo: Uptodate 2026, Tintinalli Emergency Medicine 9th ed.',
+                'âš ï¸ Ghi chÃº: Liá»u Insulin/Glucose á»Ÿ trÃªn dÃ nh cho ngÆ°á»i lá»›n. Tráº» em dÃ¹ng liá»u 0.1 UI/kg insulin + 2 ml/kg glucose 25%. LuÃ´n tham kháº£o BS Nhi khoa.\n\n'
+                'ðŸ“š Tham kháº£o: Uptodate 2026, Tintinalli Emergency Medicine 9th ed.',
                 style: TextStyle(fontSize: 11, color: Colors.black54, height: 1.4),
               ),
             ),
@@ -412,7 +413,7 @@ class TangKaiMauScreen extends StatelessWidget {
   }
 }
 
-// === v3.0.98: Helper widgets dùng chung cho 2 screen Kali máu ===
+// === v3.0.98: Helper widgets dÃ¹ng chung cho 2 screen Kali mÃ¡u ===
 Widget _kLevel(String k, String label, Color color) {
   return Padding(
     padding: const EdgeInsets.symmetric(vertical: 2),
@@ -453,7 +454,7 @@ Widget _kStep(String title, String subtitle, List<String> bullets, Color color) 
   );
 }
 
-// === v3.0.98: Điều trị hạ Kali máu (Hypokalemia) ===
+// === v3.0.98: Äiá»u trá»‹ háº¡ Kali mÃ¡u (Hypokalemia) ===
 class HaKaiMauScreen extends StatelessWidget {
   const HaKaiMauScreen({super.key});
 
@@ -464,7 +465,7 @@ class HaKaiMauScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: const Color(0xFF1565C0),
         foregroundColor: Colors.white,
-        title: const Text('Điều trị hạ Kali máu'),
+        title: const Text('Äiá»u trá»‹ háº¡ Kali mÃ¡u'),
       ),
       body: ListView(
         padding: const EdgeInsets.all(12),
@@ -480,58 +481,58 @@ class HaKaiMauScreen extends StatelessWidget {
                     Icon(Icons.info, color: Color(0xFF1565C0), size: 24),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: const Text('Mức K+ máu & biểu hiện',
+                      child: const Text('Má»©c K+ mÃ¡u & biá»ƒu hiá»‡n',
                           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF1565C0))),
                     ),
                   ]),
                   const SizedBox(height: 8),
-                  _kLevel('3.5 - 3.0 mEq/L', 'Nhẹ - thường không triệu chứng', Colors.blue),
-                  _kLevel('3.0 - 2.5 mEq/L', 'Trung bình - yếu cơ, mệt mỏi, chuột rút', Colors.indigo),
-                  _kLevel('< 2.5 mEq/L', 'Nặng - liệt cơ, loạn nhịp tim, nguy cơ tử vong', Colors.deepPurple),
+                  _kLevel('3.5 - 3.0 mEq/L', 'Nháº¹ - thÆ°á»ng khÃ´ng triá»‡u chá»©ng', Colors.blue),
+                  _kLevel('3.0 - 2.5 mEq/L', 'Trung bÃ¬nh - yáº¿u cÆ¡, má»‡t má»i, chuá»™t rÃºt', Colors.indigo),
+                  _kLevel('< 2.5 mEq/L', 'Náº·ng - liá»‡t cÆ¡, loáº¡n nhá»‹p tim, nguy cÆ¡ tá»­ vong', Colors.deepPurple),
                 ],
               ),
             ),
           ),
           const SizedBox(height: 8),
           _kStep(
-            '1️⃣ BỔ SUNG ĐƯỜNG UỐNG (ưu tiên)',
-            'Dùng cho K+ > 3.0 và không có triệu chứng nặng:',
+            '1ï¸âƒ£ Bá»” SUNG ÄÆ¯á»œNG Uá»NG (Æ°u tiÃªn)',
+            'DÃ¹ng cho K+ > 3.0 vÃ  khÃ´ng cÃ³ triá»‡u chá»©ng náº·ng:',
             const [
-              '💊 KCl viên uống: 600-1200 mg/lần × 2-3 lần/ngày (8-12 mEq/liều)',
-              '   → Mỗi 600mg KCl = ~8 mEq K+',
-              '🍊 Nên uống với nước cam hoặc nước nhiều (tránh kích ứng dạ dày)',
-              '🕐 Uống SAU ĂN (giảm nguy cơ viêm loét dạ dày)',
-              '📈 Bù 40-60 mEq K+ mỗi 24h để tăng K+ máu ~0.25 mEq/L/ngày',
+              'ðŸ’Š KCl viÃªn uá»‘ng: 600-1200 mg/láº§n Ã— 2-3 láº§n/ngÃ y (8-12 mEq/liá»u)',
+              '   â†’ Má»—i 600mg KCl = ~8 mEq K+',
+              'ðŸŠ NÃªn uá»‘ng vá»›i nÆ°á»›c cam hoáº·c nÆ°á»›c nhiá»u (trÃ¡nh kÃ­ch á»©ng dáº¡ dÃ y)',
+              'ðŸ• Uá»‘ng SAU Ä‚N (giáº£m nguy cÆ¡ viÃªm loÃ©t dáº¡ dÃ y)',
+              'ðŸ“ˆ BÃ¹ 40-60 mEq K+ má»—i 24h Ä‘á»ƒ tÄƒng K+ mÃ¡u ~0.25 mEq/L/ngÃ y',
             ],
             const Color(0xFF1565C0),
           ),
           const SizedBox(height: 8),
           _kStep(
-            '2️⃣ TRUYỀN TĨNH MẠCH (khi K+ < 3.0 hoặc có triệu chứng)',
-            'KCl truyền TM - CẨN THẬN nguy cơ loạn nhịp:',
+            '2ï¸âƒ£ TRUYá»€N TÄ¨NH Máº CH (khi K+ < 3.0 hoáº·c cÃ³ triá»‡u chá»©ng)',
+            'KCl truyá»n TM - Cáº¨N THáº¬N nguy cÆ¡ loáº¡n nhá»‹p:',
             const [
-              '💉 Liều khởi đầu: 20-40 mEq KCl trong 1L NaCl 0.9%, truyền 4-6 giờ',
-              '   → Tốc độ: KHÔNG quá 10-20 mEq/giờ qua TM ngoại vi',
-              '   → TM trung tâm (CVC): max 20-40 mEq/giờ (có monitor tim liên tục)',
-              '⚠️ TUYỆT ĐỐI KHÔNG:',
-              '   ❌ Tiêm KCl bolus TM (gây ngừng tim tức thì)',
-              '   ❌ Pha KCl với Glucose 5% hoặc Ringer Lactat (Ca2+ + K+ gây tủa)',
-              '❌ Truyền > 20 mEq/giờ qua TM ngoại vi (gây đau, viêm tĩnh mạch)',
-              '🔍 MONITOR: EKG liên tục + K+ máu mỗi 4-6 giờ',
+              'ðŸ’‰ Liá»u khá»Ÿi Ä‘áº§u: 20-40 mEq KCl trong 1L NaCl 0.9%, truyá»n 4-6 giá»',
+              '   â†’ Tá»‘c Ä‘á»™: KHÃ”NG quÃ¡ 10-20 mEq/giá» qua TM ngoáº¡i vi',
+              '   â†’ TM trung tÃ¢m (CVC): max 20-40 mEq/giá» (cÃ³ monitor tim liÃªn tá»¥c)',
+              'âš ï¸ TUYá»†T Äá»I KHÃ”NG:',
+              '   âŒ TiÃªm KCl bolus TM (gÃ¢y ngá»«ng tim tá»©c thÃ¬)',
+              '   âŒ Pha KCl vá»›i Glucose 5% hoáº·c Ringer Lactat (Ca2+ + K+ gÃ¢y tá»§a)',
+              'âŒ Truyá»n > 20 mEq/giá» qua TM ngoáº¡i vi (gÃ¢y Ä‘au, viÃªm tÄ©nh máº¡ch)',
+              'ðŸ” MONITOR: EKG liÃªn tá»¥c + K+ mÃ¡u má»—i 4-6 giá»',
             ],
             const Color(0xFFD32F2F),
           ),
           const SizedBox(height: 8),
           _kStep(
-            '3️⃣ MỤC TIÊU BÙ K+',
-            'Tính toán nhanh:',
+            '3ï¸âƒ£ Má»¤C TIÃŠU BÃ™ K+',
+            'TÃ­nh toÃ¡n nhanh:',
             const [
-              '📊 Thiếu hụt K+ (mEq) ≈ 0.4 × cân nặng (kg) × (K+ bình thường - K+ hiện tại)',
-              '   → Ví dụ: BN 60kg, K+ = 2.5: thiếu ≈ 0.4 × 60 × (4 - 2.5) = 36 mEq',
-              '🎯 Mục tiêu: K+ ≥ 3.5 mEq/L (an toàn cho phẫu thuật, digoxin)',
-              '⏱️ Tốc độ bù tối đa 20 mEq/giờ (TM ngoại vi) / 40 mEq/giờ (TM trung tâm)',
-              '📈 Mỗi 20 mEq KCl tăng K+ máu ~0.25 mEq/L (trung bình)',
-              '⚠️ KHÔNG cố bù nhanh - cơ thể cần 12-24h để cân bằng K+ nội bào',
+              'ðŸ“Š Thiáº¿u há»¥t K+ (mEq) â‰ˆ 0.4 Ã— cÃ¢n náº·ng (kg) Ã— (K+ bÃ¬nh thÆ°á»ng - K+ hiá»‡n táº¡i)',
+              '   â†’ VÃ­ dá»¥: BN 60kg, K+ = 2.5: thiáº¿u â‰ˆ 0.4 Ã— 60 Ã— (4 - 2.5) = 36 mEq',
+              'ðŸŽ¯ Má»¥c tiÃªu: K+ â‰¥ 3.5 mEq/L (an toÃ n cho pháº«u thuáº­t, digoxin)',
+              'â±ï¸ Tá»‘c Ä‘á»™ bÃ¹ tá»‘i Ä‘a 20 mEq/giá» (TM ngoáº¡i vi) / 40 mEq/giá» (TM trung tÃ¢m)',
+              'ðŸ“ˆ Má»—i 20 mEq KCl tÄƒng K+ mÃ¡u ~0.25 mEq/L (trung bÃ¬nh)',
+              'âš ï¸ KHÃ”NG cá»‘ bÃ¹ nhanh - cÆ¡ thá»ƒ cáº§n 12-24h Ä‘á»ƒ cÃ¢n báº±ng K+ ná»™i bÃ o',
             ],
             const Color(0xFF388E3C),
           ),
@@ -546,14 +547,14 @@ class HaKaiMauScreen extends StatelessWidget {
                   Row(children: [
                     Icon(Icons.search, color: Color(0xFFE65100)),
                     SizedBox(width: 8),
-                    Text('Tìm nguyên nhân gốc (quan trọng!)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    Text('TÃ¬m nguyÃªn nhÃ¢n gá»‘c (quan trá»ng!)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                   ]),
                   SizedBox(height: 6),
-                  Text('• Mất qua thận: lợi tiểu (Furosemide, Thiazide), corticosteroid', style: TextStyle(fontSize: 12)),
-                  Text('• Mất qua tiêu hóa: nôn, tiêu chảy, sonde dạ dày, lỗ rò', style: TextStyle(fontSize: 12)),
-                  Text('• Vào nội bào: insulin, beta-agonist (salbutamol), toan kiềm', style: TextStyle(fontSize: 12)),
-                  Text('• Ăn uống kém: nghiện rượu, ăn chay, suy dinh dưỡng', style: TextStyle(fontSize: 12)),
-                  Text('• Bệnh lý: cường Aldosteron, h/c Cushing, Bartter, Gitelman', style: TextStyle(fontSize: 12)),
+                  Text('â€¢ Máº¥t qua tháº­n: lá»£i tiá»ƒu (Furosemide, Thiazide), corticosteroid', style: TextStyle(fontSize: 12)),
+                  Text('â€¢ Máº¥t qua tiÃªu hÃ³a: nÃ´n, tiÃªu cháº£y, sonde dáº¡ dÃ y, lá»— rÃ²', style: TextStyle(fontSize: 12)),
+                  Text('â€¢ VÃ o ná»™i bÃ o: insulin, beta-agonist (salbutamol), toan kiá»m', style: TextStyle(fontSize: 12)),
+                  Text('â€¢ Ä‚n uá»‘ng kÃ©m: nghiá»‡n rÆ°á»£u, Äƒn chay, suy dinh dÆ°á»¡ng', style: TextStyle(fontSize: 12)),
+                  Text('â€¢ Bá»‡nh lÃ½: cÆ°á»ng Aldosteron, h/c Cushing, Bartter, Gitelman', style: TextStyle(fontSize: 12)),
                 ],
               ),
             ),
@@ -564,8 +565,8 @@ class HaKaiMauScreen extends StatelessWidget {
             child: const Padding(
               padding: EdgeInsets.all(10),
               child: Text(
-                '⚠️ Ghi chú: KHÔNG dùng Salbutamol trong cơn hen cấp nếu K+ < 3.0 (làm hạ K+ thêm, nguy cơ loạn nhịp). Bù K+ trước khi dùng Insulin cho bệnh nhân ĐTĐ có K+ thấp.\n\n'
-                '📚 Tham khảo: Uptodate 2026, Harrison 21st ed.',
+                'âš ï¸ Ghi chÃº: KHÃ”NG dÃ¹ng Salbutamol trong cÆ¡n hen cáº¥p náº¿u K+ < 3.0 (lÃ m háº¡ K+ thÃªm, nguy cÆ¡ loáº¡n nhá»‹p). BÃ¹ K+ trÆ°á»›c khi dÃ¹ng Insulin cho bá»‡nh nhÃ¢n ÄTÄ cÃ³ K+ tháº¥p.\n\n'
+                'ðŸ“š Tham kháº£o: Uptodate 2026, Harrison 21st ed.',
                 style: TextStyle(fontSize: 11, color: Colors.black54, height: 1.4),
               ),
             ),

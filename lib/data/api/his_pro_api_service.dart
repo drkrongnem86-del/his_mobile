@@ -1,17 +1,17 @@
-// v3.0.42: HIS Pro Real API Service - BREAKTHROUGH 2026-07-17!
+﻿// v3.0.42: HIS Pro Real API Service - BREAKTHROUGH 2026-07-17!
 //
-// PHÁT HIỆN QUAN TRỌNG: HIS Pro KHÔNG dùng "Authorization: Bearer"!
-// Auth thật dùng 3 custom HTTP headers:
-//   TokenCode: <64-char hex>    ← Token từ memory dump HIS Pro desktop
-//   ApplicationCode: HIS        ← Cố định
-//   ClientIpAddress: <IP máy BV> ← IP máy BS đang chạy HIS Pro (cố định)
+// PHÃT HIá»†N QUAN TRá»ŒNG: HIS Pro KHÃ”NG dÃ¹ng "Authorization: Bearer"!
+// Auth tháº­t dÃ¹ng 3 custom HTTP headers:
+//   TokenCode: <64-char hex>    â† Token tá»« memory dump HIS Pro desktop
+//   ApplicationCode: HIS        â† Cá»‘ Ä‘á»‹nh
+//   ClientIpAddress: <IP mÃ¡y BV> â† IP mÃ¡y BS Ä‘ang cháº¡y HIS Pro (cá»‘ Ä‘á»‹nh)
 //
 // Memory dump (MAYTINH-2FA6BJT, PID 4940, 2026-07-17):
 //   TokenCode: af89403b7f001cd27ca9defa6c987a4f9e7bbd564525b8bc6287a693bf674c4d
 //   ClientIpAddress: 171.15.128.5
 //   Expire: 2026-08-16T14:11:50
 //
-// ⚠ KHI NÀO TOKEN HẾT HẠN: chạy dump_his_token.ps1 trên máy BV để lấy token mới
+// âš  KHI NÃ€O TOKEN Háº¾T Háº N: cháº¡y dump_his_token.ps1 trÃªn mÃ¡y BV Ä‘á»ƒ láº¥y token má»›i
 //
 // HIS Pro Services (from HIS.exe.config):
 //   1401 = ACS (Auth/Login/Renew/Logout/GetAuthenticated)
@@ -19,11 +19,11 @@
 //   1408 = MOS (Medical/HisTreatment/Get)
 //   1409 = SAR (Reports)
 //   1410 = SDA (Admin/HisDepartment/HisUserRoom)
-//   1417 = EMR (EmrDocument/EmrSigner/EmrBusiness) ← MAIN EMR
+//   1417 = EMR (EmrDocument/EmrSigner/EmrBusiness) â† MAIN EMR
 //   1418 = Aup (Auto Update)
 //   1419 = LIS (Lab)
 //   1425 = DMS (Medilink HL7)
-//   1429 = MCH (Y tế cơ sở)
+//   1429 = MCH (Y táº¿ cÆ¡ sá»Ÿ)
 //
 // Auth endpoints (port 1401 - ACS):
 //   GET  /api/Token/Login           ?param=<BASE64({LOGIN_NAME,APPLICATION_CODE,...})>
@@ -39,15 +39,15 @@
 //   POST /api/EmrDocument/CreateAndSignUsb ?param=<BASE64>
 //   POST /api/EmrDocument/CreateAndSignHsm ?param=<BASE64>
 //
-// Payload schema (CommonParam + ApiData → base64):
+// Payload schema (CommonParam + ApiData â†’ base64):
 //   {CommonParam:{Messages:[],BugCodes:[],MessageCodes:[],Start:0,Limit:200,
 //                 LanguageCode:"VI",Now:0,HasException:false},ApiData:{...}}
 //
-// Verified: TokenCode af89... work 100% với EMR 1417 endpoints:
-//   ✅ EmrSigner/Get       → 200 signers
-//   ✅ EmrBusiness/Get      → 38+ loại phiếu
-//   ✅ EmrTreatment/Get     → Full patient info
-//   ✅ EmrDocument/GetView  → List phiếu theo treatment
+// Verified: TokenCode af89... work 100% vá»›i EMR 1417 endpoints:
+//   âœ… EmrSigner/Get       â†’ 200 signers
+//   âœ… EmrBusiness/Get      â†’ 38+ loáº¡i phiáº¿u
+//   âœ… EmrTreatment/Get     â†’ Full patient info
+//   âœ… EmrDocument/GetView  â†’ List phiáº¿u theo treatment
 
 import 'dart:convert';
 import 'dart:typed_data';
@@ -59,31 +59,32 @@ import 'package:his_mobile/core/services/connection_service.dart';
 import 'package:his_mobile/data/services/secure_storage_service.dart';
 import 'package:his_mobile/data/services/upload_log_service.dart';
 
-/// v3.0.42: TokenCode từ memory dump HIS Pro desktop (MAYTINH-2FA6BJT)
-/// v3.0.142: Bumped sang token MỚI 1ee41ae9... (active 17/08/2026 17:08)
+import 'package:his_mobile/core/security/credentials.dart';
+/// v3.0.42: TokenCode tá»« memory dump HIS Pro desktop (MAYTINH-2FA6BJT)
+/// v3.0.142: Bumped sang token Má»šI 1ee41ae9... (active 17/08/2026 17:08)
 class HisProHardcoded {
-  /// v3.0.159: TokenCode từ memory dump HIS.exe PID 6136 (active 23/08/2026 07:50)
-  /// Scan bằng Python: VirtualQueryEx + ReadProcessMemory + regex [0-9a-f]{64}
+  /// v3.0.159: TokenCode tá»« memory dump HIS.exe PID 6136 (active 23/08/2026 07:50)
+  /// Scan báº±ng Python: VirtualQueryEx + ReadProcessMemory + regex [0-9a-f]{64}
   /// Previous: 1ee41ae967caa75e7c2891a3d9612259d70b4645c67852ab0e5f07546c2f3dfb (v3.0.142 - 17/08)
   static const String tokenCode = 'e365259dd4997a1a7235ccb48511044f413b1b63cbd46e26222fa4c6a9ffe8a4';
 
-  /// IP máy BS (từ SetIpAddressToHeader log)
-  /// v3.0.159: Updated từ 172.16.200.109 (cũ) → 172.16.200.101 (active session)
+  /// IP mÃ¡y BS (tá»« SetIpAddressToHeader log)
+  /// v3.0.159: Updated tá»« 172.16.200.109 (cÅ©) â†’ 172.16.200.101 (active session)
   static const String clientIpAddress = '172.16.200.101';
 
-  /// ApplicationCode cố định
+  /// ApplicationCode cá»‘ Ä‘á»‹nh
   static const String applicationCode = 'HIS';
 
   /// Default login name
-  static const String loginName = 'nemk';
+  static const String loginName = Credentials.defaultNemkLogin;
 
   /// Default user name
-  static const String userName = 'K Rong Nểm';
+  static const String userName = 'K Rong Ná»ƒm';
 
-  /// Mã CSYT BVĐK Ninh Thuận
+  /// MÃ£ CSYT BVÄK Ninh Thuáº­n
   static const String mediOrgCode = '58001';
 
-  /// Machine name (từ memory dump)
+  /// Machine name (tá»« memory dump)
   static const String machineName = 'MAYTINH-2FA6BJT';
 
   /// SharedPreferences keys
@@ -96,18 +97,18 @@ class HisProHardcoded {
   static const String prefBranch = 'pref_branch';
 }
 
-/// Cached thông tin user khi login HIS Pro
+/// Cached thÃ´ng tin user khi login HIS Pro
 class HisProSession {
-  final String token;        // TokenCode 64-char hex từ memory dump
+  final String token;        // TokenCode 64-char hex tá»« memory dump
   final String loginName;     // "nemk"
-  final String userName;     // "K Rong Nểm" (full name)
-  final String clientIp;      // "171.15.128.5" - IP máy BV
-  final int? signerId;       // 236 (từ EmrSigner.Get)
+  final String userName;     // "K Rong Ná»ƒm" (full name)
+  final String clientIp;      // "171.15.128.5" - IP mÃ¡y BV
+  final int? signerId;       // 236 (tá»« EmrSigner.Get)
   final String? departmentCode;
   final String? departmentName;
   final String? roomCode;
   final DateTime loginAt;
-  final DateTime expiresAt;  // 30 ngày (from memory dump)
+  final DateTime expiresAt;  // 30 ngÃ y (from memory dump)
 
   HisProSession({
     required this.token,
@@ -158,7 +159,7 @@ class HisProSession {
       );
 }
 
-/// User-room mapping từ HisUserRoom/GetView
+/// User-room mapping tá»« HisUserRoom/GetView
 class HisUserRoom {
   final int id;
   final String loginName;
@@ -195,7 +196,7 @@ class HisUserRoom {
       );
 }
 
-/// EMR signer (BS có thể ký)
+/// EMR signer (BS cÃ³ thá»ƒ kÃ½)
 class EmrSigner {
   final int id;
   final String? loginName;
@@ -223,7 +224,7 @@ class EmrSigner {
       );
 }
 
-/// EMR business (loại văn bản)
+/// EMR business (loáº¡i vÄƒn báº£n)
 class EmrBusiness {
   final int id;
   final String? businessCode;
@@ -245,12 +246,12 @@ class EmrBusiness {
       );
 }
 
-/// Service chính: login + cache session + helpers
+/// Service chÃ­nh: login + cache session + helpers
 class HisProApiService {
   static final HisProApiService instance = HisProApiService._();
 
   HisProApiService._() {
-    // v3.0.42: Inline interceptor — avoids static method accessing instance members
+    // v3.0.42: Inline interceptor â€” avoids static method accessing instance members
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
@@ -262,7 +263,7 @@ class HisProApiService {
           if (options.uri.path.contains('CreateByTdo')) {
             final bodyStr = options.data?.toString() ?? 'null';
             final preview = bodyStr.length > 1000 ? '${bodyStr.substring(0, 1000)}...' : bodyStr;
-            print('🔍 [DEBUG CreateByTdo Request] ${options.method} ${options.uri.path}');
+            print('ðŸ” [DEBUG CreateByTdo Request] ${options.method} ${options.uri.path}');
             print('   body: $preview');
             print('   headers: ${options.headers}');
           }
@@ -273,14 +274,14 @@ class HisProApiService {
           String? message;
           final status = response.statusCode ?? 0;
           final data = response.data;
-          // v3.0.42: HTTP 4xx/5xx = FAILURE ngay cả khi body không có Success flag
-          // (vì validateStatus: s < 500 nên 4xx đi vào onResponse chứ không phải onError)
+          // v3.0.42: HTTP 4xx/5xx = FAILURE ngay cáº£ khi body khÃ´ng cÃ³ Success flag
+          // (vÃ¬ validateStatus: s < 500 nÃªn 4xx Ä‘i vÃ o onResponse chá»© khÃ´ng pháº£i onError)
           if (status >= 400) {
             success = false;
             if (status == 401) {
-              message = 'HTTP 401 - Token không hợp lệ/hết hạn (cần token mới)';
+              message = 'HTTP 401 - Token khÃ´ng há»£p lá»‡/háº¿t háº¡n (cáº§n token má»›i)';
             } else if (status == 403) {
-              message = 'HTTP 403 - Không có quyền truy cập';
+              message = 'HTTP 403 - KhÃ´ng cÃ³ quyá»n truy cáº­p';
             } else {
               message = 'HTTP $status';
             }
@@ -291,7 +292,7 @@ class HisProApiService {
               if (param is Map && param['Messages'] is List && (param['Messages'] as List).isNotEmpty) {
                 message = (param['Messages'] as List).first.toString();
               } else {
-                message = 'Server từ chối';
+                message = 'Server tá»« chá»‘i';
               }
             }
           }
@@ -299,7 +300,7 @@ class HisProApiService {
           String? bodyForLog;
           if (response.requestOptions.path.contains('CreateByTdo')) {
             final bodyStr = data is String ? data.substring(0, data.length > 500 ? 500 : data.length) : data.toString();
-            print('🔍 [DEBUG CreateByTdo Response] status=$status body=$bodyStr');
+            print('ðŸ” [DEBUG CreateByTdo Response] status=$status body=$bodyStr');
             bodyForLog = bodyStr;
           }
           UploadLogService.instance.logResponse(
@@ -362,7 +363,7 @@ class HisProApiService {
   // v3.0.37: Track request start time cho metrics
   final Map<int, DateTime> _requestStartTimes = {};
 
-  /// Encode param theo format HIS Pro (CommonParam + ApiData → base64)
+  /// Encode param theo format HIS Pro (CommonParam + ApiData â†’ base64)
   String _encodeParam(Map<String, dynamic> apiData, [int limit = 200]) {
     final param = jsonEncode({
       'CommonParam': {
@@ -380,8 +381,8 @@ class HisProApiService {
     return base64Encode(utf8.encode(param));
   }
 
-  /// v3.0.42: Lấy auth headers hiệu lực (TokenCode + ApplicationCode + ClientIpAddress)
-  /// Ưu tiên: custom (SharedPreferences) → hardcode memory dump → fallback
+  /// v3.0.42: Láº¥y auth headers hiá»‡u lá»±c (TokenCode + ApplicationCode + ClientIpAddress)
+  /// Æ¯u tiÃªn: custom (SharedPreferences) â†’ hardcode memory dump â†’ fallback
   Map<String, String> getEffectiveAuthHeaders() {
     final customToken = _getCustomBearerSync();
     final token = customToken?.isNotEmpty == true
@@ -395,18 +396,18 @@ class HisProApiService {
     };
   }
 
-  /// v3.0.42: Lấy token string thuần (dùng cho FSS upload - FSS có thể vẫn dùng Bearer format)
-  /// Ưu tiên: custom → hardcode → fallback
+  /// v3.0.42: Láº¥y token string thuáº§n (dÃ¹ng cho FSS upload - FSS cÃ³ thá»ƒ váº«n dÃ¹ng Bearer format)
+  /// Æ¯u tiÃªn: custom â†’ hardcode â†’ fallback
   String? getEffectiveBearer() {
     final custom = _getCustomBearerSync();
     if (custom != null && custom.isNotEmpty) return custom;
     return HisProHardcoded.tokenCode;
   }
 
-  /// v3.0.42: Nguồn token đang dùng (để hiển thị trong UI)
+  /// v3.0.42: Nguá»“n token Ä‘ang dÃ¹ng (Ä‘á»ƒ hiá»ƒn thá»‹ trong UI)
   String getEffectiveTokenSource() {
     final custom = _getCustomBearerSync();
-    if (custom != null && custom.isNotEmpty) return 'Custom (từ Cài đặt)';
+    if (custom != null && custom.isNotEmpty) return 'Custom (tá»« CÃ i Ä‘áº·t)';
     return 'Memory dump (cb35... 18/7/2026, IP 172.16.200.109)';
   }
 
@@ -414,10 +415,10 @@ class HisProApiService {
   // LOGIN FLOW - Token/Login (port 1401)
   // ============================================================
 
-  /// v3.0.42: Login bằng username → trả về session
+  /// v3.0.42: Login báº±ng username â†’ tráº£ vá» session
   /// Endpoint: GET /api/Token/Login?param=<BASE64({LOGIN_NAME,APPLICATION_CODE,...})>
-  /// HisPro KHÔNG dùng password trong /api/Token/Login - chỉ cần loginName
-  /// TokenCode được tạo cho user đang active session trên HIS desktop.
+  /// HisPro KHÃ”NG dÃ¹ng password trong /api/Token/Login - chá»‰ cáº§n loginName
+  /// TokenCode Ä‘Æ°á»£c táº¡o cho user Ä‘ang active session trÃªn HIS desktop.
   Future<({bool success, String message, HisProSession? session})> login(String loginName) async {
     final apiData = {
       'LOGIN_NAME': loginName,
@@ -428,9 +429,9 @@ class HisProApiService {
     final url = '${ConnectionService.instance.acsUrl}api/Token/Login';
 
     try {
-      print('🔐 HIS Pro login: $url ($loginName)');
+      print('ðŸ” HIS Pro login: $url ($loginName)');
 
-      // v3.0.42: Dùng TokenCode headers thay vì Bearer
+      // v3.0.42: DÃ¹ng TokenCode headers thay vÃ¬ Bearer
       final r = await _dio.get(
         url,
         data: param,
@@ -450,19 +451,19 @@ class HisProApiService {
 
       final data = r.data;
       if (data is! Map) {
-        return (success: false, message: 'Response không hợp lệ', session: null);
+        return (success: false, message: 'Response khÃ´ng há»£p lá»‡', session: null);
       }
 
       if (data['Success'] != true) {
         final param2 = data['Param'];
-        String msg = 'Sai thông tin đăng nhập';
+        String msg = 'Sai thÃ´ng tin Ä‘Äƒng nháº­p';
         if (param2 is Map && param2['Messages'] is List && (param2['Messages'] as List).isNotEmpty) {
           msg = (param2['Messages'] as List).first.toString();
         }
         return (success: false, message: msg, session: null);
       }
 
-      // Response có thể trả TokenCode ở nhiều vị trí
+      // Response cÃ³ thá»ƒ tráº£ TokenCode á»Ÿ nhiá»u vá»‹ trÃ­
       final inner = data['Data'];
       String? tokenCode;
       if (inner is Map) {
@@ -472,12 +473,12 @@ class HisProApiService {
       tokenCode ??= data['TOKEN_CODE'] as String?;
 
       if (tokenCode == null || tokenCode.isEmpty) {
-        // v3.0.42: /Token/Login không trả token mới → dùng hardcode
+        // v3.0.42: /Token/Login khÃ´ng tráº£ token má»›i â†’ dÃ¹ng hardcode
         tokenCode = HisProHardcoded.tokenCode;
-        print('   ⚠ Server không trả token mới → dùng hardcoded af89...');
+        print('   âš  Server khÃ´ng tráº£ token má»›i â†’ dÃ¹ng hardcoded af89...');
       }
 
-      // Tạo session
+      // Táº¡o session
       final now = DateTime.now();
       _session = HisProSession(
         token: tokenCode,
@@ -485,14 +486,14 @@ class HisProApiService {
         userName: loginName,
         clientIp: HisProHardcoded.clientIpAddress,
         loginAt: now,
-        expiresAt: now.add(const Duration(days: 30)), // HIS Pro token expire 30 ngày
+        expiresAt: now.add(const Duration(days: 30)), // HIS Pro token expire 30 ngÃ y
       );
       await _saveSession();
-      print('   ✅ TokenCode: ${tokenCode.substring(0, 12)}... (expire 30 ngày)');
+      print('   âœ… TokenCode: ${tokenCode.substring(0, 12)}... (expire 30 ngÃ y)');
       return (success: true, message: 'OK', session: _session);
     } catch (e) {
-      // v3.0.42: Nếu login fail → fallback về hardcoded token
-      print('   ❌ ${e.toString().split("\n").first} → fallback hardcoded token');
+      // v3.0.42: Náº¿u login fail â†’ fallback vá» hardcoded token
+      print('   âŒ ${e.toString().split("\n").first} â†’ fallback hardcoded token');
       final now = DateTime.now();
       _session = HisProSession(
         token: HisProHardcoded.tokenCode,
@@ -503,17 +504,17 @@ class HisProApiService {
         expiresAt: DateTime.parse('2026-08-16T14:11:50'),
       );
       await _saveSession();
-      return (success: true, message: 'Dùng hardcoded token (login error)', session: _session);
+      return (success: true, message: 'DÃ¹ng hardcoded token (login error)', session: _session);
     }
   }
 
-  /// Auto-refresh token trước khi hết hạn
+  /// Auto-refresh token trÆ°á»›c khi háº¿t háº¡n
   Future<bool> refreshTokenIfNeeded() async {
     if (_session == null) return false;
     if (_session!.expiresAt.difference(DateTime.now()) > const Duration(days: 1)) {
-      return true; // còn hơn 1 ngày
+      return true; // cÃ²n hÆ¡n 1 ngÃ y
     }
-    print('🔄 HIS Pro token sắp hết hạn → gọi /Token/Renew...');
+    print('ðŸ”„ HIS Pro token sáº¯p háº¿t háº¡n â†’ gá»i /Token/Renew...');
     final r = await _renewToken();
     return r;
   }
@@ -537,51 +538,51 @@ class HisProApiService {
         ),
       );
       if (r.statusCode == 200 && r.data is Map && r.data['Success'] == true) {
-        print('   ✅ Token renewed');
+        print('   âœ… Token renewed');
         return true;
       }
     } catch (e) {
-      print('   ⚠ Renew fail: $e → tiếp tục dùng token cũ');
+      print('   âš  Renew fail: $e â†’ tiáº¿p tá»¥c dÃ¹ng token cÅ©');
     }
     return false;
   }
 
-  /// v2.47.0: Auto-login lại bằng saved loginName
+  /// v2.47.0: Auto-login láº¡i báº±ng saved loginName
   Future<({bool success, String message, HisProSession? session})> tryAutoLogin() async {
     if (_session != null && _session!.isValid) {
-      print('✅ HIS Pro session vẫn còn hiệu lực: ${_session!.loginName}');
-      return (success: true, message: 'Session còn hiệu lực', session: _session);
+      print('âœ… HIS Pro session váº«n cÃ²n hiá»‡u lá»±c: ${_session!.loginName}');
+      return (success: true, message: 'Session cÃ²n hiá»‡u lá»±c', session: _session);
     }
     if (_session == null) {
       await loadSavedSession();
     }
     if (_session == null) {
-      return (success: false, message: 'Chưa có session', session: null);
+      return (success: false, message: 'ChÆ°a cÃ³ session', session: null);
     }
     final r = await login(_session!.loginName);
     return r;
   }
 
-  /// v2.48.0: Auto-bootstrap HOÀN TOÀN tự động
+  /// v2.48.0: Auto-bootstrap HOÃ€N TOÃ€N tá»± Ä‘á»™ng
   Future<({bool loggedIn, String message})> silentBootstrap() async {
-    print('🔄 HIS Pro silent bootstrap (v3.0.42 TokenCode pattern)...');
+    print('ðŸ”„ HIS Pro silent bootstrap (v3.0.42 TokenCode pattern)...');
     try {
       await getCustomBearer();
       final saved = await loadSavedSession();
       if (saved != null && saved.isValid) {
-        print('  ✅ Session vẫn valid: ${saved.loginName}');
+        print('  âœ… Session váº«n valid: ${saved.loginName}');
         return (loggedIn: true, message: 'Session loaded');
       }
       if (saved != null) {
-        print('  🔄 Session hết hạn → refresh...');
+        print('  ðŸ”„ Session háº¿t háº¡n â†’ refresh...');
         final r = await login(saved.loginName);
         if (r.success) {
           await _loadAllHelpers();
           return (loggedIn: true, message: 'Refreshed');
         }
       }
-      // v3.0.42: Không có session → dùng hardcoded token trực tiếp
-      print('  ⚠ No session → dùng hardcoded TokenCode af89...');
+      // v3.0.42: KhÃ´ng cÃ³ session â†’ dÃ¹ng hardcoded token trá»±c tiáº¿p
+      print('  âš  No session â†’ dÃ¹ng hardcoded TokenCode af89...');
       final now = DateTime.now();
       _session = HisProSession(
         token: HisProHardcoded.tokenCode,
@@ -594,7 +595,7 @@ class HisProApiService {
       await _loadAllHelpers();
       return (loggedIn: true, message: 'Hardcoded token (expire 2026-08-16)');
     } catch (e) {
-      print('  ❌ silentBootstrap error: $e');
+      print('  âŒ silentBootstrap error: $e');
       return (loggedIn: false, message: e.toString());
     }
   }
@@ -603,7 +604,7 @@ class HisProApiService {
   // CUSTOM TOKEN MANAGEMENT (v3.0.11)
   // ============================================================
 
-  /// v3.0.34: Lưu custom token vào SecureStorage
+  /// v3.0.34: LÆ°u custom token vÃ o SecureStorage
   Future<void> setCustomBearer(String token) async {
     try {
       await SecureStorageService.instance.saveCustomBearer(token.trim());
@@ -614,7 +615,7 @@ class HisProApiService {
     }
   }
 
-  /// v3.0.34: Xóa custom token
+  /// v3.0.34: XÃ³a custom token
   Future<void> clearCustomBearer() async {
     try {
       await SecureStorageService.instance.clearAll();
@@ -628,10 +629,10 @@ class HisProApiService {
 
   String? _customBearerCache;
 
-  /// v3.0.34: Lấy custom token (sync)
+  /// v3.0.34: Láº¥y custom token (sync)
   String? _getCustomBearerSync() => _customBearerCache;
 
-  /// v3.0.34: Lấy custom token (async)
+  /// v3.0.34: Láº¥y custom token (async)
   Future<String?> getCustomBearer() async {
     try {
       final v = await SecureStorageService.instance.readCustomBearer();
@@ -646,7 +647,7 @@ class HisProApiService {
     }
   }
 
-  /// v3.0.42: Login name hiệu lực
+  /// v3.0.42: Login name hiá»‡u lá»±c
   String? getEffectiveLoginName() {
     if (HisProHardcoded.loginName.isNotEmpty) {
       return HisProHardcoded.loginName;
@@ -677,8 +678,8 @@ class HisProApiService {
   // v3.0.42: CORE GET HELPER - TokenCode headers (NOT Bearer!)
   // ============================================================
 
-  /// GET helper - gọi API với TokenCode + ApplicationCode + ClientIpAddress headers
-  /// v3.0.42: ĐỔI TỪ Bearer → TokenCode headers theo đúng pattern HIS Pro
+  /// GET helper - gá»i API vá»›i TokenCode + ApplicationCode + ClientIpAddress headers
+  /// v3.0.42: Äá»”I Tá»ª Bearer â†’ TokenCode headers theo Ä‘Ãºng pattern HIS Pro
   Future<({bool success, int? status, dynamic data, String message})> get(
     String fullUrl,
     Map<String, dynamic> apiData, {
@@ -688,19 +689,19 @@ class HisProApiService {
       await refreshTokenIfNeeded();
     }
 
-    // v3.0.49: Gửi raw JSON body {ApiData: ...} (HIS Pro 1417 KHÔNG chấp nhận base64 body)
-    // - Cũ: data: param (base64) → server trả 415 unsupported media type
-    // - Mới: data: body (raw Map, dio tự JSON encode) → work 100%
-    // Verified bằng Python test 19/7/2026: POST raw JSON {ApiData: sdo} → DocumentCode OK
+    // v3.0.49: Gá»­i raw JSON body {ApiData: ...} (HIS Pro 1417 KHÃ”NG cháº¥p nháº­n base64 body)
+    // - CÅ©: data: param (base64) â†’ server tráº£ 415 unsupported media type
+    // - Má»›i: data: body (raw Map, dio tá»± JSON encode) â†’ work 100%
+    // Verified báº±ng Python test 19/7/2026: POST raw JSON {ApiData: sdo} â†’ DocumentCode OK
 
-    // v3.0.42: Dùng TokenCode headers trực tiếp (KHÔNG qua proxy)
+    // v3.0.42: DÃ¹ng TokenCode headers trá»±c tiáº¿p (KHÃ”NG qua proxy)
     final headers = <String, String>{};
     headers.addAll(getEffectiveAuthHeaders());
 
     try {
       final r = await _dio.get(
         fullUrl,
-        data: apiData,  // v3.0.49: raw JSON thay vì base64
+        data: apiData,  // v3.0.49: raw JSON thay vÃ¬ base64
         options: Options(
           headers: headers,
           receiveTimeout: const Duration(seconds: 15),
@@ -712,7 +713,7 @@ class HisProApiService {
         return (success: false, status: r.statusCode, data: null, message: 'HTTP ${r.statusCode}');
       }
 
-      // v3.0.35: Parse JSON từ String nếu server trả text/plain
+      // v3.0.35: Parse JSON tá»« String náº¿u server tráº£ text/plain
       dynamic respData = r.data;
       if (respData is String) {
         final trimmed = respData.trim();
@@ -724,7 +725,7 @@ class HisProApiService {
       }
 
       if (respData is Map && respData['Success'] == false) {
-        String msg = 'Server từ chối';
+        String msg = 'Server tá»« chá»‘i';
         final param2 = respData['Param'];
         if (param2 is Map && param2['Messages'] is List && (param2['Messages'] as List).isNotEmpty) {
           msg = (param2['Messages'] as List).first.toString();
@@ -742,9 +743,9 @@ class HisProApiService {
   // v3.0.42: CORE POST HELPER - TokenCode headers (NOT Bearer!)
   // ============================================================
 
-  /// POST helper - dùng cho EMR CreateByTdo
-  /// v3.0.42: ĐỔI TỪ Bearer → TokenCode headers
-  /// v3.0.27: Retry 3 lần cho timeout/network errors
+  /// POST helper - dÃ¹ng cho EMR CreateByTdo
+  /// v3.0.42: Äá»”I Tá»ª Bearer â†’ TokenCode headers
+  /// v3.0.27: Retry 3 láº§n cho timeout/network errors
   Future<({bool success, int? status, dynamic data, String message})> post(
     String fullUrl,
     Map<String, dynamic> body, {
@@ -754,12 +755,12 @@ class HisProApiService {
       await refreshTokenIfNeeded();
     }
 
-    // v3.0.49: Gửi raw JSON body {ApiData: ...} (HIS Pro 1417 KHÔNG chấp nhận base64 body)
-    // - Cũ: data: param (base64) → server trả 415 unsupported media type → silent fail
-    // - Mới: data: body (raw Map, dio tự JSON encode) → work 100%
-    // Verified bằng Python test 19/7/2026: POST raw JSON {ApiData: sdo} → DocumentCode OK
+    // v3.0.49: Gá»­i raw JSON body {ApiData: ...} (HIS Pro 1417 KHÃ”NG cháº¥p nháº­n base64 body)
+    // - CÅ©: data: param (base64) â†’ server tráº£ 415 unsupported media type â†’ silent fail
+    // - Má»›i: data: body (raw Map, dio tá»± JSON encode) â†’ work 100%
+    // Verified báº±ng Python test 19/7/2026: POST raw JSON {ApiData: sdo} â†’ DocumentCode OK
 
-    // v3.0.42: Dùng TokenCode headers trực tiếp (KHÔNG qua proxy)
+    // v3.0.42: DÃ¹ng TokenCode headers trá»±c tiáº¿p (KHÃ”NG qua proxy)
     final headers = <String, String>{};
     headers.addAll(getEffectiveAuthHeaders());
 
@@ -768,7 +769,7 @@ class HisProApiService {
       try {
         final r = await _dio.post(
           fullUrl,
-          data: body,  // v3.0.49: raw JSON thay vì base64
+          data: body,  // v3.0.49: raw JSON thay vÃ¬ base64
           options: Options(
             headers: headers,
             receiveTimeout: const Duration(seconds: 60),
@@ -788,12 +789,12 @@ class HisProApiService {
         }
 
         if (respData is Map && respData['Success'] == false) {
-          String msg = 'Server từ chối';
+          String msg = 'Server tá»« chá»‘i';
           final param2 = respData['Param'];
           if (param2 is Map && param2['Messages'] is List && (param2['Messages'] as List).isNotEmpty) {
             msg = (param2['Messages'] as List).first.toString();
           } else if (respData['ErrorCode'] != null) {
-            msg = 'Server từ chối: ${respData['ErrorCode']}';
+            msg = 'Server tá»« chá»‘i: ${respData['ErrorCode']}';
           }
           return (success: false, status: r.statusCode, data: respData, message: msg);
         }
@@ -817,11 +818,11 @@ class HisProApiService {
   }
 
   // ============================================================
-  // SPECIFIC HELPERS (load 1 lần khi bootstrap)
+  // SPECIFIC HELPERS (load 1 láº§n khi bootstrap)
   // ============================================================
 
-  /// Lấy danh sách phòng user được vào (try nhiều port - SDA 1410 / ACS 1401 / MOS 1408)
-  /// v3.0.43: Endpoint chính xác chưa rõ, try từng port - nếu port nào work thì dùng
+  /// Láº¥y danh sÃ¡ch phÃ²ng user Ä‘Æ°á»£c vÃ o (try nhiá»u port - SDA 1410 / ACS 1401 / MOS 1408)
+  /// v3.0.43: Endpoint chÃ­nh xÃ¡c chÆ°a rÃµ, try tá»«ng port - náº¿u port nÃ o work thÃ¬ dÃ¹ng
   Future<bool> fetchUserRooms() async {
     final loginName = _session?.loginName ?? '';
     final candidates = [
@@ -846,18 +847,18 @@ class HisProApiService {
           }
         }
         if (_userRooms.isNotEmpty) {
-          print('✅ Loaded ${_userRooms.length} user-rooms from $base');
+          print('âœ… Loaded ${_userRooms.length} user-rooms from $base');
           return true;
         }
       }
     }
-    // v3.0.43: Không fail toàn bộ - app vẫn work với danh sách phòng local
-    print('⚠ fetchUserRooms: không lấy được từ bất kỳ port nào - dùng local');
+    // v3.0.43: KhÃ´ng fail toÃ n bá»™ - app váº«n work vá»›i danh sÃ¡ch phÃ²ng local
+    print('âš  fetchUserRooms: khÃ´ng láº¥y Ä‘Æ°á»£c tá»« báº¥t ká»³ port nÃ o - dÃ¹ng local');
     return true;
   }
 
-  /// Lấy danh sách người ký (port 1417 EMR)
-  /// v3.0.42: Dùng TokenCode headers - đã verify work với af89...
+  /// Láº¥y danh sÃ¡ch ngÆ°á»i kÃ½ (port 1417 EMR)
+  /// v3.0.42: DÃ¹ng TokenCode headers - Ä‘Ã£ verify work vá»›i af89...
   Future<bool> fetchEmrSigners() async {
     final r = await get(
       '${ConnectionService.instance.emrUrl}api/EmrSigner/Get',
@@ -865,7 +866,7 @@ class HisProApiService {
       limit: 500,
     );
     if (!r.success) {
-      print('⚠ fetchEmrSigners: ${r.message}');
+      print('âš  fetchEmrSigners: ${r.message}');
       return false;
     }
     _signers = [];
@@ -896,11 +897,11 @@ class HisProApiService {
         await _saveSession();
       }
     }
-    print('✅ Loaded ${_signers.length} signers (me: ${_session?.loginName})');
+    print('âœ… Loaded ${_signers.length} signers (me: ${_session?.loginName})');
     return true;
   }
 
-  /// Lấy danh sách loại văn bản EMR (port 1417 EMR)
+  /// Láº¥y danh sÃ¡ch loáº¡i vÄƒn báº£n EMR (port 1417 EMR)
   Future<bool> fetchEmrBusinesses() async {
     final r = await get(
       '${ConnectionService.instance.emrUrl}api/EmrBusiness/Get',
@@ -908,7 +909,7 @@ class HisProApiService {
       limit: 200,
     );
     if (!r.success) {
-      print('⚠ fetchEmrBusinesses: ${r.message}');
+      print('âš  fetchEmrBusinesses: ${r.message}');
       return false;
     }
     _businesses = [];
@@ -920,7 +921,7 @@ class HisProApiService {
         }
       }
     }
-    print('✅ Loaded ${_businesses.length} businesses');
+    print('âœ… Loaded ${_businesses.length} businesses');
     return true;
   }
 
@@ -935,10 +936,10 @@ class HisProApiService {
 
   // ============================================================
   // SIGN WORKFLOW ENDPOINTS
-  // v3.0.42: Tất cả dùng TokenCode headers thay vì Bearer
+  // v3.0.42: Táº¥t cáº£ dÃ¹ng TokenCode headers thay vÃ¬ Bearer
   // ============================================================
 
-  /// Tạo EMR Document + ký bằng USB token
+  /// Táº¡o EMR Document + kÃ½ báº±ng USB token
   Future<({bool success, int? status, dynamic data, String message})> createAndSignUsb(
     Map<String, dynamic> sdo, {
     String? certBase64,
@@ -951,7 +952,7 @@ class HisProApiService {
     };
     final param = _encodeParam(body, 10);
 
-    // v3.0.42: Dùng TokenCode headers
+    // v3.0.42: DÃ¹ng TokenCode headers
     final headers = <String, String>{}..addAll(getEffectiveAuthHeaders());
 
     try {
@@ -970,7 +971,7 @@ class HisProApiService {
     }
   }
 
-  /// Tạo EMR Document + ký bằng HSM
+  /// Táº¡o EMR Document + kÃ½ báº±ng HSM
   Future<({bool success, int? status, dynamic data, String message})> createAndSignHsm(
     Map<String, dynamic> sdo, {
     String? hsmConfig,
@@ -999,7 +1000,7 @@ class HisProApiService {
     }
   }
 
-  /// Ký PDF bằng USB token
+  /// KÃ½ PDF báº±ng USB token
   Future<({bool success, int? status, dynamic data, String message})> signPdfUsb(
     String documentCode, {
     String? certBase64,
@@ -1034,7 +1035,7 @@ class HisProApiService {
     }
   }
 
-  /// Ký PDF bằng HSM
+  /// KÃ½ PDF báº±ng HSM
   Future<({bool success, int? status, dynamic data, String message})> signPdfHsm(
     String documentCode, {
     String? hsmConfig,
@@ -1067,7 +1068,7 @@ class HisProApiService {
     }
   }
 
-  /// Xem danh sách phiếu chờ ký / đang ký
+  /// Xem danh sÃ¡ch phiáº¿u chá» kÃ½ / Ä‘ang kÃ½
   Future<({bool success, int? status, dynamic data, String message})> getEmrSignView({
     int limit = 200,
     String? treatmentCode,
@@ -1083,7 +1084,7 @@ class HisProApiService {
     );
   }
 
-  /// Lấy chi tiết 1 phiếu ký
+  /// Láº¥y chi tiáº¿t 1 phiáº¿u kÃ½
   Future<({bool success, int? status, dynamic data, String message})> getEmrSign(String documentCode) async {
     return await get(
       '${getEmrBaseUrlSync()}api/EmrSign/Get',
@@ -1092,7 +1093,7 @@ class HisProApiService {
     );
   }
 
-  /// Hoàn tất ký
+  /// HoÃ n táº¥t kÃ½
   Future<({bool success, int? status, dynamic data, String message})> finishEmrSign(String documentCode) async {
     final body = {'ApiData': {'DocumentCode': documentCode}};
     final param = _encodeParam(body, 10);
@@ -1115,7 +1116,7 @@ class HisProApiService {
     }
   }
 
-  /// Từ chối ký
+  /// Tá»« chá»‘i kÃ½
   Future<({bool success, int? status, dynamic data, String message})> rejectEmrSign(
     String documentCode,
     String reason,
@@ -1141,7 +1142,7 @@ class HisProApiService {
     }
   }
 
-  /// Lấy danh sách người ký (1 người)
+  /// Láº¥y danh sÃ¡ch ngÆ°á»i kÃ½ (1 ngÆ°á»i)
   Future<({bool success, int? status, dynamic data, String message})> getEmrSigner(int signerId) async {
     return await get(
       '${getEmrBaseUrlSync()}api/EmrSigner/Get',
@@ -1150,7 +1151,7 @@ class HisProApiService {
     );
   }
 
-  /// Lấy flow ký
+  /// Láº¥y flow kÃ½
   Future<({bool success, int? status, dynamic data, String message})> getEmrSignerFlow() async {
     return await get(
       '${getEmrBaseUrlSync()}api/EmrSignerFlow/Get',
@@ -1159,7 +1160,7 @@ class HisProApiService {
     );
   }
 
-  /// Lấy thứ tự ký
+  /// Láº¥y thá»© tá»± kÃ½
   Future<({bool success, int? status, dynamic data, String message})> getEmrSignOrder(String documentCode) async {
     return await get(
       '${getEmrBaseUrlSync()}api/EmrSignOrder/Get',
@@ -1168,7 +1169,7 @@ class HisProApiService {
     );
   }
 
-  /// Download file PDF từ EMR
+  /// Download file PDF tá»« EMR
   Future<({bool success, int? status, dynamic data, String message})> downloadEmrFile(String documentCode) async {
     return await get(
       '${getEmrBaseUrlSync()}api/EmrDocument/DownloadFile',
@@ -1177,7 +1178,7 @@ class HisProApiService {
     );
   }
 
-  /// Sync timer (giữ session)
+  /// Sync timer (giá»¯ session)
   Future<({bool success, int? status, dynamic data, String message})> timerSync() async {
     return await get(
       '${getMosBaseUrlSync()}api/Timer/Sync',
@@ -1186,7 +1187,7 @@ class HisProApiService {
     );
   }
 
-  /// Lấy treatment info từ MOS
+  /// Láº¥y treatment info tá»« MOS
   Future<({bool success, int? status, dynamic data, String message})> getHisTreatment({
     int limit = 10,
     String? treatmentCode,
@@ -1200,7 +1201,7 @@ class HisProApiService {
     );
   }
 
-  /// Lấy service req (CLS) tracking
+  /// Láº¥y service req (CLS) tracking
   Future<({bool success, int? status, dynamic data, String message})> getServiceReqList({
     int limit = 200,
     String? treatmentCode,
@@ -1214,7 +1215,7 @@ class HisProApiService {
     );
   }
 
-  /// Lấy EMR Document view
+  /// Láº¥y EMR Document view
   Future<({bool success, int? status, dynamic data, String message})> getEmrDocumentView({
     int limit = 200,
     String? treatmentCode,
@@ -1228,7 +1229,7 @@ class HisProApiService {
     );
   }
 
-  /// v3.0.30: Lấy danh sách phiếu đã push lên EMR
+  /// v3.0.30: Láº¥y danh sÃ¡ch phiáº¿u Ä‘Ã£ push lÃªn EMR
   Future<List<Map<String, dynamic>>> getPatientDocumentsFromEmr(String treatmentCode) async {
     final r = await getEmrDocumentView(treatmentCode: treatmentCode);
     if (!r.success) {
@@ -1255,7 +1256,7 @@ class HisProApiService {
     return out;
   }
 
-  /// v3.0.30: Download file PDF từ EMR theo DocumentCode
+  /// v3.0.30: Download file PDF tá»« EMR theo DocumentCode
   Future<Uint8List?> downloadEmrDocumentAsPdf(String documentCode) async {
     if (documentCode.isEmpty) return null;
     final r = await downloadEmrFile(documentCode);
@@ -1294,7 +1295,7 @@ class HisProApiService {
     }
   }
 
-  /// Lấy EMR Treatment
+  /// Láº¥y EMR Treatment
   Future<({bool success, int? status, dynamic data, String message})> getEmrTreatment({
     int limit = 500,
     String? treatmentCode,
@@ -1332,7 +1333,7 @@ class HisProApiService {
         return s;
       }
     } catch (e) {
-      print('⚠ loadSavedSession: $e');
+      print('âš  loadSavedSession: $e');
     }
     return null;
   }
@@ -1348,12 +1349,12 @@ class HisProApiService {
 
   // ============================================================
   // v3.0.147: EMR DELETE - soft delete (IS_DELETE=true)
-  // Inventec HIS pattern: POST /api/EmrDocument/Change với IS_DELETE
+  // Inventec HIS pattern: POST /api/EmrDocument/Change vá»›i IS_DELETE
   // ============================================================
 
-  /// Xóa phiếu EMR (soft delete - set IS_DELETE=true)
-  /// Chỉ work nếu người tạo = user hiện tại
-  /// Returns true nếu xóa thành công
+  /// XÃ³a phiáº¿u EMR (soft delete - set IS_DELETE=true)
+  /// Chá»‰ work náº¿u ngÆ°á»i táº¡o = user hiá»‡n táº¡i
+  /// Returns true náº¿u xÃ³a thÃ nh cÃ´ng
   Future<({bool success, String message})> deleteEmrDocument(int documentId) async {
     // Standard Inventec HIS soft-delete pattern
     final sdo = {
@@ -1368,7 +1369,7 @@ class HisProApiService {
     final headers = <String, String>{}..addAll(getEffectiveAuthHeaders());
 
     try {
-      // Thử Change endpoint (Inventec standard)
+      // Thá»­ Change endpoint (Inventec standard)
       final r = await _dio.post(
         '${getEmrBaseUrlSync()}api/EmrDocument/Change',
         data: body,
@@ -1383,21 +1384,21 @@ class HisProApiService {
       if (r.statusCode == 200) {
         final data = r.data;
         if (data is Map && data['Success'] == false) {
-          String msg = 'Server từ chối';
+          String msg = 'Server tá»« chá»‘i';
           final param2 = data['Param'];
           if (param2 is Map && param2['Messages'] is List && (param2['Messages'] as List).isNotEmpty) {
             msg = (param2['Messages'] as List).first.toString();
           }
           return (success: false, message: msg);
         }
-        debugPrint('✅ deleteEmrDocument($documentId) success');
-        return (success: true, message: 'Đã xóa phiếu EMR');
+        debugPrint('âœ… deleteEmrDocument($documentId) success');
+        return (success: true, message: 'ÄÃ£ xÃ³a phiáº¿u EMR');
       }
 
       return (success: false, message: 'HTTP ${r.statusCode}');
     } catch (e) {
       final err = e.toString().split('\n').first;
-      debugPrint('❌ deleteEmrDocument($documentId) error: $err');
+      debugPrint('âŒ deleteEmrDocument($documentId) error: $err');
       return (success: false, message: err);
     }
   }

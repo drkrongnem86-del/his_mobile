@@ -1,14 +1,15 @@
-// HisConfigService v3.0.62
-// v3.0.62: Port từ HIS_ICU v2.35.13
-//   + Thêm thongkeBaseUrl + 6 sub-endpoints (login/home/insurance-check/insurance-search/emr-index/emr-search)
-//   + Đổi port MOS 1408→1429 (theo v2.35.13 verified)
-//   + Đổi port OCR 1429→1425 (lấy chỗ trống vì 1429 đã dùng cho MOS)
-//   + Restore script: nếu port sai, dùng restore_v361.bat
-// Quản lý cấu hình HIS (URL Backend + tài khoản + khoa)
-// Lưu vào SharedPreferences để giữ qua các lần mở app
+﻿// HisConfigService v3.0.62
+// v3.0.62: Port tá»« HIS_ICU v2.35.13
+//   + ThÃªm thongkeBaseUrl + 6 sub-endpoints (login/home/insurance-check/insurance-search/emr-index/emr-search)
+//   + Äá»•i port MOS 1408â†’1429 (theo v2.35.13 verified)
+//   + Äá»•i port OCR 1429â†’1425 (láº¥y chá»— trá»‘ng vÃ¬ 1429 Ä‘Ã£ dÃ¹ng cho MOS)
+//   + Restore script: náº¿u port sai, dÃ¹ng restore_v361.bat
+// Quáº£n lÃ½ cáº¥u hÃ¬nh HIS (URL Backend + tÃ i khoáº£n + khoa)
+// LÆ°u vÃ o SharedPreferences Ä‘á»ƒ giá»¯ qua cÃ¡c láº§n má»Ÿ app
 import 'package:shared_preferences/shared_preferences.dart';
 
-// v3.0.62: Thêm thongkeBaseUrl + 6 sub-endpoints (port từ HIS_ICU v2.35.13)
+import 'package:his_mobile/core/security/credentials.dart';
+// v3.0.62: ThÃªm thongkeBaseUrl + 6 sub-endpoints (port tá»« HIS_ICU v2.35.13)
 class HisConfigPreset {
   final String label;
   final String bvbmUrl;
@@ -19,12 +20,12 @@ class HisConfigPreset {
   final String fssUrl;
   final String lisUrl;
   final String ocrUrl;
-  // v3.0.57: Thêm 4 services mới
+  // v3.0.57: ThÃªm 4 services má»›i
   final String dmsUrl;     // 1425 - DMS Medilink HL7
   final String emrWebUrl;  // 1530 - EMR Web Oracle DB (on-demand)
   final String redisUrl;   // 8335 - Redis Cache
   final String vvaUrl;     // 8926 - VVA Backend
-  // v3.0.62: Thongke public - 6 sub-endpoints (từ HIS_ICU v2.35.13)
+  // v3.0.62: Thongke public - 6 sub-endpoints (tá»« HIS_ICU v2.35.13)
   final String thongkeBaseUrl;          // http://thongke.benhvienninhthuan.vn:8080
   final String thongkeLoginUrl;         // /login
   final String thongkeHomeUrl;          // /home
@@ -56,22 +57,22 @@ class HisConfigPreset {
   });
 }
 
-/// v2.76.3: Cách hiển thị tên BN
-/// BS chọn 1 trong các chế độ trong Settings
+/// v2.76.3: CÃ¡ch hiá»ƒn thá»‹ tÃªn BN
+/// BS chá»n 1 trong cÃ¡c cháº¿ Ä‘á»™ trong Settings
 enum NameField {
-  /// Tên có dấu - từ HIS Pro uppercase (có thể bị mojibake)
+  /// TÃªn cÃ³ dáº¥u - tá»« HIS Pro uppercase (cÃ³ thá»ƒ bá»‹ mojibake)
   tdlPatientName,
 
-  /// Tên không dấu - từ HIS Pro (sạch, không lỗi font)
+  /// TÃªn khÃ´ng dáº¥u - tá»« HIS Pro (sáº¡ch, khÃ´ng lá»—i font)
   tdlPatientUnsignedName,
 
-  /// Tên đã verify - từ HIS Pro (chuẩn nhất, có thể thiếu)
+  /// TÃªn Ä‘Ã£ verify - tá»« HIS Pro (chuáº©n nháº¥t, cÃ³ thá»ƒ thiáº¿u)
   virPatientName,
 
-  /// Tên tiếng Việt từ Data public (HIS Desktop API)
+  /// TÃªn tiáº¿ng Viá»‡t tá»« Data public (HIS Desktop API)
   tenBenhNhan,
 
-  /// Tên từ field legacy BV
+  /// TÃªn tá»« field legacy BV
   hotenbn,
 }
 
@@ -91,20 +92,20 @@ extension NameFieldX on NameField {
     }
   }
 
-  String get label => name; // Tên enum là tiếng Việt-friendly
+  String get label => name; // TÃªn enum lÃ  tiáº¿ng Viá»‡t-friendly
 
   String get description {
     switch (this) {
       case NameField.tdlPatientName:
-        return 'Tên có dấu từ HIS Pro (vd: "Nguyễn Văn A")';
+        return 'TÃªn cÃ³ dáº¥u tá»« HIS Pro (vd: "Nguyá»…n VÄƒn A")';
       case NameField.tdlPatientUnsignedName:
-        return 'Tên không dấu từ HIS Pro (vd: "Nguyen Van A") - sạch nhất';
+        return 'TÃªn khÃ´ng dáº¥u tá»« HIS Pro (vd: "Nguyen Van A") - sáº¡ch nháº¥t';
       case NameField.virPatientName:
-        return 'Tên đã verify từ HIS Pro';
+        return 'TÃªn Ä‘Ã£ verify tá»« HIS Pro';
       case NameField.tenBenhNhan:
-        return 'Tên tiếng Việt từ Data public';
+        return 'TÃªn tiáº¿ng Viá»‡t tá»« Data public';
       case NameField.hotenbn:
-        return 'Tên từ field legacy BV';
+        return 'TÃªn tá»« field legacy BV';
     }
   }
 }
@@ -116,20 +117,20 @@ class HisConfig {
   final String bvbmUrl; // Backend (login + DS BN)
   final String acsUrl;  // Auth (1401)
   final String emrUrl;  // EMR (1417)
-  // v3.0.62: Đổi port MOS 1408 → 1429 (theo HIS_ICU v2.35.13 verified)
-  final String mosUrl;  // MOS / Data (1429 v3.0.62, cũ 1408)
+  // v3.0.62: Äá»•i port MOS 1408 â†’ 1429 (theo HIS_ICU v2.35.13 verified)
+  final String mosUrl;  // MOS / Data (1429 v3.0.62, cÅ© 1408)
   final String sarUrl;  // SAR / Reports (1409)
   final String sdaUrl;  // SDA / System (1410)
   final String fssUrl;  // FSS / File (1405)
   final String lisUrl;  // LIS / Lab (1419)
-  // v3.0.62: Đổi port OCR 1429 → 1425 (lấy chỗ trống vì 1429 đã dùng cho MOS)
-  final String ocrUrl;  // OCR / MCH (1425 v3.0.62, cũ 1429)
-  // v3.0.57: Thêm 4 services mới
+  // v3.0.62: Äá»•i port OCR 1429 â†’ 1425 (láº¥y chá»— trá»‘ng vÃ¬ 1429 Ä‘Ã£ dÃ¹ng cho MOS)
+  final String ocrUrl;  // OCR / MCH (1425 v3.0.62, cÅ© 1429)
+  // v3.0.57: ThÃªm 4 services má»›i
   final String dmsUrl;     // 1425 - DMS Medilink HL7
   final String emrWebUrl;  // 1530 - EMR Web Oracle DB (on-demand)
   final String redisUrl;   // 8335 - Redis Cache
   final String vvaUrl;     // 8926 - VVA Backend
-  // v3.0.62: Thongke public - 6 sub-endpoints (từ HIS_ICU v2.35.13)
+  // v3.0.62: Thongke public - 6 sub-endpoints (tá»« HIS_ICU v2.35.13)
   final String thongkeBaseUrl;             // http://thongke.benhvienninhthuan.vn:8080
   final String thongkeLoginUrl;            // /login
   final String thongkeHomeUrl;             // /home
@@ -137,37 +138,37 @@ class HisConfig {
   final String thongkeInsuranceSearchUrl;  // /insurance/medicine-search
   final String thongkeEmrIndexUrl;         // /emr/index
   final String thongkeEmrSearchUrl;        // /emr/index/search
-  // v2.76.0: Cục KCB gateway (Bộ Y tế)
+  // v2.76.0: Cá»¥c KCB gateway (Bá»™ Y táº¿)
   final String kcbBaseUrl;     // vd: https://prod.kcb.vn
   final String kcbToken;        // Bearer token (optional)
   final String kcbHospitalCode; // vd: bvdkninhthuan
-  final bool useKcbForEmr;      // true = push EMR qua Cục KCB
+  final bool useKcbForEmr;      // true = push EMR qua Cá»¥c KCB
   // User
   final String loginName;
   final String password;
-  final int defaultDeptId; // Mã khoa (mặc định 22)
-  final String defaultDeptName; // Tên khoa
-  // v2.76.3: Cách hiển thị tên BN
-  final NameField nameField;     // Ưu tiên field để hiển thị tên
+  final int defaultDeptId; // MÃ£ khoa (máº·c Ä‘á»‹nh 22)
+  final String defaultDeptName; // TÃªn khoa
+  // v2.76.3: CÃ¡ch hiá»ƒn thá»‹ tÃªn BN
+  final NameField nameField;     // Æ¯u tiÃªn field Ä‘á»ƒ hiá»ƒn thá»‹ tÃªn
 
   const HisConfig({
     this.mode = 'public_vpn',
     this.bvbmUrl = 'http://117.2.25.67:3000',
     this.acsUrl = 'http://172.16.9.6:1401/',
     this.emrUrl = 'http://172.16.9.6:1417/',
-    // v3.0.62: 1408 → 1429 (HIS_ICU v2.35.13 verified)
+    // v3.0.62: 1408 â†’ 1429 (HIS_ICU v2.35.13 verified)
     this.mosUrl = 'http://172.16.9.6:1429/',
     this.sarUrl = 'http://172.16.9.6:1409/',
     this.sdaUrl = 'http://172.16.9.6:1410/',
     this.fssUrl = 'http://172.16.9.6:1405/',
     this.lisUrl = 'http://172.16.9.6:1419/',
-    // v3.0.62: 1429 → 1425 (lấy chỗ trống vì 1429 đã dùng cho MOS)
+    // v3.0.62: 1429 â†’ 1425 (láº¥y chá»— trá»‘ng vÃ¬ 1429 Ä‘Ã£ dÃ¹ng cho MOS)
     this.ocrUrl = 'http://172.16.9.6:1425/',
     this.dmsUrl = 'http://172.16.9.6:1425/',
     this.emrWebUrl = 'http://172.16.9.6:1530/',
     this.redisUrl = 'http://172.16.9.6:8335/',
     this.vvaUrl = 'http://172.16.9.6:8926/',
-    // v3.0.62: Thongke public endpoints (từ HIS_ICU v2.35.13)
+    // v3.0.62: Thongke public endpoints (tá»« HIS_ICU v2.35.13)
     this.thongkeBaseUrl = 'http://thongke.benhvienninhthuan.vn:8080',
     this.thongkeLoginUrl = '/login',
     this.thongkeHomeUrl = '/home',
@@ -179,11 +180,11 @@ class HisConfig {
     this.kcbToken = '',
     this.kcbHospitalCode = 'bvdkninhthuan',
     this.useKcbForEmr = true,
-    this.loginName = 'nemk',
+    this.loginName = Credentials.defaultNemkLogin,
     this.password = '',
     this.defaultDeptId = 22,
-    this.defaultDeptName = 'Khoa Cấp Cứu',
-    this.nameField = NameField.tdlPatientUnsignedName, // mặc định: tên không dấu (sạch)
+    this.defaultDeptName = 'Khoa Cáº¥p Cá»©u',
+    this.nameField = NameField.tdlPatientUnsignedName, // máº·c Ä‘á»‹nh: tÃªn khÃ´ng dáº¥u (sáº¡ch)
   });
 
   HisConfig copyWith({
@@ -260,41 +261,41 @@ class HisConfigService {
   HisConfig _config = const HisConfig();
   HisConfig get config => _config;
 
-  // v3.0.49: 3 preset cho 3 chế độ mạng
-  // Mode "Public VPN" - external qua internet (cần OpenVPN)
-  // Mode "LAN nội bộ" - WiFi nội bộ BV
-  // Mode "Proxy qua PC" - qua PC BS (cần chạy his_proxy_server.py port 9999)
-  // v3.0.62: Đổi port MOS 1408→1429 + OCR 1429→1425 (theo HIS_ICU v2.35.13)
-  // v3.0.93: Sửa link BVBM → dùng IP public 113.163.187.3 (DataService publicBaseUrl)
-  //   + sửa FSS/LIS về LAN (qua VPN) - đỡ rối
+  // v3.0.49: 3 preset cho 3 cháº¿ Ä‘á»™ máº¡ng
+  // Mode "Public VPN" - external qua internet (cáº§n OpenVPN)
+  // Mode "LAN ná»™i bá»™" - WiFi ná»™i bá»™ BV
+  // Mode "Proxy qua PC" - qua PC BS (cáº§n cháº¡y his_proxy_server.py port 9999)
+  // v3.0.62: Äá»•i port MOS 1408â†’1429 + OCR 1429â†’1425 (theo HIS_ICU v2.35.13)
+  // v3.0.93: Sá»­a link BVBM â†’ dÃ¹ng IP public 113.163.187.3 (DataService publicBaseUrl)
+  //   + sá»­a FSS/LIS vá» LAN (qua VPN) - Ä‘á»¡ rá»‘i
   static const HisConfigPreset presetPublicVpn = HisConfigPreset(
     label: 'Public VPN',
-    bvbmUrl: 'http://113.163.187.3:3000',  // v3.0.93: Public IP (Y Tế Số / Data public)
+    bvbmUrl: 'http://113.163.187.3:3000',  // v3.0.93: Public IP (Y Táº¿ Sá»‘ / Data public)
     emrUrl: 'http://172.16.9.6:1417',      // HIS Pro EMR (LAN, qua VPN tunnel)
-    mosUrl: 'http://172.16.9.6:1429',      // v3.0.62: 1408→1429
+    mosUrl: 'http://172.16.9.6:1429',      // v3.0.62: 1408â†’1429
     sdaUrl: 'http://172.16.9.6:1410',
     sarUrl: 'http://172.16.9.6:1409',
     fssUrl: 'http://172.16.9.6:1405',
     lisUrl: 'http://172.16.9.6:1419',
-    ocrUrl: 'http://172.16.9.6:1425',      // v3.0.62: 1429→1425
+    ocrUrl: 'http://172.16.9.6:1425',      // v3.0.62: 1429â†’1425
   );
 
   static const HisConfigPreset presetLan = HisConfigPreset(
-    label: 'LAN nội bộ',
-    bvbmUrl: 'http://172.16.1.12:3000',    // BVBM gateway nội bộ
+    label: 'LAN ná»™i bá»™',
+    bvbmUrl: 'http://172.16.1.12:3000',    // BVBM gateway ná»™i bá»™
     emrUrl: 'http://172.16.9.6:1417',
-    mosUrl: 'http://172.16.9.6:1429',      // v3.0.62: 1408→1429
+    mosUrl: 'http://172.16.9.6:1429',      // v3.0.62: 1408â†’1429
     sdaUrl: 'http://172.16.9.6:1410',
     sarUrl: 'http://172.16.9.6:1409',
     fssUrl: 'http://172.16.9.6:1405',
     lisUrl: 'http://172.16.9.6:1419',
-    ocrUrl: 'http://172.16.9.6:1425',      // v3.0.62: 1429→1425
+    ocrUrl: 'http://172.16.9.6:1425',      // v3.0.62: 1429â†’1425
   );
 
-  // v3.0.49: Proxy qua PC BS (chạy his_proxy_server.py port 9999)
-  // PC BS IP: 172.16.200.109 - proxy forward tới HIS Pro LAN 172.16.9.6
-  // Phone gọi qua WiFi/LAN tới PC, PC forward với token đúng
-  // v3.0.62: Đổi port proxy theo backend mới (1429 cho MOS, 1425 cho OCR)
+  // v3.0.49: Proxy qua PC BS (cháº¡y his_proxy_server.py port 9999)
+  // PC BS IP: 172.16.200.109 - proxy forward tá»›i HIS Pro LAN 172.16.9.6
+  // Phone gá»i qua WiFi/LAN tá»›i PC, PC forward vá»›i token Ä‘Ãºng
+  // v3.0.62: Äá»•i port proxy theo backend má»›i (1429 cho MOS, 1425 cho OCR)
   static const HisConfigPreset presetProxyPc = HisConfigPreset(
     label: 'Proxy qua PC',
     bvbmUrl: 'http://172.16.200.109:9999/proxy/bvbm',
@@ -307,7 +308,7 @@ class HisConfigService {
     ocrUrl: 'http://172.16.200.109:9999/proxy/ocr',  // 1425 backend
   );
 
-  /// Load config từ SharedPreferences (gọi lúc app init)
+  /// Load config tá»« SharedPreferences (gá»i lÃºc app init)
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
     _config = HisConfig(
@@ -337,11 +338,11 @@ class HisConfigService {
       kcbToken: prefs.getString('cfg_kcb_token') ?? '',
       kcbHospitalCode: prefs.getString('cfg_kcb_hospital') ?? 'bvdkninhthuan',
       useKcbForEmr: prefs.getBool('cfg_use_kcb_for_emr') ?? true,
-      loginName: prefs.getString('cfg_login_name') ?? 'nemk',
+      loginName: prefs.getString('cfg_login_name') ?? Credentials.defaultNemkLogin,
       password: prefs.getString('cfg_password') ?? '',
       defaultDeptId: prefs.getInt('cfg_default_dept_id') ?? 22,
       defaultDeptName:
-          prefs.getString('cfg_default_dept_name') ?? 'Khoa Cấp Cứu',
+          prefs.getString('cfg_default_dept_name') ?? 'Khoa Cáº¥p Cá»©u',
       nameField: NameField.values.firstWhere(
         (e) => e.key == prefs.getString('cfg_name_field'),
         orElse: () => NameField.tdlPatientUnsignedName,
@@ -363,7 +364,7 @@ class HisConfigService {
     await prefs.setString('cfg_fss_url', c.fssUrl);
     await prefs.setString('cfg_lis_url', c.lisUrl);
     await prefs.setString('cfg_ocr_url', c.ocrUrl);
-    // v3.0.57: 4 services mới
+    // v3.0.57: 4 services má»›i
     await prefs.setString('cfg_dms_url', c.dmsUrl);
     await prefs.setString('cfg_emr_web_url', c.emrWebUrl);
     await prefs.setString('cfg_redis_url', c.redisUrl);
@@ -414,12 +415,12 @@ class HisConfigService {
     await save(c);
   }
 
-  /// Reset về default
+  /// Reset vá» default
   Future<void> reset() async {
     await save(const HisConfig());
   }
 
-  /// v2.76.3: Update NameField (cách hiển thị tên BN)
+  /// v2.76.3: Update NameField (cÃ¡ch hiá»ƒn thá»‹ tÃªn BN)
   Future<void> updateNameField(NameField field) async {
     final c = _config.copyWith(nameField: field);
     await save(c);

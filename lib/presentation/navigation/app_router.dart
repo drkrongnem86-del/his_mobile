@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:his_mobile/modules/auth/presentation/screens/splash_screen.dart';
 import 'package:his_mobile/modules/auth/presentation/screens/login_screen.dart';
@@ -12,6 +12,7 @@ import 'package:his_mobile/presentation/screens/tien_ich_screen.dart';
 import 'package:his_mobile/presentation/screens/treatment_records_screen.dart';
 import 'package:his_mobile/modules/cpa/presentation/screens/emergency_screen.dart';
 
+import 'package:his_mobile/core/security/credentials.dart';
 /// HIS Pro Mobile - Application Router
 class AppRouter {
   AppRouter._();
@@ -67,11 +68,11 @@ class AppRouter {
           final extra = state.extra;
           Map<String, dynamic> patient = <String, dynamic>{};
           Map<String, dynamic> department = <String, dynamic>{};
-          String username = 'nemk';
+          String username = Credentials.defaultNemkLogin;
           if (extra is Map<String, dynamic>) {
             patient = (extra['patient'] as Map?)?.cast<String, dynamic>() ?? <String, dynamic>{};
             department = (extra['department'] as Map?)?.cast<String, dynamic>() ?? <String, dynamic>{};
-            username = (extra['username'] as String?) ?? 'nemk';
+            username = (extra['username'] as String?) ?? Credentials.defaultNemkLogin;
           }
           return PatientDetailScreen(
             patient: patient,

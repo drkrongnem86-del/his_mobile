@@ -1,52 +1,52 @@
-// PhieuKhamScreen.dart v2.55.0
+﻿// PhieuKhamScreen.dart v2.55.0
 
 
 
 
 
-// Workflow phiếu khám HOÀN CHỈNH:
+// Workflow phiáº¿u khÃ¡m HOÃ€N CHá»ˆNH:
 
 
 
 
 
-//   1. Sinh hiệu (mạch / nhiệt / HHA / SpO2)
+//   1. Sinh hiá»‡u (máº¡ch / nhiá»‡t / HHA / SpO2)
 
 
 
 
 
-//   2. Chẩn đoán ICD chính
+//   2. Cháº©n Ä‘oÃ¡n ICD chÃ­nh
 
 
 
 
 
-//   3. Chỉ định Cận lâm sàng (CLS)
+//   3. Chá»‰ Ä‘á»‹nh Cáº­n lÃ¢m sÃ ng (CLS)
 
 
 
 
 
-//   4. Đơn thuốc (liều/cách dùng/số ngày)
+//   4. ÄÆ¡n thuá»‘c (liá»u/cÃ¡ch dÃ¹ng/sá»‘ ngÃ y)
 
 
 
 
 
-//   5. Ghi chú
+//   5. Ghi chÃº
 
 
 
 
 
-//   6. Ký số → push EMR
+//   6. KÃ½ sá»‘ â†’ push EMR
 
 
 
 
 
-//   7. Auto-create Tracking sau khám
+//   7. Auto-create Tracking sau khÃ¡m
 
 
 
@@ -70,25 +70,25 @@
 
 
 
-//   2. POST HisServiceReq/Update cho từng CLS
+//   2. POST HisServiceReq/Update cho tá»«ng CLS
 
 
 
 
 
-//   3. Nếu có thuốc → POST HisPrescription/Create (TBD v2.55.1)
+//   3. Náº¿u cÃ³ thuá»‘c â†’ POST HisPrescription/Create (TBD v2.55.1)
 
 
 
 
 
-//   4. POST HisTracking/Update với content sinh hiệu
+//   4. POST HisTracking/Update vá»›i content sinh hiá»‡u
 
 
 
 
 
-//   5. Tạo EMR Document PDF → push
+//   5. Táº¡o EMR Document PDF â†’ push
 
 
 
@@ -231,6 +231,7 @@ import 'package:his_mobile/presentation/widgets/medicine_selector.dart';
 
 
 
+import 'package:his_mobile/core/security/credentials.dart';
 class PhieuKhamScreen extends StatefulWidget {
 
 
@@ -333,7 +334,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-  // v2.55.0: Sinh hiệu
+  // v2.55.0: Sinh hiá»‡u
 
 
 
@@ -399,19 +400,19 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-  // v2.98.5: ICD dùng IcdInputField widget (chuẩn hóa với Lập phiếu khác)
+  // v2.98.5: ICD dÃ¹ng IcdInputField widget (chuáº©n hÃ³a vá»›i Láº­p phiáº¿u khÃ¡c)
 
 
 
 
 
-  // Không cần controller riêng - IcdInputField tự quản lý
+  // KhÃ´ng cáº§n controller riÃªng - IcdInputField tá»± quáº£n lÃ½
 
 
 
 
 
-  // Lưu giá trị ICD vào _icdValues để dùng cho save
+  // LÆ°u giÃ¡ trá»‹ ICD vÃ o _icdValues Ä‘á»ƒ dÃ¹ng cho save
 
 
 
@@ -447,7 +448,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-  bool _loadingAllCls = false;  // v2.98.7: Loading state cho nút "Chọn tất cả"
+  bool _loadingAllCls = false;  // v2.98.7: Loading state cho nÃºt "Chá»n táº¥t cáº£"
 
 
 
@@ -547,7 +548,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-    // v3.0.32: Đảm bảo catalog đã load - nếu chưa có data thì trigger refresh
+    // v3.0.32: Äáº£m báº£o catalog Ä‘Ã£ load - náº¿u chÆ°a cÃ³ data thÃ¬ trigger refresh
 
 
 
@@ -571,7 +572,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-  /// v3.0.32: Đảm bảo HisCatalogService đã load xong (tránh case mở màn nhanh khi catalog chưa ready)
+  /// v3.0.32: Äáº£m báº£o HisCatalogService Ä‘Ã£ load xong (trÃ¡nh case má»Ÿ mÃ n nhanh khi catalog chÆ°a ready)
 
 
 
@@ -589,7 +590,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-      // Init (nếu chưa) - sẽ load cache + background refresh
+      // Init (náº¿u chÆ°a) - sáº½ load cache + background refresh
 
 
 
@@ -601,7 +602,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-      // Check nếu cả 3 catalog trống → trigger refresh đồng bộ
+      // Check náº¿u cáº£ 3 catalog trá»‘ng â†’ trigger refresh Ä‘á»“ng bá»™
 
 
 
@@ -619,7 +620,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-        debugPrint('Catalog empty → force refresh');
+        debugPrint('Catalog empty â†’ force refresh');
 
 
 
@@ -667,7 +668,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-  /// v3.0.1: tìm treatment ID từ nhiều nguồn (fix lỗi "không có TREATMENT_ID")
+  /// v3.0.1: tÃ¬m treatment ID tá»« nhiá»u nguá»“n (fix lá»—i "khÃ´ng cÃ³ TREATMENT_ID")
 
 
 
@@ -679,7 +680,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-    // 1. Widget truyền vào
+    // 1. Widget truyá»n vÃ o
 
 
 
@@ -733,7 +734,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-    // 3. ID thường
+    // 3. ID thÆ°á»ng
 
 
 
@@ -775,13 +776,13 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-    // 4. TreatmentCode (string) → fetch từ HIS Pro
+    // 4. TreatmentCode (string) â†’ fetch tá»« HIS Pro
 
 
 
 
 
-    // Nếu không có sẵn, _save() sẽ tự fetch từ treatmentCode
+    // Náº¿u khÃ´ng cÃ³ sáºµn, _save() sáº½ tá»± fetch tá»« treatmentCode
 
 
 
@@ -805,25 +806,25 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-  /// v3.0.1: Lấy treatment ID từ HIS Pro qua treatmentCode (nếu chưa có)
+  /// v3.0.1: Láº¥y treatment ID tá»« HIS Pro qua treatmentCode (náº¿u chÆ°a cÃ³)
 
 
 
 
 
-  /// v3.0.7: Lấy treatment ID từ HIS Pro qua treatmentCode (nếu chưa có)
+  /// v3.0.7: Láº¥y treatment ID tá»« HIS Pro qua treatmentCode (náº¿u chÆ°a cÃ³)
 
 
 
 
 
-  /// PHÁT HIỆN MỚI (2026-07-14 test Python):
+  /// PHÃT HIá»†N Má»šI (2026-07-14 test Python):
 
 
 
 
 
-  ///   - Filter `TREATMENT_CODE` (string) KHÔNG work trên tất cả endpoint HIS Pro
+  ///   - Filter `TREATMENT_CODE` (string) KHÃ”NG work trÃªn táº¥t cáº£ endpoint HIS Pro
 
 
 
@@ -835,43 +836,43 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-  ///     là DETAIL API, chỉ nhận filter `ID` (int) hoặc `TREATMENT_ID` (int)
+  ///     lÃ  DETAIL API, chá»‰ nháº­n filter `ID` (int) hoáº·c `TREATMENT_ID` (int)
 
 
 
 
 
-  ///   - CHỈ `EmrTreatment/Get 1417` LÀ LIST API - trả 500 records không cần filter
+  ///   - CHá»ˆ `EmrTreatment/Get 1417` LÃ€ LIST API - tráº£ 500 records khÃ´ng cáº§n filter
 
 
 
 
 
-  ///   → Workflow đúng:
+  ///   â†’ Workflow Ä‘Ãºng:
 
 
 
 
 
-  ///     1. Gọi EmrTreatment/Get 1417 với limit=500, KHÔNG filter
+  ///     1. Gá»i EmrTreatment/Get 1417 vá»›i limit=500, KHÃ”NG filter
 
 
 
 
 
-  ///     2. Scan list tìm record có TREATMENT_CODE == code
+  ///     2. Scan list tÃ¬m record cÃ³ TREATMENT_CODE == code
 
 
 
 
 
-  ///     3. Lấy ID từ record đó
+  ///     3. Láº¥y ID tá»« record Ä‘Ã³
 
 
 
 
 
-  ///     4. (Optional) Verify qua HisTreatment/Get 1408 với filter ID
+  ///     4. (Optional) Verify qua HisTreatment/Get 1408 vá»›i filter ID
 
 
 
@@ -925,7 +926,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-        debugPrint('✅ _fetchTreatmentIdFromCode: cache HIT for $treatmentCode = $cached');
+        debugPrint('âœ… _fetchTreatmentIdFromCode: cache HIT for $treatmentCode = $cached');
 
 
 
@@ -985,19 +986,19 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-    // Strategy 2: EMR /api/EmrTreatment/Get (1417) - LIST API duy nhất
+    // Strategy 2: EMR /api/EmrTreatment/Get (1417) - LIST API duy nháº¥t
 
 
 
 
 
-    // Gọi KHÔNG filter (filter TREATMENT_CODE bị server bỏ qua)
+    // Gá»i KHÃ”NG filter (filter TREATMENT_CODE bá»‹ server bá» qua)
 
 
 
 
 
-    // Scan 500 records tìm record có TREATMENT_CODE = code
+    // Scan 500 records tÃ¬m record cÃ³ TREATMENT_CODE = code
 
 
 
@@ -1015,7 +1016,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-        'LOGIN_NAME': 'nemk',
+        'LOGIN_NAME': Credentials.defaultNemkLogin,
 
 
 
@@ -1039,13 +1040,13 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-        debugPrint('✅ _fetchTreatmentIdFromCode: Got ID=$id from EMR EmrTreatment/Get (limit=500)');
+        debugPrint('âœ… _fetchTreatmentIdFromCode: Got ID=$id from EMR EmrTreatment/Get (limit=500)');
 
 
 
 
 
-        // Verify ID qua HisTreatment/Get 1408 (optional, nếu work thì càng chắc)
+        // Verify ID qua HisTreatment/Get 1408 (optional, náº¿u work thÃ¬ cÃ ng cháº¯c)
 
 
 
@@ -1093,7 +1094,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-              debugPrint('   ✓ Verified via MOS 1408 HisTreatment/Get');
+              debugPrint('   âœ“ Verified via MOS 1408 HisTreatment/Get');
 
 
 
@@ -1117,7 +1118,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-          debugPrint('   ⚠ Verify qua MOS 1408 fail (không sao): $e');
+          debugPrint('   âš  Verify qua MOS 1408 fail (khÃ´ng sao): $e');
 
 
 
@@ -1171,7 +1172,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-    debugPrint('❌ _fetchTreatmentIdFromCode: No strategy worked for $treatmentCode (có thể ca cũ ngoài 500 records)');
+    debugPrint('âŒ _fetchTreatmentIdFromCode: No strategy worked for $treatmentCode (cÃ³ thá»ƒ ca cÅ© ngoÃ i 500 records)');
 
 
 
@@ -1195,7 +1196,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-  /// Tìm treatment ID trong list data (filter theo TREATMENT_CODE)
+  /// TÃ¬m treatment ID trong list data (filter theo TREATMENT_CODE)
 
 
 
@@ -1303,7 +1304,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-  /// Parse treatment ID từ response (lấy đầu tiên)
+  /// Parse treatment ID tá»« response (láº¥y Ä‘áº§u tiÃªn)
 
 
 
@@ -1555,13 +1556,13 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-  /// v2.98.7: Chọn tất cả CLS (load từ HisCatalogService)
+  /// v2.98.7: Chá»n táº¥t cáº£ CLS (load tá»« HisCatalogService)
 
 
 
 
 
-  /// Lấy tất cả dịch vụ đã cache (Xét nghiệm, CDHA, Thủ thuật) - không qua API
+  /// Láº¥y táº¥t cáº£ dá»‹ch vá»¥ Ä‘Ã£ cache (XÃ©t nghiá»‡m, CDHA, Thá»§ thuáº­t) - khÃ´ng qua API
 
 
 
@@ -1591,7 +1592,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-      // Lấy tất cả services (giới hạn 500 để tránh quá tải)
+      // Láº¥y táº¥t cáº£ services (giá»›i háº¡n 500 Ä‘á»ƒ trÃ¡nh quÃ¡ táº£i)
 
 
 
@@ -1657,7 +1658,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-            content: Text('Đã chọn tất cả ${all.length} CLS (Xét nghiệm, CDHA, Thủ thuật)'),
+            content: Text('ÄÃ£ chá»n táº¥t cáº£ ${all.length} CLS (XÃ©t nghiá»‡m, CDHA, Thá»§ thuáº­t)'),
 
 
 
@@ -1717,7 +1718,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-          SnackBar(content: Text('Lỗi chọn tất cả CLS: $e')),
+          SnackBar(content: Text('Lá»—i chá»n táº¥t cáº£ CLS: $e')),
 
 
 
@@ -1926,7 +1927,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
     return pdf.save();
   }
 
-  /// Build content for HIS Tracking (mô tả sinh hiệu)
+  /// Build content for HIS Tracking (mÃ´ táº£ sinh hiá»‡u)
 
 
 
@@ -1980,13 +1981,13 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-    if (m.isNotEmpty) parts.add('Mạch: $m l/p');
+    if (m.isNotEmpty) parts.add('Máº¡ch: $m l/p');
 
 
 
 
 
-    if (n.isNotEmpty) parts.add('Nhiệt: $n°C');
+    if (n.isNotEmpty) parts.add('Nhiá»‡t: $nÂ°C');
 
 
 
@@ -1998,19 +1999,19 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-    if (s.isNotEmpty) parts.add('SpO₂: $s%');
+    if (s.isNotEmpty) parts.add('SpOâ‚‚: $s%');
 
 
 
 
 
-    if (_lyDoCtrl.text.isNotEmpty) parts.add('Lý do: ${_lyDoCtrl.text}');
+    if (_lyDoCtrl.text.isNotEmpty) parts.add('LÃ½ do: ${_lyDoCtrl.text}');
 
 
 
 
 
-    // v2.98.5: Lấy ICD đầu tiên từ _icdValues (IcdInputField)
+    // v2.98.5: Láº¥y ICD Ä‘áº§u tiÃªn tá»« _icdValues (IcdInputField)
 
 
 
@@ -2028,7 +2029,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-      parts.add('Chẩn đoán: ${icd.code.isNotEmpty ? icd.code : "?"} - ${icd.name.isNotEmpty ? icd.name : "?"}');
+      parts.add('Cháº©n Ä‘oÃ¡n: ${icd.code.isNotEmpty ? icd.code : "?"} - ${icd.name.isNotEmpty ? icd.name : "?"}');
 
 
 
@@ -2040,7 +2041,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-    return parts.join(' • ');
+    return parts.join(' â€¢ ');
 
 
 
@@ -2064,13 +2065,13 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-    // v2.98.7: ICD chính - check từ _icdValues (IcdInputField)
+    // v2.98.7: ICD chÃ­nh - check tá»« _icdValues (IcdInputField)
 
 
 
 
 
-    // KHÔNG bắt buộc CLS - cho phép lưu khi không có cận lâm sàng
+    // KHÃ”NG báº¯t buá»™c CLS - cho phÃ©p lÆ°u khi khÃ´ng cÃ³ cáº­n lÃ¢m sÃ ng
 
 
 
@@ -2100,37 +2101,37 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-  /// v3.0.0: 3 chế độ - Lưu / Lưu chưa ký / Lưu ký
+  /// v3.0.0: 3 cháº¿ Ä‘á»™ - LÆ°u / LÆ°u chÆ°a kÃ½ / LÆ°u kÃ½
 
 
 
 
 
-  /// - pushEmr=false: chỉ lưu local
+  /// - pushEmr=false: chá»‰ lÆ°u local
 
 
 
 
 
-  /// - pushEmr=true, forceSigned=false: lưu + đẩy EMR unsigned
+  /// - pushEmr=true, forceSigned=false: lÆ°u + Ä‘áº©y EMR unsigned
 
 
 
 
 
-  /// - pushEmr=true, forceSigned=true: lưu + ký + đẩy EMR (auto-sign nếu chưa vẽ)
+  /// - pushEmr=true, forceSigned=true: lÆ°u + kÃ½ + Ä‘áº©y EMR (auto-sign náº¿u chÆ°a váº½)
 
 
 
 
 
-  /// v3.0.1: Nếu thiếu treatment_id → tự fetch từ treatmentCode qua HIS Pro
+  /// v3.0.1: Náº¿u thiáº¿u treatment_id â†’ tá»± fetch tá»« treatmentCode qua HIS Pro
 
 
 
 
 
-  /// v3.0.46: Thêm useVnptSignature=true → ký PKCS#7 qua VNPT SmartCA
+  /// v3.0.46: ThÃªm useVnptSignature=true â†’ kÃ½ PKCS#7 qua VNPT SmartCA
 
 
 
@@ -2154,7 +2155,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-      _snack('Vui lòng chọn ICD chính (CLS không bắt buộc)');
+      _snack('Vui lÃ²ng chá»n ICD chÃ­nh (CLS khÃ´ng báº¯t buá»™c)');
 
 
 
@@ -2178,7 +2179,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-    // v3.0.1: Nếu chưa có tid, fetch từ treatmentCode
+    // v3.0.1: Náº¿u chÆ°a cÃ³ tid, fetch tá»« treatmentCode
 
 
 
@@ -2202,7 +2203,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-        _snack('Đang lấy TREATMENT_ID từ HIS Pro...', color: Colors.blue);
+        _snack('Äang láº¥y TREATMENT_ID tá»« HIS Pro...', color: Colors.blue);
 
 
 
@@ -2226,7 +2227,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-            widget.patient['TREATMENT_ID'] = tid;  // cache lại
+            widget.patient['TREATMENT_ID'] = tid;  // cache láº¡i
 
 
 
@@ -2262,7 +2263,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-      _snack('Không lấy được TREATMENT_ID (chọn lại BN hoặc kiểm tra VPN)');
+      _snack('KhÃ´ng láº¥y Ä‘Æ°á»£c TREATMENT_ID (chá»n láº¡i BN hoáº·c kiá»ƒm tra VPN)');
 
 
 
@@ -2322,7 +2323,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-      results.add('Đang tạo ${_selectedServices.length} phiếu CLS...');
+      results.add('Äang táº¡o ${_selectedServices.length} phiáº¿u CLS...');
 
 
 
@@ -2340,7 +2341,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-        requestLoginname: 'nemk',
+        requestLoginname: Credentials.defaultNemkLogin,
 
 
 
@@ -2412,7 +2413,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-        results.add('Mã: ${successCls.take(8).map((r) => r.serviceReqCode).join(", ")}');
+        results.add('MÃ£: ${successCls.take(8).map((r) => r.serviceReqCode).join(", ")}');
 
 
 
@@ -2430,7 +2431,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-      // 2. Tracking (sinh hiệu + ICD + lý do)
+      // 2. Tracking (sinh hiá»‡u + ICD + lÃ½ do)
 
 
 
@@ -2448,7 +2449,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-        results.add('Đang lưu sinh hiệu...');
+        results.add('Äang lÆ°u sinh hiá»‡u...');
 
 
 
@@ -2478,13 +2479,13 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-            roomId: 36,  // PKCC - v3.0.105: ROOM_ID thật = 36 (từ log HIS Pro)
+            roomId: 36,  // PKCC - v3.0.105: ROOM_ID tháº­t = 36 (tá»« log HIS Pro)
 
 
 
 
 
-            trackingType: 1, // NHẬP VIỆN/KHÁM
+            trackingType: 1, // NHáº¬P VIá»†N/KHÃM
 
 
 
@@ -2526,7 +2527,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-                : 'Khám bệnh',
+                : 'KhÃ¡m bá»‡nh',
 
 
 
@@ -2580,7 +2581,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-        results.add(tr.success ? 'Theo dõi: OK (ID=${tr.id})' : 'Theo dõi: ${tr.error}');
+        results.add(tr.success ? 'Theo dÃµi: OK (ID=${tr.id})' : 'Theo dÃµi: ${tr.error}');
 
 
 
@@ -2598,7 +2599,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-      // 3. v3.0.22: EMR push theo mode (dùng PhieuSaveService thống nhất)
+      // 3. v3.0.22: EMR push theo mode (dÃ¹ng PhieuSaveService thá»‘ng nháº¥t)
 
 
 
@@ -2616,7 +2617,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-          results.add('Đang ký + đẩy EMR...');
+          results.add('Äang kÃ½ + Ä‘áº©y EMR...');
 
 
 
@@ -2628,7 +2629,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-          results.add('Đang đẩy EMR (chưa ký)...');
+          results.add('Äang Ä‘áº©y EMR (chÆ°a kÃ½)...');
 
 
 
@@ -2646,7 +2647,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-          // v3.0.22: Lấy signature (user vẽ hoặc auto-gen) cho mode signed
+          // v3.0.22: Láº¥y signature (user váº½ hoáº·c auto-gen) cho mode signed
 
 
 
@@ -2701,7 +2702,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-                throw Exception('Không tạo được chữ ký tự động');
+                throw Exception('KhÃ´ng táº¡o Ä‘Æ°á»£c chá»¯ kÃ½ tá»± Ä‘á»™ng');
 
 
 
@@ -2767,13 +2768,13 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-            'sinh_hieu': 'Mạch: ${_machCtrl.text}, Nhiệt: ${_nhietCtrl.text}°C, HHA: ${_hhaTTCtrl.text}/${_hhaTDCtrl.text}, SpO2: ${_spo2Ctrl.text}%',
+            'sinh_hieu': 'Máº¡ch: ${_machCtrl.text}, Nhiá»‡t: ${_nhietCtrl.text}Â°C, HHA: ${_hhaTTCtrl.text}/${_hhaTDCtrl.text}, SpO2: ${_spo2Ctrl.text}%',
 
 
 
 
 
-            'icd_chinh': _icdValues.isNotEmpty ? _icdValues.first.name : 'Khám bệnh',
+            'icd_chinh': _icdValues.isNotEmpty ? _icdValues.first.name : 'KhÃ¡m bá»‡nh',
 
 
 
@@ -2833,14 +2834,14 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-          // Gọi PhieuSaveService thống nhất
+          // Gá»i PhieuSaveService thá»‘ng nháº¥t
 
 
 
 
 
           // v3.0.143: Build PDF with TNKeyUni font
-          // v3.0.145: Render PDF -> PNG -> EMR (font trên server khong garble)
+          // v3.0.145: Render PDF -> PNG -> EMR (font trÃªn server khong garble)
           final pdfBytes = await _buildPdf(signatureBytes: signatureBytes);
           final pngBytes = await PdfToImageService.pdfToPngPdf(pdfBytes);
 
@@ -2869,7 +2870,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-              formName: 'Phiếu khám - ${_patientCode}_${DateTime.now().millisecondsSinceEpoch}',
+              formName: 'Phiáº¿u khÃ¡m - ${_patientCode}_${DateTime.now().millisecondsSinceEpoch}',
 
 
 
@@ -2916,7 +2917,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-              workingDeptName: 'Khoa Cấp Cứu',
+              workingDeptName: 'Khoa Cáº¥p Cá»©u',
 
 
 
@@ -2988,13 +2989,13 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-                ? 'EMR: ✅ push + ký thành công (${result.documentCode})'
+                ? 'EMR: âœ… push + kÃ½ thÃ nh cÃ´ng (${result.documentCode})'
 
 
 
 
 
-                : 'EMR: ✅ push thành công (chưa ký) (${result.documentCode})');
+                : 'EMR: âœ… push thÃ nh cÃ´ng (chÆ°a kÃ½) (${result.documentCode})');
 
 
 
@@ -3006,7 +3007,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-            results.add('EMR: ⚠ fail (${result.error}) - PDF giữ tại ${result.tempPdfPath}');
+            results.add('EMR: âš  fail (${result.error}) - PDF giá»¯ táº¡i ${result.tempPdfPath}');
 
 
 
@@ -3018,7 +3019,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-            results.add('EMR: ❌ ${result.error}');
+            results.add('EMR: âŒ ${result.error}');
 
 
 
@@ -3036,7 +3037,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-          results.add('EMR: lỗi $e');
+          results.add('EMR: lá»—i $e');
 
 
 
@@ -3084,7 +3085,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-        _snack('Phiếu khám: ${successCls.length} CLS OK');
+        _snack('Phiáº¿u khÃ¡m: ${successCls.length} CLS OK');
 
 
 
@@ -3102,7 +3103,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-      _snack('Lỗi: $e', color: Colors.red);
+      _snack('Lá»—i: $e', color: Colors.red);
 
 
 
@@ -3120,7 +3121,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-          _result = '❌ Lỗi: $e';
+          _result = 'âŒ Lá»—i: $e';
 
 
 
@@ -3168,7 +3169,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-  /// v3.0.22: _pushSignatureToEmr cũ đã bỏ - giờ dùng PhieuSaveService trực tiếp trong _save()
+  /// v3.0.22: _pushSignatureToEmr cÅ© Ä‘Ã£ bá» - giá» dÃ¹ng PhieuSaveService trá»±c tiáº¿p trong _save()
 
 
 
@@ -3180,13 +3181,13 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-  /// v2.98.7: Tự tạo signature text-based (PNG) - vẽ text "Đã ký bởi..." lên canvas
+  /// v2.98.7: Tá»± táº¡o signature text-based (PNG) - váº½ text "ÄÃ£ kÃ½ bá»Ÿi..." lÃªn canvas
 
 
 
 
 
-  /// Dùng khi user bấm "Ký" mà chưa vẽ signature tay
+  /// DÃ¹ng khi user báº¥m "KÃ½" mÃ  chÆ°a váº½ signature tay
 
 
 
@@ -3204,7 +3205,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-      // vẽ lên Canvas
+      // váº½ lÃªn Canvas
 
 
 
@@ -3222,7 +3223,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-      // Nền trắng
+      // Ná»n tráº¯ng
 
 
 
@@ -3234,7 +3235,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-      // Viền đen
+      // Viá»n Ä‘en
 
 
 
@@ -3282,7 +3283,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-      // Text "Đã ký bởi: [username]"
+      // Text "ÄÃ£ kÃ½ bá»Ÿi: [username]"
 
 
 
@@ -3324,7 +3325,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-          text: 'Đã ký bởi: $username',
+          text: 'ÄÃ£ kÃ½ bá»Ÿi: $username',
 
 
 
@@ -3390,7 +3391,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-      // Text ngày giờ
+      // Text ngÃ y giá»
 
 
 
@@ -3408,7 +3409,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-          text: 'Lúc: $timeStr',
+          text: 'LÃºc: $timeStr',
 
 
 
@@ -3528,7 +3529,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-      debugPrint('Lỗi tạo auto signature: $e');
+      debugPrint('Lá»—i táº¡o auto signature: $e');
 
 
 
@@ -3660,7 +3661,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-        title: const Text('Tạo phiếu khám'),
+        title: const Text('Táº¡o phiáº¿u khÃ¡m'),
 
 
 
@@ -3750,7 +3751,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-                    _sectionTitle('🌡️ Sinh hiệu', Icons.favorite),
+                    _sectionTitle('ðŸŒ¡ï¸ Sinh hiá»‡u', Icons.favorite),
 
 
 
@@ -3768,7 +3769,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-                    _sectionTitle('📝 Lý do khám', Icons.notes),
+                    _sectionTitle('ðŸ“ LÃ½ do khÃ¡m', Icons.notes),
 
 
 
@@ -3798,7 +3799,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-                        hintText: 'Đau ngực, khó thở, ...',
+                        hintText: 'Äau ngá»±c, khÃ³ thá»Ÿ, ...',
 
 
 
@@ -3834,13 +3835,13 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-                    _sectionTitle('🔍 Chẩn đoán ICD chính', Icons.assignment),
+                    _sectionTitle('ðŸ” Cháº©n Ä‘oÃ¡n ICD chÃ­nh', Icons.assignment),
 
 
 
 
 
-                    // v2.98.5: Dùng IcdInputField widget dùng chung (chuẩn hóa)
+                    // v2.98.5: DÃ¹ng IcdInputField widget dÃ¹ng chung (chuáº©n hÃ³a)
 
 
 
@@ -3858,7 +3859,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-                      label: 'Chẩn đoán ICD',
+                      label: 'Cháº©n Ä‘oÃ¡n ICD',
 
 
 
@@ -3936,13 +3937,13 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-                    _sectionTitle('🩺 Chỉ định Cận lâm sàng', Icons.medical_services),
+                    _sectionTitle('ðŸ©º Chá»‰ Ä‘á»‹nh Cáº­n lÃ¢m sÃ ng', Icons.medical_services),
 
 
 
 
 
-                    // v2.98.7: Nút chọn tất cả CLS + đếm số đã chọn
+                    // v2.98.7: NÃºt chá»n táº¥t cáº£ CLS + Ä‘áº¿m sá»‘ Ä‘Ã£ chá»n
 
 
 
@@ -3972,7 +3973,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-                            'Bao gồm: XN máu, X-quang, SA, Điện tim, Nội soi... (${_selectedServices.length} đã chọn)',
+                            'Bao gá»“m: XN mÃ¡u, X-quang, SA, Äiá»‡n tim, Ná»™i soi... (${_selectedServices.length} Ä‘Ã£ chá»n)',
 
 
 
@@ -4062,7 +4063,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-                            label: const Text('Chọn tất cả', style: TextStyle(fontSize: 10)),
+                            label: const Text('Chá»n táº¥t cáº£', style: TextStyle(fontSize: 10)),
 
 
 
@@ -4122,7 +4123,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-                            label: Text('Xoá (${_selectedServices.length})', style: const TextStyle(fontSize: 10, color: Colors.red)),
+                            label: Text('XoÃ¡ (${_selectedServices.length})', style: const TextStyle(fontSize: 10, color: Colors.red)),
 
 
 
@@ -4188,13 +4189,13 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-                      title: 'CLS (Xét nghiệm, CDHA, Thủ thuật)',
+                      title: 'CLS (XÃ©t nghiá»‡m, CDHA, Thá»§ thuáº­t)',
 
 
 
 
 
-                      hintText: 'Tìm CLS (XN máu, X-quang, SA tim...)',
+                      hintText: 'TÃ¬m CLS (XN mÃ¡u, X-quang, SA tim...)',
 
 
 
@@ -4254,7 +4255,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-                    _sectionTitle('💊 Đơn thuốc', Icons.medication),
+                    _sectionTitle('ðŸ’Š ÄÆ¡n thuá»‘c', Icons.medication),
 
 
 
@@ -4308,7 +4309,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-                    _sectionTitle('📋 Ghi chú (tùy chọn)', Icons.edit_note),
+                    _sectionTitle('ðŸ“‹ Ghi chÃº (tÃ¹y chá»n)', Icons.edit_note),
 
 
 
@@ -4338,7 +4339,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-                        hintText: 'Ghi chú thêm cho phiếu...',
+                        hintText: 'Ghi chÃº thÃªm cho phiáº¿u...',
 
 
 
@@ -4374,7 +4375,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-                    _sectionTitle('✍️ Ký số (tùy chọn - cho EMR)', Icons.draw),
+                    _sectionTitle('âœï¸ KÃ½ sá»‘ (tÃ¹y chá»n - cho EMR)', Icons.draw),
 
 
 
@@ -4500,7 +4501,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-                          label: const Text('Xóa chữ ký'),
+                          label: const Text('XÃ³a chá»¯ kÃ½'),
 
 
 
@@ -4560,7 +4561,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-                            _sigCtrl.isNotEmpty ? '✅ Đã ký' : 'Chưa ký',
+                            _sigCtrl.isNotEmpty ? 'âœ… ÄÃ£ kÃ½' : 'ChÆ°a kÃ½',
 
 
 
@@ -4650,7 +4651,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-                          color: _result!.startsWith('❌')
+                          color: _result!.startsWith('âŒ')
 
 
 
@@ -4680,7 +4681,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-                            color: _result!.startsWith('❌')
+                            color: _result!.startsWith('âŒ')
 
 
 
@@ -4728,7 +4729,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-                            color: _result!.startsWith('❌')
+                            color: _result!.startsWith('âŒ')
 
 
 
@@ -4848,7 +4849,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-          // v3.0.46: 3 nút - [Lưu] [Lưu ký] [Ký VNPT SmartCA] theo mẫu Bàn giao BN
+          // v3.0.46: 3 nÃºt - [LÆ°u] [LÆ°u kÃ½] [KÃ½ VNPT SmartCA] theo máº«u BÃ n giao BN
 
 
 
@@ -4908,7 +4909,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-                      label: const Text('Lưu', style: TextStyle(fontSize: 12)),
+                      label: const Text('LÆ°u', style: TextStyle(fontSize: 12)),
 
 
 
@@ -4986,7 +4987,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-                      label: const Text('Lưu ký', style: TextStyle(fontSize: 12)),
+                      label: const Text('LÆ°u kÃ½', style: TextStyle(fontSize: 12)),
 
 
 
@@ -5046,7 +5047,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-              // v3.0.46: Nút Ký VNPT SmartCA - ký PKCS#7 thật qua app VNPT
+              // v3.0.46: NÃºt KÃ½ VNPT SmartCA - kÃ½ PKCS#7 tháº­t qua app VNPT
 
 
 
@@ -5076,7 +5077,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-                    label: const Text('Ký VNPT SmartCA', style: TextStyle(fontSize: 12)),
+                    label: const Text('KÃ½ VNPT SmartCA', style: TextStyle(fontSize: 12)),
 
 
 
@@ -5172,7 +5173,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-  /// Build 5 vital signs inputs (mạch/nhiệt/HHA TT-TD/SpO2)
+  /// Build 5 vital signs inputs (máº¡ch/nhiá»‡t/HHA TT-TD/SpO2)
 
 
 
@@ -5250,7 +5251,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-              Expanded(child: _vitalField(_machCtrl, 'Mạch', 'l/p')),
+              Expanded(child: _vitalField(_machCtrl, 'Máº¡ch', 'l/p')),
 
 
 
@@ -5262,7 +5263,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-              Expanded(child: _vitalField(_nhietCtrl, 'Nhiệt', '°C')),
+              Expanded(child: _vitalField(_nhietCtrl, 'Nhiá»‡t', 'Â°C')),
 
 
 
@@ -5274,7 +5275,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-              Expanded(child: _vitalField(_spo2Ctrl, 'SpO₂', '%')),
+              Expanded(child: _vitalField(_spo2Ctrl, 'SpOâ‚‚', '%')),
 
 
 
@@ -5310,7 +5311,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-              Expanded(flex: 2, child: _vitalField(_hhaTTCtrl, 'HA Tâm thu', 'mmHg')),
+              Expanded(flex: 2, child: _vitalField(_hhaTTCtrl, 'HA TÃ¢m thu', 'mmHg')),
 
 
 
@@ -5322,7 +5323,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-              Expanded(flex: 2, child: _vitalField(_hhaTDCtrl, 'HA Tâm trương', 'mmHg')),
+              Expanded(flex: 2, child: _vitalField(_hhaTDCtrl, 'HA TÃ¢m trÆ°Æ¡ng', 'mmHg')),
 
 
 
@@ -5562,7 +5563,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-            _patientName ?? '—',
+            _patientName ?? 'â€”',
 
 
 
@@ -5592,7 +5593,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-            'Mã ĐT: ${_treatmentCode ?? '—'} | Mã BN: ${_patientCode ?? '—'}',
+            'MÃ£ ÄT: ${_treatmentCode ?? 'â€”'} | MÃ£ BN: ${_patientCode ?? 'â€”'}',
 
 
 
@@ -5670,7 +5671,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-                  'ICD cũ: ${icd}',
+                  'ICD cÅ©: ${icd}',
 
 
 
@@ -5730,7 +5731,7 @@ class _PhieuKhamScreenState extends State<PhieuKhamScreen> {
 
 
 
-  /// v2.98.5: Widget _buildIcdInputField cũ đã xóa - dùng IcdInputField widget dùng chung
+  /// v2.98.5: Widget _buildIcdInputField cÅ© Ä‘Ã£ xÃ³a - dÃ¹ng IcdInputField widget dÃ¹ng chung
 
 
 

@@ -1,33 +1,34 @@
-// v3.0.42: Chọn nguồn API push EMR - đơn giản hóa, chỉ 2 options
-// - hisPro: HIS Pro 1417 (mặc định, ai cũng dùng được) - thông qua proxy/tunnel
-// - mockLocal: Mock server local trong app (test offline, không cần server)
+﻿// v3.0.42: Chá»n nguá»“n API push EMR - Ä‘Æ¡n giáº£n hÃ³a, chá»‰ 2 options
+// - hisPro: HIS Pro 1417 (máº·c Ä‘á»‹nh, ai cÅ©ng dÃ¹ng Ä‘Æ°á»£c) - thÃ´ng qua proxy/tunnel
+// - mockLocal: Mock server local trong app (test offline, khÃ´ng cáº§n server)
 //
-// Phân quyền:
-//   - User thường → thấy 2 options: hisPro + mockLocal
-//   - User `nemk` (admin) → thấy thêm 1 option: bvbmWorkaround (push tạm qua BVBM Gateway)
+// PhÃ¢n quyá»n:
+//   - User thÆ°á»ng â†’ tháº¥y 2 options: hisPro + mockLocal
+//   - User `nemk` (admin) â†’ tháº¥y thÃªm 1 option: bvbmWorkaround (push táº¡m qua BVBM Gateway)
 //
 // Smart default (v3.0.42):
-//   1. Nếu Mock bật → mockLocal (test offline)
-//   2. Nếu không có gì → hisPro (mặc định)
+//   1. Náº¿u Mock báº­t â†’ mockLocal (test offline)
+//   2. Náº¿u khÃ´ng cÃ³ gÃ¬ â†’ hisPro (máº·c Ä‘á»‹nh)
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:his_mobile/data/api/thongke_auth_service.dart';
 import 'package:his_mobile/data/services/data_service.dart';
 import 'package:his_mobile/data/services/mock_emr_server.dart';
 
-/// Các nguồn API để push EMR (v3.0.42 - chỉ 2 options chính)
+import 'package:his_mobile/core/security/credentials.dart';
+/// CÃ¡c nguá»“n API Ä‘á»ƒ push EMR (v3.0.42 - chá»‰ 2 options chÃ­nh)
 enum EmrPushApiSource {
-  /// HIS Pro 1417 - mặc định, ai cũng dùng được
-  /// Dùng TokenCode headers qua proxy/auto-bootstrap từ HIS Pro session
-  hisPro('🏥 HIS Pro 1417', 'Đẩy thẳng lên EMR BV (mặc định)'),
+  /// HIS Pro 1417 - máº·c Ä‘á»‹nh, ai cÅ©ng dÃ¹ng Ä‘Æ°á»£c
+  /// DÃ¹ng TokenCode headers qua proxy/auto-bootstrap tá»« HIS Pro session
+  hisPro('ðŸ¥ HIS Pro 1417', 'Äáº©y tháº³ng lÃªn EMR BV (máº·c Ä‘á»‹nh)'),
 
   /// Mock server local trong app - test offline
-  /// Lưu phiếu vào SharedPreferences + PDF vào app docs folder
-  mockLocal('🧪 Mock (offline)', 'Test offline - không cần server'),
+  /// LÆ°u phiáº¿u vÃ o SharedPreferences + PDF vÃ o app docs folder
+  mockLocal('ðŸ§ª Mock (offline)', 'Test offline - khÃ´ng cáº§n server'),
 
-  /// v3.0.42: HIS Pro 8080 (public) - cho fallback khi VPN chưa lên
-  /// Dùng endpoint public 113.163.187.3:8080 (Data API công khai)
-  public('🌍 Public 8080', 'API công khai (fallback)');
+  /// v3.0.42: HIS Pro 8080 (public) - cho fallback khi VPN chÆ°a lÃªn
+  /// DÃ¹ng endpoint public 113.163.187.3:8080 (Data API cÃ´ng khai)
+  public('ðŸŒ Public 8080', 'API cÃ´ng khai (fallback)');
 
   final String label;
   final String description;
@@ -39,17 +40,17 @@ enum EmrPushApiSource {
   }
 }
 
-/// Singleton quản lý API selection + role-based visibility
+/// Singleton quáº£n lÃ½ API selection + role-based visibility
 class EmrApiSelectorService {
   static final EmrApiSelectorService instance = EmrApiSelectorService._();
   EmrApiSelectorService._();
 
   static const _kSelectedKey = 'emr_push_api_source_idx';
 
-  /// Username admin (được phép thấy tất cả API)
-  static const String adminUsername = 'nemk';
+  /// Username admin (Ä‘Æ°á»£c phÃ©p tháº¥y táº¥t cáº£ API)
+  static const String adminUsername = Credentials.defaultNemkLogin;
 
-  /// Lấy username hiện tại
+  /// Láº¥y username hiá»‡n táº¡i
   String? _getCurrentUsername() {
     final thongkeUser = ThongkeAuthService().currentUsername;
     if (thongkeUser != null && thongkeUser.isNotEmpty) return thongkeUser;
@@ -58,17 +59,17 @@ class EmrApiSelectorService {
     return null;
   }
 
-  /// Check user hiện tại có phải admin (`nemk`) không
+  /// Check user hiá»‡n táº¡i cÃ³ pháº£i admin (`nemk`) khÃ´ng
   bool isAdmin() {
     final username = _getCurrentUsername();
     if (username == null || username.isEmpty) return false;
     return username.toLowerCase().trim() == adminUsername.toLowerCase();
   }
 
-  /// v3.0.57: Phân quyền hiển thị API sources
-  /// - User `nemk` (admin) → thấy 3 options: hisPro + mockLocal + public
-  /// - User khác → chỉ thấy 2 options: hisPro + public (bỏ mockLocal)
-  /// - Trước đó: ai cũng thấy 3 options → user thường thấy Mock không cần thiết
+  /// v3.0.57: PhÃ¢n quyá»n hiá»ƒn thá»‹ API sources
+  /// - User `nemk` (admin) â†’ tháº¥y 3 options: hisPro + mockLocal + public
+  /// - User khÃ¡c â†’ chá»‰ tháº¥y 2 options: hisPro + public (bá» mockLocal)
+  /// - TrÆ°á»›c Ä‘Ã³: ai cÅ©ng tháº¥y 3 options â†’ user thÆ°á»ng tháº¥y Mock khÃ´ng cáº§n thiáº¿t
   List<EmrPushApiSource> visibleSources() {
     if (isAdmin()) {
       return EmrPushApiSource.values.toList();
@@ -76,11 +77,11 @@ class EmrApiSelectorService {
     return [EmrPushApiSource.hisPro, EmrPushApiSource.public];
   }
 
-  /// Lấy API source hiện tại
-  /// v3.0.42: Ưu tiên Mock (nếu bật) > HIS Pro (mặc định)
+  /// Láº¥y API source hiá»‡n táº¡i
+  /// v3.0.42: Æ¯u tiÃªn Mock (náº¿u báº­t) > HIS Pro (máº·c Ä‘á»‹nh)
   Future<EmrPushApiSource> getSelected() async {
     if (await MockEmrServer.instance.isEnabled()) {
-      debugPrint('EmrApiSelector: Mock enabled → mockLocal');
+      debugPrint('EmrApiSelector: Mock enabled â†’ mockLocal');
       return EmrPushApiSource.mockLocal;
     }
     final prefs = await SharedPreferences.getInstance();
@@ -88,7 +89,7 @@ class EmrApiSelectorService {
     return EmrPushApiSource.fromIndex(idx);
   }
 
-  /// Lưu API source
+  /// LÆ°u API source
   Future<bool> setSelected(EmrPushApiSource src) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_kSelectedKey, src.index);

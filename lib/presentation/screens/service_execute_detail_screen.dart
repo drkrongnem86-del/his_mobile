@@ -1,13 +1,13 @@
-// ServiceExecuteDetailScreen v3.1.05 - Màn hình thực hiện dịch vụ (Xử lý yêu cầu khám/cls/pttt)
-// Workflow giống HIS Desktop "Xử lý yêu cầu khám/cls/pttt (Phòng TT Khoa Cấp Cứu)":
-// - Top: Thông tin BN (mã, tên, năm sinh, giới tính, khoa, ICD, ngày y lệnh)
-// - Center: Form "PHIẾU ĐIỆN TIM" / "PHIẾU KHÁM" / etc. với:
-//   + Dịch vụ yêu cầu (list, multi-select)
-//   + Hình ảnh: Góp kết quả + Lưu ảnh + Đính kèm ảnh (3 tab)
-//   + Thời gian: Bắt đầu + Kết thúc + Giờ GPBL
-//   + Kết quả (multiline) + Kết luận + Ghi chú
-//   + Kíp thực hiện: 5 vị trí (PTV chính + PTV phụ 1+2 + Gây mê chính + Gây mê phụ 1)
-//   + Nút "Hoàn thành" → call FinishWithTime → EMR push (optional)
+﻿// ServiceExecuteDetailScreen v3.1.05 - MÃ n hÃ¬nh thá»±c hiá»‡n dá»‹ch vá»¥ (Xá»­ lÃ½ yÃªu cáº§u khÃ¡m/cls/pttt)
+// Workflow giá»‘ng HIS Desktop "Xá»­ lÃ½ yÃªu cáº§u khÃ¡m/cls/pttt (PhÃ²ng TT Khoa Cáº¥p Cá»©u)":
+// - Top: ThÃ´ng tin BN (mÃ£, tÃªn, nÄƒm sinh, giá»›i tÃ­nh, khoa, ICD, ngÃ y y lá»‡nh)
+// - Center: Form "PHIáº¾U ÄIá»†N TIM" / "PHIáº¾U KHÃM" / etc. vá»›i:
+//   + Dá»‹ch vá»¥ yÃªu cáº§u (list, multi-select)
+//   + HÃ¬nh áº£nh: GÃ³p káº¿t quáº£ + LÆ°u áº£nh + ÄÃ­nh kÃ¨m áº£nh (3 tab)
+//   + Thá»i gian: Báº¯t Ä‘áº§u + Káº¿t thÃºc + Giá» GPBL
+//   + Káº¿t quáº£ (multiline) + Káº¿t luáº­n + Ghi chÃº
+//   + KÃ­p thá»±c hiá»‡n: 5 vá»‹ trÃ­ (PTV chÃ­nh + PTV phá»¥ 1+2 + GÃ¢y mÃª chÃ­nh + GÃ¢y mÃª phá»¥ 1)
+//   + NÃºt "HoÃ n thÃ nh" â†’ call FinishWithTime â†’ EMR push (optional)
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
@@ -19,11 +19,12 @@ import 'package:his_mobile/data/services/form_draft_service.dart';
 import 'package:his_mobile/presentation/widgets/user_header.dart';
 import 'package:his_mobile/presentation/widgets/user_picker_dialog.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:his_mobile/core/security/credentials.dart';
 import 'package:intl/intl.dart' as intl;
 
 class ServiceExecuteDetailScreen extends StatefulWidget {
   final Map<String, dynamic> patient;
-  final List<Map<String, dynamic>>? serviceReqs; // danh sách dịch vụ của BN (optional, mặc định 1)
+  final List<Map<String, dynamic>>? serviceReqs; // danh sÃ¡ch dá»‹ch vá»¥ cá»§a BN (optional, máº·c Ä‘á»‹nh 1)
   final int? executeRoomId;
   final int? executeDepartmentId;
   const ServiceExecuteDetailScreen({
@@ -58,13 +59,13 @@ class _ServiceExecuteDetailScreenState extends State<ServiceExecuteDetailScreen>
   DateTime _startTime = DateTime.now();
   DateTime _endTime = DateTime.now().add(const Duration(minutes: 15));
   DateTime? _gpblTime;
-  final List<File> _images = []; // ảnh đính kèm
-  final List<int> _selectedServiceIds = []; // id các dịch vụ được chọn để thực hiện
+  final List<File> _images = []; // áº£nh Ä‘Ã­nh kÃ¨m
+  final List<int> _selectedServiceIds = []; // id cÃ¡c dá»‹ch vá»¥ Ä‘Æ°á»£c chá»n Ä‘á»ƒ thá»±c hiá»‡n
   bool _saving = false;
   String _debug = '';
 
-  // v3.1.05: Tabs hình ảnh
-  int _imageTab = 0; // 0=Góp kết quả, 1=Lưu ảnh, 2=Đính kèm ảnh
+  // v3.1.05: Tabs hÃ¬nh áº£nh
+  int _imageTab = 0; // 0=GÃ³p káº¿t quáº£, 1=LÆ°u áº£nh, 2=ÄÃ­nh kÃ¨m áº£nh
 
   @override
   void initState() {
@@ -86,13 +87,13 @@ class _ServiceExecuteDetailScreenState extends State<ServiceExecuteDetailScreen>
 
   Future<void> _loadCurrentUser() async {
     try {
-      // Mặc định = tên đăng nhập hiện tại (từ SharedPreferences)
+      // Máº·c Ä‘á»‹nh = tÃªn Ä‘Äƒng nháº­p hiá»‡n táº¡i (tá»« SharedPreferences)
       // ignore: deprecated_member_use
       // final username = await ...;
-      // For now: dùng tên từ patient context
-      _bsChinhCtrl.text = 'nemk';
+      // For now: dÃ¹ng tÃªn tá»« patient context
+      _bsChinhCtrl.text = Credentials.defaultNemkLogin;
     } catch (_) {
-      _bsChinhCtrl.text = 'nemk';
+      _bsChinhCtrl.text = Credentials.defaultNemkLogin;
     }
   }
 
@@ -180,7 +181,7 @@ class _ServiceExecuteDetailScreenState extends State<ServiceExecuteDetailScreen>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Lỗi chọn ảnh: $e'), backgroundColor: Colors.red),
+          SnackBar(content: Text('Lá»—i chá»n áº£nh: $e'), backgroundColor: Colors.red),
         );
       }
     }
@@ -194,34 +195,34 @@ class _ServiceExecuteDetailScreenState extends State<ServiceExecuteDetailScreen>
     return (dt.year * 10000000000 + dt.month * 100000000 + dt.day * 1000000 + dt.hour * 100 + dt.minute).toString();
   }
 
-  /// v3.1.05: Lưu + auto-finish tất cả dịch vụ được chọn
+  /// v3.1.05: LÆ°u + auto-finish táº¥t cáº£ dá»‹ch vá»¥ Ä‘Æ°á»£c chá»n
   Future<bool> _saveAndFinish() async {
     if (_ketQuaCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('⚠️ Vui lòng nhập kết quả trước khi lưu')),
+        const SnackBar(content: Text('âš ï¸ Vui lÃ²ng nháº­p káº¿t quáº£ trÆ°á»›c khi lÆ°u')),
       );
       return false;
     }
     if (_bsChinhCtrl.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('⚠️ Vui lòng nhập Bác sĩ chính')),
+        const SnackBar(content: Text('âš ï¸ Vui lÃ²ng nháº­p BÃ¡c sÄ© chÃ­nh')),
       );
       return false;
     }
     if (_selectedServiceIds.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('⚠️ Chưa chọn dịch vụ nào')),
+        const SnackBar(content: Text('âš ï¸ ChÆ°a chá»n dá»‹ch vá»¥ nÃ o')),
       );
       return false;
     }
 
     setState(() {
       _saving = true;
-      _debug = '⏳ Đang xử lý ${_selectedServiceIds.length} dịch vụ...';
+      _debug = 'â³ Äang xá»­ lÃ½ ${_selectedServiceIds.length} dá»‹ch vá»¥...';
     });
 
     try {
-      // 1. Lưu local (FormDraftService) - backup
+      // 1. LÆ°u local (FormDraftService) - backup
       final formData = {
         'form': 'SERVICE_EXECUTE',
         'patient_code': _patientCode,
@@ -255,11 +256,11 @@ class _ServiceExecuteDetailScreenState extends State<ServiceExecuteDetailScreen>
         debugPrint('FormDraftService save error: $e');
       }
 
-      // 2. Call finishServiceReqWithTime cho từng dịch vụ được chọn
+      // 2. Call finishServiceReqWithTime cho tá»«ng dá»‹ch vá»¥ Ä‘Æ°á»£c chá»n
       int successCount = 0;
       String lastError = '';
       for (final serviceReqId in _selectedServiceIds) {
-        setState(() => _debug = '⏳ FinishWithTime $serviceReqId... ($successCount/${_selectedServiceIds.length} xong)');
+        setState(() => _debug = 'â³ FinishWithTime $serviceReqId... ($successCount/${_selectedServiceIds.length} xong)');
         final result = await _api.finishServiceReqWithTime(
           serviceReqId: serviceReqId,
           startTime: _startTime,
@@ -269,7 +270,7 @@ class _ServiceExecuteDetailScreenState extends State<ServiceExecuteDetailScreen>
         if (result.success) {
           successCount++;
         } else {
-          lastError = result.message ?? 'Lỗi không xác định';
+          lastError = result.message ?? 'Lá»—i khÃ´ng xÃ¡c Ä‘á»‹nh';
           debugPrint('finishServiceReq $serviceReqId failed: $lastError');
         }
       }
@@ -279,11 +280,11 @@ class _ServiceExecuteDetailScreenState extends State<ServiceExecuteDetailScreen>
       if (successCount == _selectedServiceIds.length) {
         setState(() {
           _saving = false;
-          _debug = '✅ Hoàn thành $successCount dịch vụ';
+          _debug = 'âœ… HoÃ n thÃ nh $successCount dá»‹ch vá»¥';
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('✅ Đã hoàn thành $successCount dịch vụ${_images.isNotEmpty ? " + ${_images.length} ảnh" : ""}'),
+            content: Text('âœ… ÄÃ£ hoÃ n thÃ nh $successCount dá»‹ch vá»¥${_images.isNotEmpty ? " + ${_images.length} áº£nh" : ""}'),
             backgroundColor: Colors.green,
             duration: const Duration(seconds: 2),
           ),
@@ -295,11 +296,11 @@ class _ServiceExecuteDetailScreenState extends State<ServiceExecuteDetailScreen>
       } else {
         setState(() {
           _saving = false;
-          _debug = '⚠️ $successCount/${_selectedServiceIds.length} xong. Lỗi cuối: $lastError';
+          _debug = 'âš ï¸ $successCount/${_selectedServiceIds.length} xong. Lá»—i cuá»‘i: $lastError';
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('⚠️ $successCount/${_selectedServiceIds.length} OK. $lastError'),
+            content: Text('âš ï¸ $successCount/${_selectedServiceIds.length} OK. $lastError'),
             backgroundColor: Colors.orange,
             duration: const Duration(seconds: 4),
           ),
@@ -310,10 +311,10 @@ class _ServiceExecuteDetailScreenState extends State<ServiceExecuteDetailScreen>
       if (!mounted) return false;
       setState(() {
         _saving = false;
-        _debug = '❌ Lỗi: $e';
+        _debug = 'âŒ Lá»—i: $e';
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Lỗi: $e'), backgroundColor: Colors.red),
+        SnackBar(content: Text('âŒ Lá»—i: $e'), backgroundColor: Colors.red),
       );
       return false;
     }
@@ -321,16 +322,16 @@ class _ServiceExecuteDetailScreenState extends State<ServiceExecuteDetailScreen>
 
   String _buildResultNote() {
     final parts = <String>[];
-    if (_ketQuaCtrl.text.isNotEmpty) parts.add('Kết quả: ${_ketQuaCtrl.text}');
-    if (_moTaCtrl.text.isNotEmpty) parts.add('Mô tả: ${_moTaCtrl.text}');
-    if (_phuongPhapCtrl.text.isNotEmpty) parts.add('Phương pháp: ${_phuongPhapCtrl.text}');
-    if (_ketLuanCtrl.text.isNotEmpty) parts.add('\nKết luận: ${_ketLuanCtrl.text}');
-    if (_ghiChuCtrl.text.isNotEmpty) parts.add('\nGhi chú: ${_ghiChuCtrl.text}');
+    if (_ketQuaCtrl.text.isNotEmpty) parts.add('Káº¿t quáº£: ${_ketQuaCtrl.text}');
+    if (_moTaCtrl.text.isNotEmpty) parts.add('MÃ´ táº£: ${_moTaCtrl.text}');
+    if (_phuongPhapCtrl.text.isNotEmpty) parts.add('PhÆ°Æ¡ng phÃ¡p: ${_phuongPhapCtrl.text}');
+    if (_ketLuanCtrl.text.isNotEmpty) parts.add('\nKáº¿t luáº­n: ${_ketLuanCtrl.text}');
+    if (_ghiChuCtrl.text.isNotEmpty) parts.add('\nGhi chÃº: ${_ghiChuCtrl.text}');
     if (_bsChinhCtrl.text.isNotEmpty) parts.add('\nBS: ${_bsChinhCtrl.text}');
-    if (_ptvPhu1Ctrl.text.isNotEmpty) parts.add('PTV phụ 1: ${_ptvPhu1Ctrl.text}');
-    if (_ptvPhu2Ctrl.text.isNotEmpty) parts.add('PTV phụ 2: ${_ptvPhu2Ctrl.text}');
-    if (_gayMeChinhCtrl.text.isNotEmpty) parts.add('GM chính: ${_gayMeChinhCtrl.text}');
-    if (_ddCtrl.text.isNotEmpty) parts.add('ĐD: ${_ddCtrl.text}');
+    if (_ptvPhu1Ctrl.text.isNotEmpty) parts.add('PTV phá»¥ 1: ${_ptvPhu1Ctrl.text}');
+    if (_ptvPhu2Ctrl.text.isNotEmpty) parts.add('PTV phá»¥ 2: ${_ptvPhu2Ctrl.text}');
+    if (_gayMeChinhCtrl.text.isNotEmpty) parts.add('GM chÃ­nh: ${_gayMeChinhCtrl.text}');
+    if (_ddCtrl.text.isNotEmpty) parts.add('ÄD: ${_ddCtrl.text}');
     return parts.join(' | ');
   }
 
@@ -378,11 +379,11 @@ class _ServiceExecuteDetailScreenState extends State<ServiceExecuteDetailScreen>
       appBar: AppBar(
         backgroundColor: const Color(0xFF6A1B9A),
         foregroundColor: Colors.white,
-        title: Text('Xử lý yêu cầu - $_serviceName', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+        title: Text('Xá»­ lÃ½ yÃªu cáº§u - $_serviceName', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
             icon: const Icon(Icons.flash_on),
-            tooltip: 'Lưu + Kết thúc',
+            tooltip: 'LÆ°u + Káº¿t thÃºc',
             onPressed: _saving ? null : _saveAndFinish,
           ),
         ],
@@ -393,16 +394,16 @@ class _ServiceExecuteDetailScreenState extends State<ServiceExecuteDetailScreen>
           indicatorColor: Colors.amber,
           labelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600),
           tabs: const [
-            Tab(icon: Icon(Icons.assignment_turned_in, size: 14), text: 'Góp kết quả'),
-            Tab(icon: Icon(Icons.save_alt, size: 14), text: 'Lưu ảnh'),
-            Tab(icon: Icon(Icons.attach_file, size: 14), text: 'Đính kèm'),
+            Tab(icon: Icon(Icons.assignment_turned_in, size: 14), text: 'GÃ³p káº¿t quáº£'),
+            Tab(icon: Icon(Icons.save_alt, size: 14), text: 'LÆ°u áº£nh'),
+            Tab(icon: Icon(Icons.attach_file, size: 14), text: 'ÄÃ­nh kÃ¨m'),
           ],
         ),
       ),
       body: Column(children: [
         // ===== USER HEADER =====
         UserHeader.fromAuth(compact: true),
-        // ===== PATIENT INFO BAR (giống HIS Desktop "Thông tin bệnh nhân") =====
+        // ===== PATIENT INFO BAR (giá»‘ng HIS Desktop "ThÃ´ng tin bá»‡nh nhÃ¢n") =====
         _buildPatientInfoBar(),
         // ===== 3 TABS CONTENT =====
         Expanded(
@@ -429,7 +430,7 @@ class _ServiceExecuteDetailScreenState extends State<ServiceExecuteDetailScreen>
     );
   }
 
-  /// v3.1.05: Thanh thông tin BN (compact - giống HIS Desktop bên phải)
+  /// v3.1.05: Thanh thÃ´ng tin BN (compact - giá»‘ng HIS Desktop bÃªn pháº£i)
   Widget _buildPatientInfoBar() {
     return Container(
       width: double.infinity,
@@ -458,7 +459,7 @@ class _ServiceExecuteDetailScreenState extends State<ServiceExecuteDetailScreen>
               Text(_patientName, style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
               const SizedBox(height: 2),
               Text(
-                '${_patientCode.isNotEmpty ? "Mã BN: $_patientCode" : ""}${_treatmentCode.isNotEmpty ? " • ĐT: $_treatmentCode" : ""}',
+                '${_patientCode.isNotEmpty ? "MÃ£ BN: $_patientCode" : ""}${_treatmentCode.isNotEmpty ? " â€¢ ÄT: $_treatmentCode" : ""}',
                 style: const TextStyle(color: Colors.white70, fontSize: 10),
                 maxLines: 1, overflow: TextOverflow.ellipsis,
               ),
@@ -475,20 +476,20 @@ class _ServiceExecuteDetailScreenState extends State<ServiceExecuteDetailScreen>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(color: Colors.red.shade700, borderRadius: BorderRadius.circular(4)),
-            child: const Text('ƯU TIÊN', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+            child: const Text('Æ¯U TIÃŠN', style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
           ),
       ]),
     );
   }
 
-  /// v3.1.05: Tab "Góp kết quả" - Form thực hiện (giống HIS Desktop PHIẾU ĐIỆN TIM)
+  /// v3.1.05: Tab "GÃ³p káº¿t quáº£" - Form thá»±c hiá»‡n (giá»‘ng HIS Desktop PHIáº¾U ÄIá»†N TIM)
   Widget _buildResultTab() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(8),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // Dịch vụ yêu cầu (checkboxes)
+        // Dá»‹ch vá»¥ yÃªu cáº§u (checkboxes)
         if (widget.serviceReqs != null && widget.serviceReqs!.length > 1) ...[
-          _sectionTitleWithIcon('DỊCH VỤ YÊU CẦU', Icons.assignment, const Color(0xFF303F9F)),
+          _sectionTitleWithIcon('Dá»ŠCH Vá»¤ YÃŠU Cáº¦U', Icons.assignment, const Color(0xFF303F9F)),
           ...widget.serviceReqs!.map((s) {
             final id = int.tryParse((s['ID'] ?? s['id'] ?? '0').toString()) ?? 0;
             final name = (s['SERVICE_NAME'] ?? s['service_name'] ?? '').toString();
@@ -514,97 +515,97 @@ class _ServiceExecuteDetailScreenState extends State<ServiceExecuteDetailScreen>
           }),
           const SizedBox(height: 8),
         ],
-        // Thời gian
-        _sectionTitle('⏱ THỜI GIAN', const Color(0xFF303F9F)),
+        // Thá»i gian
+        _sectionTitle('â± THá»œI GIAN', const Color(0xFF303F9F)),
         Row(children: [
-          Expanded(child: _dateTimeField('Bắt đầu', _startTime, () => _pickDateTime(isStart: true, isGpbl: false))),
+          Expanded(child: _dateTimeField('Báº¯t Ä‘áº§u', _startTime, () => _pickDateTime(isStart: true, isGpbl: false))),
           const SizedBox(width: 6),
-          Expanded(child: _dateTimeField('Kết thúc', _endTime, () => _pickDateTime(isStart: false, isGpbl: false))),
+          Expanded(child: _dateTimeField('Káº¿t thÃºc', _endTime, () => _pickDateTime(isStart: false, isGpbl: false))),
         ]),
         const SizedBox(height: 6),
-        _dateTimeField('Giờ GPBL (trả kết quả)', _gpblTime, () => _pickDateTime(isStart: false, isGpbl: true), isOptional: true),
+        _dateTimeField('Giá» GPBL (tráº£ káº¿t quáº£)', _gpblTime, () => _pickDateTime(isStart: false, isGpbl: true), isOptional: true),
         const SizedBox(height: 10),
-        // Kết quả
-        _sectionTitle('📋 KẾT QUẢ', const Color(0xFF1976D2)),
+        // Káº¿t quáº£
+        _sectionTitle('ðŸ“‹ Káº¾T QUáº¢', const Color(0xFF1976D2)),
         TextField(
           controller: _ketQuaCtrl,
           minLines: 4, maxLines: 8,
           decoration: const InputDecoration(
-            hintText: 'Nhập kết quả (bắt buộc) - VD: "NHỊP XOANG ĐỀU TẦN SỐ 82 LẦN / PHÚT"',
+            hintText: 'Nháº­p káº¿t quáº£ (báº¯t buá»™c) - VD: "NHá»ŠP XOANG Äá»€U Táº¦N Sá» 82 Láº¦N / PHÃšT"',
             border: OutlineInputBorder(), filled: true, fillColor: Colors.white, isDense: true,
           ),
         ),
         const SizedBox(height: 8),
-        // Mô tả + Phương pháp
-        _sectionTitle('📝 MÔ TẢ', const Color(0xFF616161)),
+        // MÃ´ táº£ + PhÆ°Æ¡ng phÃ¡p
+        _sectionTitle('ðŸ“ MÃ” Táº¢', const Color(0xFF616161)),
         TextField(
           controller: _moTaCtrl,
           minLines: 2, maxLines: 4,
           decoration: const InputDecoration(
-            hintText: 'Mô tả chi tiết (không bắt buộc)',
+            hintText: 'MÃ´ táº£ chi tiáº¿t (khÃ´ng báº¯t buá»™c)',
             border: OutlineInputBorder(), filled: true, fillColor: Colors.white, isDense: true,
           ),
         ),
         const SizedBox(height: 6),
-        _sectionTitle('🔬 PHƯƠNG PHÁP', const Color(0xFF00897B)),
+        _sectionTitle('ðŸ”¬ PHÆ¯Æ NG PHÃP', const Color(0xFF00897B)),
         TextField(
           controller: _phuongPhapCtrl,
           minLines: 1, maxLines: 2,
           decoration: const InputDecoration(
-            hintText: 'Phương pháp thực hiện (không bắt buộc)',
+            hintText: 'PhÆ°Æ¡ng phÃ¡p thá»±c hiá»‡n (khÃ´ng báº¯t buá»™c)',
             border: OutlineInputBorder(), filled: true, fillColor: Colors.white, isDense: true,
           ),
         ),
         const SizedBox(height: 8),
-        // Kết luận
-        _sectionTitle('🔍 KẾT LUẬN', const Color(0xFF388E3C)),
+        // Káº¿t luáº­n
+        _sectionTitle('ðŸ” Káº¾T LUáº¬N', const Color(0xFF388E3C)),
         TextField(
           controller: _ketLuanCtrl,
           minLines: 2, maxLines: 4,
           decoration: const InputDecoration(
-            hintText: 'Kết luận của bác sĩ (không bắt buộc)',
+            hintText: 'Káº¿t luáº­n cá»§a bÃ¡c sÄ© (khÃ´ng báº¯t buá»™c)',
             border: OutlineInputBorder(), filled: true, fillColor: Colors.white, isDense: true,
           ),
         ),
         const SizedBox(height: 8),
-        // Ghi chú
-        _sectionTitle('📋 GHI CHÚ', const Color(0xFFE65100)),
+        // Ghi chÃº
+        _sectionTitle('ðŸ“‹ GHI CHÃš', const Color(0xFFE65100)),
         TextField(
           controller: _ghiChuCtrl,
           minLines: 1, maxLines: 3,
           decoration: const InputDecoration(
-            hintText: 'Ghi chú thêm (không bắt buộc)',
+            hintText: 'Ghi chÃº thÃªm (khÃ´ng báº¯t buá»™c)',
             border: OutlineInputBorder(), filled: true, fillColor: Colors.white, isDense: true,
           ),
         ),
         const SizedBox(height: 10),
-        // Kíp thực hiện (5 vị trí - giống HIS Desktop)
-        _sectionTitle('👥 KÍP THỰC HIỆN', const Color(0xFFD32F2F)),
-        _kipField('BS / PTV chính *', Icons.medical_services, _bsChinhCtrl, required: true),
-        _kipField('PTV phụ 1', Icons.medical_services_outlined, _ptvPhu1Ctrl),
-        _kipField('PTV phụ 2', Icons.medical_services_outlined, _ptvPhu2Ctrl),
-        _kipField('Gây mê chính', Icons.healing, _gayMeChinhCtrl),
-        _kipField('Gây mê phụ 1', Icons.healing_outlined, _gayMePhuCtrl),
-        _kipField('Điều dưỡng', Icons.health_and_safety, _ddCtrl),
+        // KÃ­p thá»±c hiá»‡n (5 vá»‹ trÃ­ - giá»‘ng HIS Desktop)
+        _sectionTitle('ðŸ‘¥ KÃP THá»°C HIá»†N', const Color(0xFFD32F2F)),
+        _kipField('BS / PTV chÃ­nh *', Icons.medical_services, _bsChinhCtrl, required: true),
+        _kipField('PTV phá»¥ 1', Icons.medical_services_outlined, _ptvPhu1Ctrl),
+        _kipField('PTV phá»¥ 2', Icons.medical_services_outlined, _ptvPhu2Ctrl),
+        _kipField('GÃ¢y mÃª chÃ­nh', Icons.healing, _gayMeChinhCtrl),
+        _kipField('GÃ¢y mÃª phá»¥ 1', Icons.healing_outlined, _gayMePhuCtrl),
+        _kipField('Äiá»u dÆ°á»¡ng', Icons.health_and_safety, _ddCtrl),
         const SizedBox(height: 12),
       ]),
     );
   }
 
-  /// v3.1.05: Tab "Lưu ảnh" - Lưu ảnh kết quả
+  /// v3.1.05: Tab "LÆ°u áº£nh" - LÆ°u áº£nh káº¿t quáº£
   Widget _buildSaveImageTab() {
     return _buildImageTabContent(
-      title: 'LƯU ẢNH KẾT QUẢ',
-      desc: 'Lưu ảnh kết quả (điện tim, X-quang, v.v.) vào hồ sơ',
+      title: 'LÆ¯U áº¢NH Káº¾T QUáº¢',
+      desc: 'LÆ°u áº£nh káº¿t quáº£ (Ä‘iá»‡n tim, X-quang, v.v.) vÃ o há»“ sÆ¡',
       color: const Color(0xFF00838F),
     );
   }
 
-  /// v3.1.05: Tab "Đính kèm" - Đính kèm ảnh
+  /// v3.1.05: Tab "ÄÃ­nh kÃ¨m" - ÄÃ­nh kÃ¨m áº£nh
   Widget _buildAttachTab() {
     return _buildImageTabContent(
-      title: 'ĐÍNH KÈM ẢNH',
-      desc: 'Đính kèm ảnh vào EMR bệnh nhân',
+      title: 'ÄÃNH KÃˆM áº¢NH',
+      desc: 'ÄÃ­nh kÃ¨m áº£nh vÃ o EMR bá»‡nh nhÃ¢n',
       color: const Color(0xFFAD1457),
     );
   }
@@ -628,7 +629,7 @@ class _ServiceExecuteDetailScreenState extends State<ServiceExecuteDetailScreen>
             child: ElevatedButton.icon(
               onPressed: () => _pickImage(source: ImageSource.camera),
               icon: const Icon(Icons.camera_alt, size: 16),
-              label: const Text('Chụp ảnh', style: TextStyle(fontSize: 12)),
+              label: const Text('Chá»¥p áº£nh', style: TextStyle(fontSize: 12)),
               style: ElevatedButton.styleFrom(
                 backgroundColor: color, foregroundColor: Colors.white,
                 padding: const EdgeInsets.symmetric(vertical: 10),
@@ -640,7 +641,7 @@ class _ServiceExecuteDetailScreenState extends State<ServiceExecuteDetailScreen>
             child: OutlinedButton.icon(
               onPressed: () => _pickImage(source: ImageSource.gallery),
               icon: const Icon(Icons.photo_library, size: 16),
-              label: const Text('Thư viện', style: TextStyle(fontSize: 12)),
+              label: const Text('ThÆ° viá»‡n', style: TextStyle(fontSize: 12)),
               style: OutlinedButton.styleFrom(
                 foregroundColor: color, side: BorderSide(color: color),
                 padding: const EdgeInsets.symmetric(vertical: 10),
@@ -652,7 +653,7 @@ class _ServiceExecuteDetailScreenState extends State<ServiceExecuteDetailScreen>
         Row(children: [
           Icon(Icons.image, size: 14, color: Colors.black54),
           const SizedBox(width: 4),
-          Text('${_images.length} ảnh đã chọn', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+          Text('${_images.length} áº£nh Ä‘Ã£ chá»n', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
         ]),
         const SizedBox(height: 6),
         if (_images.isEmpty)
@@ -663,7 +664,7 @@ class _ServiceExecuteDetailScreenState extends State<ServiceExecuteDetailScreen>
               borderRadius: BorderRadius.circular(6),
               border: Border.all(color: Colors.grey.shade300, style: BorderStyle.solid),
             ),
-            child: const Center(child: Text('Chưa có ảnh. Chụp hoặc chọn từ thư viện.', style: TextStyle(color: Colors.black45, fontSize: 12))),
+            child: const Center(child: Text('ChÆ°a cÃ³ áº£nh. Chá»¥p hoáº·c chá»n tá»« thÆ° viá»‡n.', style: TextStyle(color: Colors.black45, fontSize: 12))),
           )
         else
           GridView.builder(
@@ -700,7 +701,7 @@ class _ServiceExecuteDetailScreenState extends State<ServiceExecuteDetailScreen>
             Icon(Icons.lightbulb_outline, size: 14, color: Color(0xFFE65100)),
             SizedBox(width: 6),
             Expanded(child: Text(
-              'Lưu ý: Sau khi lưu, dùng menu "Đính kèm tài liệu" trong thao tác BN để upload ảnh lên EMR.',
+              'LÆ°u Ã½: Sau khi lÆ°u, dÃ¹ng menu "ÄÃ­nh kÃ¨m tÃ i liá»‡u" trong thao tÃ¡c BN Ä‘á»ƒ upload áº£nh lÃªn EMR.',
               style: TextStyle(fontSize: 11, color: Color(0xFFE65100)),
             )),
           ]),
@@ -750,7 +751,7 @@ class _ServiceExecuteDetailScreenState extends State<ServiceExecuteDetailScreen>
                 if (dt != null)
                   Text(_formatDateTime(dt), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600))
                 else
-                  Text(isOptional ? '(không bắt buộc)' : '(chưa chọn)', style: const TextStyle(fontSize: 11, color: Colors.black38, fontStyle: FontStyle.italic)),
+                  Text(isOptional ? '(khÃ´ng báº¯t buá»™c)' : '(chÆ°a chá»n)', style: const TextStyle(fontSize: 11, color: Colors.black38, fontStyle: FontStyle.italic)),
               ],
             ),
           ),
@@ -779,7 +780,7 @@ class _ServiceExecuteDetailScreenState extends State<ServiceExecuteDetailScreen>
         const SizedBox(width: 4),
         IconButton(
           icon: const Icon(Icons.person_search, size: 20, color: Color(0xFF6A1B9A)),
-          tooltip: 'Chọn từ HIS Pro',
+          tooltip: 'Chá»n tá»« HIS Pro',
           onPressed: () => _pickUser(ctrl, label),
           padding: EdgeInsets.zero,
           constraints: const BoxConstraints(),
@@ -788,16 +789,16 @@ class _ServiceExecuteDetailScreenState extends State<ServiceExecuteDetailScreen>
     );
   }
 
-  /// v3.1.05: Picker user từ HIS Pro (api/HisExecuteRoleUser/Get)
-  /// Hiển thị danh sách BS/ĐD theo role để chọn nhanh
-  /// v3.0.174: Dùng shared UserPickerDialog (có search filter ở top) thay vì _UserPickerDialog cũ
+  /// v3.1.05: Picker user tá»« HIS Pro (api/HisExecuteRoleUser/Get)
+  /// Hiá»ƒn thá»‹ danh sÃ¡ch BS/ÄD theo role Ä‘á»ƒ chá»n nhanh
+  /// v3.0.174: DÃ¹ng shared UserPickerDialog (cÃ³ search filter á»Ÿ top) thay vÃ¬ _UserPickerDialog cÅ©
   Future<void> _pickUser(TextEditingController ctrl, String label) async {
     showDialog(
       context: context,
       builder: (ctx) => UserPickerDialog(
         api: _api,
         departmentId: widget.executeDepartmentId ?? 22, // HSCC default
-        title: 'Chọn $label',
+        title: 'Chá»n $label',
         onSelected: (result) {
           setState(() {
             ctrl.text = '${result.fullName} (${result.loginName})';
@@ -821,7 +822,7 @@ class _ServiceExecuteDetailScreenState extends State<ServiceExecuteDetailScreen>
             child: OutlinedButton.icon(
               onPressed: _saving ? null : () => Navigator.pop(context, false),
               icon: const Icon(Icons.close, size: 16),
-              label: const Text('Hủy', style: TextStyle(fontSize: 12)),
+              label: const Text('Há»§y', style: TextStyle(fontSize: 12)),
               style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12)),
             ),
           ),
@@ -834,7 +835,7 @@ class _ServiceExecuteDetailScreenState extends State<ServiceExecuteDetailScreen>
                   ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                   : const Icon(Icons.flash_on, size: 16),
               label: Text(
-                _saving ? 'Đang xử lý...' : 'Hoàn thành & Kết thúc (${_selectedServiceIds.length})',
+                _saving ? 'Äang xá»­ lÃ½...' : 'HoÃ n thÃ nh & Káº¿t thÃºc (${_selectedServiceIds.length})',
                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
               ),
               style: ElevatedButton.styleFrom(

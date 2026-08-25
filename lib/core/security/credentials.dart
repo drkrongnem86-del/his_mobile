@@ -61,6 +61,36 @@ class Credentials {
   /// Thongke public default password
   /// XOR-encoded
   static final String thongkeDefaultPassword = _decode('c2ZteQ==');
+
+  // ============ Default HIS login (nemk/1027) ============
+  // v3.0.177: Tất cả nơi hardcode 'nemk' / '1027' đều tham chiếu qua đây
+  // - Login screen cũng dùng giá trị này làm default
+  // - Khi user nhập user/pass mới ở login chính → sẽ override qua setActiveNemkCredentials()
+  static const String defaultNemkLogin = 'nemk';
+  static const String defaultNemkPassword = '1027';
+
+  // v3.0.177: Active credentials - được set bởi login screen khi user nhập
+  // Tất cả chỗ dùng credentials nên đọc currentNemkLogin / currentNemkPassword
+  // (không dùng defaultNemkLogin trực tiếp) để sync với login state
+  static String _activeNemkLogin = defaultNemkLogin;
+  static String _activeNemkPassword = defaultNemkPassword;
+
+  /// Lấy username hiện tại (sync với login nếu user đã đăng nhập)
+  static String get currentNemkLogin => _activeNemkLogin;
+  static String get currentNemkPassword => _activeNemkPassword;
+
+  /// Set credentials khi user đăng nhập thành công (gọi từ login_screen)
+  /// Sau khi gọi, tất cả chỗ dùng `Credentials.currentNemkLogin` sẽ thấy giá trị mới
+  static void setActiveNemkCredentials({required String login, required String password}) {
+    _activeNemkLogin = login;
+    _activeNemkPassword = password;
+  }
+
+  /// Reset về default (khi logout)
+  static void resetActiveNemkCredentials() {
+    _activeNemkLogin = defaultNemkLogin;
+    _activeNemkPassword = defaultNemkPassword;
+  }
 }
 
 /// Khi cần dùng 1 trong các credentials, gọi:

@@ -1,10 +1,10 @@
-// ViewAllFormsScreen - màn hình "Xem tất cả phiếu của BN" y như Y Tế Số:
-// - Timeline view tất cả phiếu đã ghi cho BN, sắp xếp MỚI NHẤT
+﻿// ViewAllFormsScreen - mÃ n hÃ¬nh "Xem táº¥t cáº£ phiáº¿u cá»§a BN" y nhÆ° Y Táº¿ Sá»‘:
+// - Timeline view táº¥t cáº£ phiáº¿u Ä‘Ã£ ghi cho BN, sáº¯p xáº¿p Má»šI NHáº¤T
 // - Filter chip theo clinical note type
-// - Tap để xem chi tiết từng phiếu
-// - Group header theo ngày (Hôm nay / Hôm qua / dd/MM/yyyy)
+// - Tap Ä‘á»ƒ xem chi tiáº¿t tá»«ng phiáº¿u
+// - Group header theo ngÃ y (HÃ´m nay / HÃ´m qua / dd/MM/yyyy)
 // - Pull-to-refresh
-// - Empty state với CTA "Tạo phiếu đầu tiên"
+// - Empty state vá»›i CTA "Táº¡o phiáº¿u Ä‘áº§u tiÃªn"
 import 'package:flutter/material.dart';
 import 'package:his_mobile/core/utils/vietnamese.dart';
 import 'package:his_mobile/data/api/thongke_auth_service.dart';
@@ -13,6 +13,7 @@ import 'package:his_mobile/presentation/widgets/clinical_note_screen.dart';
 import 'package:his_mobile/presentation/widgets/patient_header.dart';
 import 'package:his_mobile/presentation/widgets/user_header.dart';
 
+import 'package:his_mobile/core/security/credentials.dart';
 class ViewAllFormsScreen extends StatefulWidget {
   final Map<String, dynamic> patient;
   final Map<String, dynamic> department;
@@ -48,7 +49,7 @@ class _ViewAllFormsScreenState extends State<ViewAllFormsScreen> {
 
   String get _patientName => _g('TDL_PATIENT_UNSIGNED_NAME', 'TDL_PATIENT_UNSIGNED_NAME', 'TDL_PATIENT_NAME');
 
-  String get _createdBy => _auth.currentUsername ?? 'nemk';
+  String get _createdBy => _auth.currentUsername ?? Credentials.defaultNemkLogin;
 
   @override
   void initState() {
@@ -86,12 +87,12 @@ class _ViewAllFormsScreenState extends State<ViewAllFormsScreen> {
     final yesterday = today.subtract(const Duration(days: 1));
     final noteDay = DateTime(t.year, t.month, t.day);
     String two(int n) => n.toString().padLeft(2, '0');
-    if (noteDay == today) return '🕐 HÔM NAY  •  ${two(t.hour)}:${two(t.minute)}';
-    if (noteDay == yesterday) return 'HÔM QUA  •  ${two(t.day)}/${two(t.month)}';
+    if (noteDay == today) return 'ðŸ• HÃ”M NAY  â€¢  ${two(t.hour)}:${two(t.minute)}';
+    if (noteDay == yesterday) return 'HÃ”M QUA  â€¢  ${two(t.day)}/${two(t.month)}';
     return '${two(t.day)}/${two(t.month)}/${t.year}';
   }
 
-  /// Lấy giá trị hiển thị ngắn gọn (80 chars) từ data map
+  /// Láº¥y giÃ¡ trá»‹ hiá»ƒn thá»‹ ngáº¯n gá»n (80 chars) tá»« data map
   String _preview(ClinicalNote n) {
     final entries = n.data.entries.where((e) {
       final v = e.value;
@@ -110,18 +111,18 @@ class _ViewAllFormsScreenState extends State<ViewAllFormsScreen> {
         val = v.toString();
       }
       final keyHuman = _humanKey(e.key);
-      buffer.writeln('• $keyHuman: ${val.length > 60 ? val.substring(0, 60) : val}');
+      buffer.writeln('â€¢ $keyHuman: ${val.length > 60 ? val.substring(0, 60) : val}');
     }
     return buffer.toString().trim();
   }
 
   String _humanKey(String key) {
     const map = {
-      'tenthuoc': 'Tên thuốc', 'soluong': 'SL', 'tomtat': 'Tóm tắt',
-      'chandoan': 'Chẩn đoán', 'huongdieutri': 'Hướng ĐT',
-      'mach': 'Mạch', 'huyetap_tamthu': 'HA tâm thu', 'huyetap_tamtruong': 'HA tâm trương',
-      'nhietdo': 'NĐ', 'spo2': 'SpO2', 'nhiptho': 'NT',
-      'lydo': 'Lý do', 'ketqua': 'Kết quả', 'nguon_thong_tin': 'Nguồn',
+      'tenthuoc': 'TÃªn thuá»‘c', 'soluong': 'SL', 'tomtat': 'TÃ³m táº¯t',
+      'chandoan': 'Cháº©n Ä‘oÃ¡n', 'huongdieutri': 'HÆ°á»›ng ÄT',
+      'mach': 'Máº¡ch', 'huyetap_tamthu': 'HA tÃ¢m thu', 'huyetap_tamtruong': 'HA tÃ¢m trÆ°Æ¡ng',
+      'nhietdo': 'NÄ', 'spo2': 'SpO2', 'nhiptho': 'NT',
+      'lydo': 'LÃ½ do', 'ketqua': 'Káº¿t quáº£', 'nguon_thong_tin': 'Nguá»“n',
     };
     return map[key] ?? key;
   }
@@ -138,7 +139,7 @@ class _ViewAllFormsScreenState extends State<ViewAllFormsScreen> {
     return {for (final k in keys) k: grouped[k]!};
   }
 
-  /// Card hiển thị 1 note trong timeline
+  /// Card hiá»ƒn thá»‹ 1 note trong timeline
   Widget _noteCard(ClinicalNote n) {
     final accent = Color(n.type.colorValue);
     return Container(
@@ -239,7 +240,7 @@ class _ViewAllFormsScreenState extends State<ViewAllFormsScreen> {
                     ],
                   ),
                 ),
-                // Icon xem chi tiết
+                // Icon xem chi tiáº¿t
                 Icon(Icons.chevron_right, color: Colors.black26, size: 18),
               ],
             ),
@@ -250,7 +251,7 @@ class _ViewAllFormsScreenState extends State<ViewAllFormsScreen> {
   }
 
   void _openNote(ClinicalNote n) {
-    // Mở ClinicalNoteScreen ở chế độ xem (không cho save) - dùng dialog đơn giản
+    // Má»Ÿ ClinicalNoteScreen á»Ÿ cháº¿ Ä‘á»™ xem (khÃ´ng cho save) - dÃ¹ng dialog Ä‘Æ¡n giáº£n
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -297,7 +298,7 @@ class _ViewAllFormsScreenState extends State<ViewAllFormsScreen> {
               }),
               if (n.note.isNotEmpty) ...[
                 const Divider(),
-                Text('Ghi chú: ${n.note}',
+                Text('Ghi chÃº: ${n.note}',
                     style: const TextStyle(color: Colors.black87, fontSize: 12, fontStyle: FontStyle.italic)),
               ],
             ],
@@ -307,21 +308,21 @@ class _ViewAllFormsScreenState extends State<ViewAllFormsScreen> {
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
-              // Mở phiếu mới cùng loại
+              // Má»Ÿ phiáº¿u má»›i cÃ¹ng loáº¡i
               Navigator.push(context, MaterialPageRoute(builder: (_) =>
                 ClinicalNoteScreen(
                   type: n.type,
                   patient: widget.patient,
                   department: widget.department,
-                  fields: const [],  // Empty - user sẽ thấy form rỗng cho loại này
+                  fields: const [],  // Empty - user sáº½ tháº¥y form rá»—ng cho loáº¡i nÃ y
                 ),
               )).then((_) => _load());
             },
-            child: const Text('Tạo phiếu mới cùng loại'),
+            child: const Text('Táº¡o phiáº¿u má»›i cÃ¹ng loáº¡i'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Đóng'),
+            child: const Text('ÄÃ³ng'),
           ),
         ],
       ),
@@ -345,7 +346,7 @@ class _ViewAllFormsScreenState extends State<ViewAllFormsScreen> {
         child: Row(
           children: [
             FilterChip(
-              label: const Text('Tất cả', style: TextStyle(fontSize: 11)),
+              label: const Text('Táº¥t cáº£', style: TextStyle(fontSize: 11)),
               selected: _filterTypes.values.every((v) => v) || _filterTypes.values.where((v) => v).length == activeTypes.length,
               onSelected: (v) => setState(() {
                 for (final t in activeTypes) {
@@ -392,13 +393,13 @@ class _ViewAllFormsScreenState extends State<ViewAllFormsScreen> {
             Icon(Icons.inventory_2_outlined, size: 64, color: Colors.black26),
             const SizedBox(height: 12),
             Text(
-              'Chưa có phiếu nào của BN $_patientName',
+              'ChÆ°a cÃ³ phiáº¿u nÃ o cá»§a BN $_patientName',
               style: const TextStyle(color: Colors.black87, fontSize: 14, fontWeight: FontWeight.w600),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 6),
             const Text(
-              'Mở [Thao tác] ở menu BN → chọn tác vụ → Lưu phiếu.\nTất cả phiếu sẽ hiện ở đây.',
+              'Má»Ÿ [Thao tÃ¡c] á»Ÿ menu BN â†’ chá»n tÃ¡c vá»¥ â†’ LÆ°u phiáº¿u.\nTáº¥t cáº£ phiáº¿u sáº½ hiá»‡n á»Ÿ Ä‘Ã¢y.',
               style: TextStyle(color: Colors.black54, fontSize: 11),
               textAlign: TextAlign.center,
             ),
@@ -411,7 +412,7 @@ class _ViewAllFormsScreenState extends State<ViewAllFormsScreen> {
                 border: Border.all(color: Colors.green.shade200),
               ),
               child: Text(
-                '${ClinicalNoteType.values.length} loại phiếu có sẵn trên app',
+                '${ClinicalNoteType.values.length} loáº¡i phiáº¿u cÃ³ sáºµn trÃªn app',
                 style: TextStyle(color: Colors.green.shade700, fontSize: 11, fontWeight: FontWeight.bold),
               ),
             ),
@@ -432,7 +433,7 @@ class _ViewAllFormsScreenState extends State<ViewAllFormsScreen> {
         autocorrect: false,
         enableSuggestions: false,
         decoration: InputDecoration(
-          hintText: 'Tìm trong các phiếu (tên thuốc, Mã ICD, nội dung...)',
+          hintText: 'TÃ¬m trong cÃ¡c phiáº¿u (tÃªn thuá»‘c, MÃ£ ICD, ná»™i dung...)',
           hintStyle: const TextStyle(color: Colors.black45, fontSize: 12),
           prefixIcon: const Icon(Icons.search, color: Colors.indigo, size: 18),
           suffixIcon: _searchQuery.isNotEmpty
@@ -492,7 +493,7 @@ class _ViewAllFormsScreenState extends State<ViewAllFormsScreen> {
         foregroundColor: Colors.white,
         title: Row(
           children: [
-            const Text('📋 Tất cả phiếu', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+            const Text('ðŸ“‹ Táº¥t cáº£ phiáº¿u', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
             const Spacer(),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -503,7 +504,7 @@ class _ViewAllFormsScreenState extends State<ViewAllFormsScreen> {
           ],
         ),
         actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _load, tooltip: 'Làm mới'),
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _load, tooltip: 'LÃ m má»›i'),
         ],
       ),
       body: Column(
@@ -550,7 +551,7 @@ class _ViewAllFormsScreenState extends State<ViewAllFormsScreen> {
                                         color: Colors.indigo.shade100,
                                       ),
                                     ),
-                                    Text('${entry.value.length} phiếu',
+                                    Text('${entry.value.length} phiáº¿u',
                                         style: const TextStyle(color: Colors.black45, fontSize: 10)),
                                   ],
                                 ),
