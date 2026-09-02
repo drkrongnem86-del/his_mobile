@@ -125,4 +125,7 @@ lib/**/_*.bak
 # v3.0.118: Android release keystore (KHONG commit - bao mat)
 android/app/*.jks
 android/app/*.keystore
+# v3.0.183: Release keystore ở root level (khi build dev local, copy tu D:\tool\)
+android/*.jks
+android/*.keystore
 
