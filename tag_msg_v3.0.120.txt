@@ -1,0 +1,5 @@
+v3.0.120: Fix build.yml workflow - bỏ if: secrets.X (GitHub cấm)
+
+- build.yml: keystore decode step fix (continue-on-error + runtime check)
+- build.yml: update-version-json với ref: main checkout
+- Bump 3.0.119+263 -> 3.0.120+264

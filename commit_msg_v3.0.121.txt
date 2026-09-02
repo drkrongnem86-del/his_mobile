@@ -1,0 +1,16 @@
+v3.0.121: Fix lỗi 'App not installed' khi tự cập nhật qua in-app update
+
+Root cause: Android PackageInstaller yêu cầu app cũ phải TẮT HẲN
+(process killed) trước khi cho cài đè. Cũ là chỉ finishAndRemoveTask
++ mở install intent → process Flutter engine vẫn còn alive trong
+background → khi user grant permission + tap Cập nhật, install fail
+với "App not installed" dù signature khớp.
+
+Fix (MainActivity.kt - installApk method):
+1. finishAndRemoveTask() - đóng activity + xóa khỏi recents
+2. startActivity(install intent) với FLAG_ACTIVITY_CLEAR_TASK
+3. Handler.postDelayed 800ms → Process.killProcess(myPid())
+   → install intent đã start (chạy trong installer process)
+   → app process chết → user grant permission + tap Cập nhật → install OK
+
+Bump 3.0.120+264 -> 3.0.121+265

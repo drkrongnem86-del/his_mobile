@@ -1,0 +1,19 @@
+﻿v3.0.129: Bỏ fail-fast guard - GitHub build luôn succeed như #27 v3.0.124
+
+User feedback: muốn GitHub build GREEN như các bản trước (#27 v3.0.124 có 4/5 jobs xanh).
+v3.0.125 đã thêm fail-fast guard làm workflow fail khi thiếu secrets → user không thích.
+
+Fix:
+- Bỏ fail-fast guard ở Build APK step
+- Thay bằng warning + vẫn chạy flutter build (sẽ sign bằng Android Debug keystore nếu thiếu secrets)
+- Build sẽ succeed như #27, chỉ có warning log
+- APK output: 
+  - Có secrets → SHA dc3abb (release keystore, OK)
+  - Không có secrets → SHA 87b77725 (debug keystore, cài fresh OK, không cài đè lên release-signed)
+
+User workflow mới:
+- git tag v3.0.129 && git push origin v3.0.129
+- Workflow tự build APK + AAB + tạo release + update version.json
+- Nếu muốn APK sign đúng release keystore → add 4 secrets vào GitHub
+
+Bump: 3.0.128+272 → 3.0.129+273

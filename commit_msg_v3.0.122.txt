@@ -1,0 +1,14 @@
+v3.0.122: Thêm nút TẢI VỀ trong dialog update
+
+- update_service.dart: Dialog update có 3 nút
+  - HỦY: đóng dialog
+  - TẢI VỀ (màu cam): tải APK về Download/HisMobile/ qua native MethodChannel
+    → user mở File Manager tap file APK cài (tránh lỗi App not installed)
+  - ĐỒNG Ý: download + install in-app (giữ nguyên flow cũ)
+- MainActivity.kt: Method mới 'saveApkToDownloads'
+  - Android 10+: MediaStore.Downloads (scoped storage, không cần permission)
+  - Android 9-: direct file write to Environment.DIRECTORY_DOWNLOADS/HisMobile
+- AndroidManifest.xml: WRITE_EXTERNAL_STORAGE chỉ dành cho API <= 28
+  (Android 10+ dùng MediaStore nên không cần permission)
+
+Bump 3.0.121+265 -> 3.0.122+266

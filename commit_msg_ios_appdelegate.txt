@@ -1,0 +1,14 @@
+Fix iOS build: thêm ios/Runner/AppDelegate.swift (file bị thiếu)
+
+Root cause: Xcode project (project.pbxproj) reference cả
+AppDelegate.swift + SceneDelegate.swift trong Sources build phase.
+Nhưng chỉ có SceneDelegate.swift tồn tại → Xcode build fail:
+"Build input file cannot be found: '.../ios/Runner/AppDelegate.swift'"
+
+Fix: tạo ios/Runner/AppDelegate.swift với nội dung Flutter iOS chuẩn
+(extend FlutterAppDelegate, GeneratedPluginRegistrant.register)
+- File bị thiếu từ khi project migrate sang SceneDelegate (iOS 13+)
+- AppDelegate vẫn cần thiết làm entry point cho plugin registration
+- SceneDelegate (FlutterSceneDelegate) handle window/scene setup riêng
+
+Build trên Codemagic (iOS IPA) sẽ work sau khi push file này.

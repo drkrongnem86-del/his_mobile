@@ -1,0 +1,26 @@
+v3.0.123: Fix lỗi 'App not installed' lần 2 - dùng PackageInstaller API
+
+Root cause v3.0.121: Intent.ACTION_VIEW + finishAndRemoveTask + killProcess
+vẫn fail trên Samsung A17 do timing - 800ms không đủ để hệ thống check
+app state trước khi install.
+
+Fix v3.0.123: Dùng PackageInstaller.Session API (officially supported
+cho in-app update từ Android 5.0+):
+- Hệ thống tự quản lý self-update lifecycle
+- KHÔNG cần kill process
+- Hoạt động đúng trên mọi thiết bị
+
+MainActivity.kt - installApk refactor:
+- Tạo PackageInstaller.Session
+- Mở session, ghi APK vào session stream
+- Commit session với PendingIntent (FLAG_MUTABLE trên Android 12+)
+- Hệ thống tự hiển thị install dialog
+
+New InstallResultReceiver.kt (BroadcastReceiver):
+- Nhận STATUS_SUCCESS/FAILURE từ PackageInstaller
+- Toast thông báo success/failure với error message cụ thể
+- Handle STATUS_PENDING_USER_ACTION (một số thiết bị Samsung)
+
+AndroidManifest.xml: register InstallResultReceiver
+
+Bump 3.0.122+266 -> 3.0.123+267

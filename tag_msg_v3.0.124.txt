@@ -1,0 +1,6 @@
+v3.0.124: Thêm nút TẮT VPN & CÀI - giải quyết 'App not installed' trên Samsung
+
+OpenVPN foreground service gây "App not installed" khi update.
+Fix: thêm nút disconnect VPN trước khi cài.
+
+Bump 3.0.123+267 -> 3.0.124+268

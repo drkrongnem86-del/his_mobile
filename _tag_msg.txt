@@ -1,0 +1,1 @@
+v3.0.144: Đổi 5 form (Kham, BanGiao, PhauThuat, TuChoi, RaVien) sang Windows standard fonts (times.ttf/timesbd.ttf) thay vì TNKeyUni. Font name chuẩn Times New Roman → EMR server PDF viewer nhận diện và hiển thị Vietnamese đúng. Fix key.properties path: app/his-mobile-release.jks.

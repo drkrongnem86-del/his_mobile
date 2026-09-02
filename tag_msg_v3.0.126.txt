@@ -1,0 +1,7 @@
+v3.0.126: Thêm codemagic.yaml config cho iOS IPA build
+
+codemagic.yaml define ios-release workflow với:
+flutter build ipa --release --no-codesign
+→ artifact: build/ios/ipa/*.ipa
+
+Bump 3.0.125+269 -> 3.0.126+270

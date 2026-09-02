@@ -1,0 +1,8 @@
+v3.0.122: Thêm nút TẢI VỀ trong dialog update - lưu APK vào Download/HisMobile/
+
+User có 3 lựa chọn:
+- HỦY
+- TẢI VỀ: tải vào Download/HisMobile/, cài thủ công từ File Manager
+- ĐỒNG Ý: auto install (giống cũ)
+
+Bump 3.0.121+265 -> 3.0.122+266

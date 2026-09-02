@@ -1,0 +1,13 @@
+﻿v3.0.127: Đổi workflow sang LOCAL-FIRST - fix GitHub build lỗi signing
+
+Root cause: GitHub build dùng Android Debug keystore (vì thiếu ANDROID_KEYSTORE_* secrets) 
+→ APK sai signing SHA (87b77725...) khác với local build (dc3abb...)
+→ User cài đè lên bản cũ local bị 'INSTALL_FAILED_UPDATE_INCOMPATIBLE'
+
+Fix:
+- Đổi build.yml: bỏ build-apk, build-aab, build-ipa jobs (CI không build nữa)
+- Chỉ giữ create-release (rỗng, user upload local APK qua web UI) + update-version-json
+- Workflow: tag push → create release → update version.json
+- User workflow: build local → commit → push tag → upload APK manual 5 clicks
+
+Bump version: 3.0.126+270 → 3.0.127+271

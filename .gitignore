@@ -1,0 +1,128 @@
+# ==========================================
+# HIS Mobile - Git Ignore
+# ==========================================
+
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+.flutter-version
+.metadata
+*.lock
+!pubspec.lock
+*.iml
+*.ipr
+*.iws
+.idea/
+*.swp
+*.swo
+.vscode/
+
+# Android
+android/.gradle
+android/captures/
+android/local.properties
+android/key.properties
+android/**/GeneratedPluginRegistrant.java
+android/app/release/
+android/app/debug/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+
+# iOS
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.framework
+ios/Flutter/Flutter.podspec
+ios/Flutter/flutter_export_environment.sh
+ios/ServiceDefinitions.json
+ios/Runner/GeneratedPluginRegistrant.*
+ios/Runner.xcworkspace/xcuserdata/
+ios/Runner.xcodeproj/xcuserdata/
+ios/Runner.xcodeproj/project.xcworkspace/xcuserdata/
+*.ipa
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+ehthumbs.db
+ehthumbs_vista.db
+$RECYCLE.BIN/
+
+# Logs
+*.log
+logs/
+
+# Test
+coverage/
+test/.test_coverage.dart
+test/.test_coverage.golden
+
+# Local config
+.env
+*.local
+flutter_launcher_icons-*.yaml
+
+# ==========================================
+# HIS Mobile specific
+# ==========================================
+
+# Build scripts (chỉ giữ script của version hiện tại, các version cũ để local)
+# Khi push lên GitHub, ignore luôn để repo gọn
+# Nếu muốn track, đổi comment:
+# !_build_v362.py
+# !_backup_v362.bat
+# !restore_v362.bat
+_build_v3*.py
+!_build_v362.py
+_backup_v3*.bat
+!_backup_v362.bat
+restore_v3*.bat
+!restore_v362.bat
+
+# Python scripts (test, scan, etc.)
+_test_*.py
+_check_*.py
+_scan_*.py
+_dump_*.py
+_find_*.py
+_fix_*.py
+_add_*.py
+_update_*.py
+_build_v3*.py.bak
+
+# Local app data
+.dart_tool/
+.flutter-plugins
+android/.gradle/
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.podspec
+ios/Flutter/Flutter.framework
+ios/Flutter/flutter_export_environment.sh
+
+# Build artifacts (moved aside during cleanup)
+.dart_tool_old/
+android/.gradle_old/
+build_old/
+
+# Build logs (transient - keep only current in repo)
+build_log_v*.txt
+
+# Backup/OLD files (renamed with _ prefix to skip Dart import)
+lib/presentation/screens/_*.dart
+lib/presentation/screens/_*.bak
+lib/**/_*.dart
+lib/**/_*.bak
+# v3.0.118: Android release keystore (KHONG commit - bao mat)
+android/app/*.jks
+android/app/*.keystore
+

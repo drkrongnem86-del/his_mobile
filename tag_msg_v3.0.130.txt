@@ -1,0 +1,14 @@
+﻿v3.0.130: Auto-close app khi nhấn Cập nhật - kill Flutter process 1.5s sau khi start install
+
+User feedback: 'Khi nhấn Cập nhật, tự đóng app đang mở để update không bị lỗi'
+
+Fix:
+- MainActivity.kt installApk: schedule kill Flutter process 1.5s sau khi session.commit()
+- 1.5s delay để result.success(true) về Flutter + system install dialog start
+- Sau đó kill → install chạy với clean state (no Flutter engine keep-alive)
+
+LƯU Ý: KHÔNG fix lỗi INSTALL_FAILED_UPDATE_INCOMPATIBLE (signing mismatch).
+GitHub build sẽ ra debug-signed APK → cài đè lên release-signed KHÔNG được.
+Dùng LOCAL APK (sign dc3abb) để cài đè OK.
+
+Bump: 3.0.129+273 → 3.0.130+274

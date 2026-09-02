@@ -1,0 +1,23 @@
+v3.0.124: Thêm nút TẮT VPN & CÀI - giải quyết 'App not installed' trên Samsung
+
+Root cause: HIS MOBILE chạy OpenVPN foreground service
+(de.blinkt.openvpn.core.OpenVPNService) khi user bật VPN BV.
+Khi trigger install, hệ thống Samsung check `isAppInUse()` thấy
+service còn chạy → từ chối cài đè dù signature + versionCode OK.
+
+Fix:
+- MainActivity.kt: MethodChannel 'disconnectVpn' thử 3 cách (best effort)
+  1. openvpn_flutter method channel 'disconnect' (Flutter side stops)
+  2. am.killBackgroundProcesses(packageName) - kill background procs
+  3. sendBroadcast(de.blinkt.openvpn.DISCONNECT) - fallback
+  → wait 2s cho service thực sự stop
+- update_service.dart: Thêm nút 'TẮT VPN & CÀI' (màu đỏ, icon power)
+  - Tap → call disconnectVpn MethodChannel → wait → PackageInstaller
+  - Đặt trước nút ĐỒNG Ý (vì Samsung cần tắt VPN trước)
+- AndroidManifest.xml: thêm android:installLocation='auto'
+
+Flow người dùng:
+1. Bấm 'TẮT VPN & CÀI' → OpenVPN service stop → install dialog hiện
+2. Tap Cài đặt → install mượt (vì app process không còn in use)
+
+Bump 3.0.123+267 -> 3.0.124+268
