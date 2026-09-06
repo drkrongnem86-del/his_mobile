@@ -1,9 +1,9 @@
-﻿{
-    "build":  325,
-    "version":  "3.0.183",
+{
+    "build":  326,
+    "version":  "3.0.184",
     "size_mb":  27.07,
-    "build_date":  "2026-09-02 14:03:41",
-    "sha256":  "D5F8915ACD6FE3697C791E144059A01AFDA8277BC63F224CBF1FD05C1F94F2E4",
-    "apk_url":  "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.183/his_mobile_v3_0_183_arm64.apk",
-    "message":  "v3.0.183 - Bump version tu baseline v3.0.177 (D:/his_mobile_Final). Chuyen sang lam viec voi codebase nay. Build thanh cong 27.1MB, sign voi release keystore (SHA dc3abb...)."
+    "build_date":  "2026-09-06 08:16:53",
+    "sha256":  "76AADF3C57031FB09879742C8B1DDE5FF331044C1B7BA631AE4453B438BFB841",
+    "apk_url":  "https://github.com/drkrongnem86-del/his_mobile/releases/download/v3.0.184/his_mobile_v3_0_184_arm64.apk",
+    "message":  "v3.0.184 - Bump version (no code changes). Test pipeline D:/his_mobile_Final sau khi switch canonical workspace."
 }
